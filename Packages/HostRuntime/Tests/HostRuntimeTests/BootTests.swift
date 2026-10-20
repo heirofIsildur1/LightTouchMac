@@ -111,6 +111,27 @@ struct BootTests {
         #expect(boot.environment == [:])
         #expect(boot.webProxy == nil)
     }
+
+    /// The S5L8920/8930 boards' access point announces the Mac's region as its 802.11d country (issue 102: 5.x and
+    /// 6.x Setup guesses the country, and so its Welcome page, from it); the iPods' machines have no such option.
+    @Test func theAccessPointsCountryIsTheMacsRegion() throws {
+        let region = try #require(Locale.current.region?.identifier)
+        for board in [Board.k48, .n88, .n72] {
+            let f = try Fixture(board: board, strategy: board == .n72 ? "bootrom" : "kboot")
+            defer { try? FileManager.default.removeItem(at: f.root) }
+            let config = try f.prepare(board).configuration(
+                bootArgs: "",
+                usbAddress: nil,
+                wifi: true,
+                guestPackage: nil,
+                serial: "null",
+                audio: [],
+                netdev: "user,id=wifi0"
+            )
+            let machine = try #require(config.argv.firstIndex(of: "-M").map { config.argv[$0 + 1] })
+            #expect(machine.contains(",wifi-country=\(region)") == (board != .n72 && region.count == 2), "\(machine)")
+        }
+    }
 }
 
 private final class Fixture {
@@ -231,7 +252,9 @@ extension BootTests {
                     usbAddress: "127.0.0.1:1234",
                     wifi: true,
                     guestPackage: "offer",
-                    machineOptions: ["aes-uid": "engine", "wifi-mac": "02:11:22:33:44:66"]
+                    machineOptions: ["aes-uid": "engine", "wifi-mac": "02:11:22:33:44:66"].merging(
+                        Locale.current.region.map { ["wifi-country": $0.identifier] } ?? [:]
+                    ) { a, _ in a }
                 ),
                 hardware: board.hardware!,
                 serial: "null",

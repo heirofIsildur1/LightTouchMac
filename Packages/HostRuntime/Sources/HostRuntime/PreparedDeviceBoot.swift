@@ -127,6 +127,18 @@ public struct PreparedDeviceBoot {
         return first.upperBound
     }
 
+    /// The country the emulated access point announces (qemu-ios wifi-country, its 802.11d element): the Mac's
+    /// region, where the Mac and the network it shares are. Setup Assistant on 5.x and 6.x guesses the country from
+    /// the access points a Wi-Fi scan finds when the SIM gives none, and offers that country's languages over its
+    /// Welcome animation; with no country it lists every language and no Welcome. Nil (the emulator's US) for a
+    /// region that is not a country ("001").
+    static func wifiCountry(_ locale: Locale = .current) -> String? {
+        guard let region = locale.region?.identifier, region.count == 2, region.allSatisfy(\.isLetter) else {
+            return nil
+        }
+        return region
+    }
+
     /// Explicit adapter for pre-library N72 regression fixtures with separate images.
     /// Prepared device records always use prepare; no firmware policy is inferred here.
     public static func legacyN72(
@@ -377,7 +389,7 @@ public struct PreparedDeviceBoot {
                 usbAddress: usbAddress,
                 wifi: wifi,
                 guestPackage: guestPackage,
-                machineOptions: machine
+                machineOptions: machine.merging(Self.wifiCountry().map { ["wifi-country": $0] } ?? [:]) { a, _ in a }
             )
             ipad.cellular = cellular
             config = BootRecipe.iPad(

@@ -11,6 +11,9 @@ public enum SetupPages {
         if b1 > 0.85, b2 > 0.85, gap < 0.2, frame < 0.1 { return "apple id" }
         if b1 > 0.85, b2 > 0.85, gap > 0.9, left < 0.1, frame > 0.9, mid < 0.1 { return "set up" }
         if b1 > 0.85, gap > 0.7, left > 0.8, frame > 0.9, mid > 0.8 { return "list" }
+        // a guessed country's language page (its few languages under the Welcome words) and country page (it and
+        // Show More over the moving world map): a short list on the right, the rest dark or animated
+        if b1 < 0.85, b2 > 0.7, gap > 0.85, left < 0.2 { return "list" }
         if b1 > 0.85, b2 < 0.1, gap > 0.85 { return "location" }
         if b1 < 0.1, b2 < 0.1, left > 0.9, frame > 0.15, frame < 0.45 { return "diagnostics" }
         if b1 < 0.1, b2 < 0.1, left < 0.2, frame < 0.1, mid < 0.1, list > 0.9 { return "diagnostics" }  // 5.0 beta 1
@@ -72,6 +75,16 @@ public enum SetupPlan {
     public static let country = "United States"
     public static let alertYes = ["OK", "Skip", "Agree", "Continue", "Don't Use", "Don't Add"]
     public static let nextArrow = (x: 587.0 / 640, y: 84.0 / 960)
+    /// Rows the language page shows together only when it lists every language: 5.x and 6.x Setup does that when it
+    /// guessed no country (no SIM country, no 802.11d country from a Wi-Fi scan), and then has no Welcome animation
+    /// above the list; a guessed country's page offers at most four of its languages and More.
+    public static let everyLanguage = ["English", "Deutsch", "Nederlands", "Italiano"]
+
+    /// Whether a language page (`read`, the labels on it) lists every language rather than a country's few.
+    public static func listsEveryLanguage(_ read: [String: (x: Double, y: Double)]) -> Bool {
+        let found = normalized(read)
+        return everyLanguage.allSatisfy { found[$0] != nil }
+    }
 
     public enum Step: Equatable, Sendable {
         case tap(Double, Double, String?)

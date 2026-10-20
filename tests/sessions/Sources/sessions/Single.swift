@@ -422,6 +422,15 @@ func single(_ args: SingleCheck) -> Never {
         )
         r.check(seed.string("location") == "0", "\(d): Location Services off: \(seed.string("location") ?? "?")")
     }
+    // 5.x and 6.x Setup's first page: the languages of the country the Wi-Fi scan found (the emulated access point's
+    // 802.11d country) under the Welcome animation, not every language without it (issue 102).
+    if (5...6).contains(base.major), let page = events.find("setupLanguages", ["device": d]).first {
+        r.check(
+            !page.bool("every"),
+            "\(d): Setup's language page offers a country's languages over Welcome, not every language "
+                + "(\(page.string("shot") ?? "no shot"))"
+        )
+    }
     if args.developerImage {
         let mount = events.one("developerImage", ["device": d])
         r.check(

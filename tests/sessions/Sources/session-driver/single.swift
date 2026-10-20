@@ -1829,7 +1829,17 @@ nonisolated enum CydiaSources {
                 pages.append("(sheet probe)")
             }
             guard let shot = await d.wakeForShot("setup\(generation)-\(n)") else { continue }
-            for step in SetupPlan.plan(labels(shot), pages: pages) {
+            let read = labels(shot)
+            if !pages.contains("English"), read["English"] != nil {
+                emit(
+                    "setupLanguages",
+                    [
+                        "device": d.name, "generation": generation, "shot": shot,
+                        "every": SetupPlan.listsEveryLanguage(read),
+                    ]
+                )
+            }
+            for step in SetupPlan.plan(read, pages: pages) {
                 switch step {
                 case .tap(let x, let y, let log):
                     await d.tap(x, y)

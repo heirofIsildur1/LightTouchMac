@@ -56,8 +56,11 @@ struct SetupWalkTests {
         #expect(r && taps == 2)
     }
 
-    /// Fingerprints measured off real Setup screenshots (9A5220p, 9A334, 9A405, 9B176, 9B206).
+    /// Fingerprints measured off real Setup screenshots (9A5220p, 9A334, 9A405, 9B176, 9B206; the first three are
+    /// 9B206's language page with a guessed country, under the Welcome words, and its country page over the map).
     static let measured: [(String?, [Double])] = [
+        ("list", [0.55, 0.97, 1.0, 0.04, 0.0, 0.06, 0.0]), ("list", [0.55, 0.97, 1.0, 0.01, 0.04, 0.03, 0.01]),
+        ("list", [0.0, 0.87, 1.0, 0.0, 0.43, 0.0, 0.0]),
         ("list", [0.97, 0.92, 0.83, 0.92, 1.0, 0.95, 0.8]), ("list", [0.98, 0.92, 0.83, 0.92, 1.0, 0.96, 0.79]),
         ("location", [0.97, 0.0, 0.95, 0.05, 0.0, 0.34, 0.0]), ("wi-fi", [0.0, 0.0, 0.0, 0.28, 0.0, 0.0, 0.75]),
         ("set up", [0.93, 0.92, 0.99, 0.0, 1.0, 0.0, 0.0]), ("set up", [0.94, 0.92, 0.99, 0.0, 1.0, 0.0, 0.0]),
@@ -137,6 +140,22 @@ struct SetupWalkTests {
     @Test func anAlertsOKAndTheWelcomeSlide() {
         #expect(taps(SetupPlan.plan(["OK": (0.5, 0.6), "Location Services": (0.5, 0.4)], pages: [])) == ["(OK)"])
         #expect(SetupPlan.plan(["slide to set up": (0.5, 0.9)], pages: []) == [.slideIfLockScreen])
+    }
+
+    /// 5.x and 6.x's language page with a guessed country (issue 102) offers its languages under the Welcome words;
+    /// with none it lists every language.
+    @Test func aCountrysLanguagePageIsNotEveryLanguage() {
+        let country: [String: (x: Double, y: Double)] = [
+            "Vítejte": (0.4, 0.22), "Bienven": (0.8, 0.38), "Bem-vindo": (0.4, 0.45), "Välkommen": (0.6, 0.53),
+            "English": (0.14, 0.73), "Español": (0.14, 0.82),
+        ]
+        let every: [String: (x: Double, y: Double)] = [
+            "English": (0.14, 0.2), "Français": (0.16, 0.29), "Deutsch": (0.16, 0.38), "日本語": (0.13, 0.48),
+            "Nederlands": (0.2, 0.57), "Italiano": (0.16, 0.66), "Español": (0.16, 0.75),
+        ]
+        #expect(!SetupPlan.listsEveryLanguage(country))
+        #expect(SetupPlan.listsEveryLanguage(every))
+        #expect(taps(SetupPlan.plan(country, pages: [])).first == "English")
     }
 
     /// The pages four walks stopped on with "Setup still up after 80 pages" (10-18), as Vision reads them: each has a
