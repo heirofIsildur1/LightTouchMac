@@ -20,6 +20,15 @@ public enum TextReader {
         public let text: String
         public let x: Double
         public let y: Double
+        /// The line's words (split at spaces), each centered where Vision places it: a status bar can read as one
+        /// line, carrier and clock together ("Light Touch 2:38 PM").
+        public var words: [Line]? = nil
+    }
+
+    /// The status bar's clock (h:mm) among `lines`: the word, where Vision places one, else the line.
+    public static func clock(in lines: [Line]) -> Line? {
+        lines.lazy.compactMap { $0.words?.first { $0.text.contains(#/^\d{1,2}:\d{2}/#) } }.first
+            ?? lines.first { $0.text.contains(#/\d{1,2}:\d{2}/#) }
     }
 
     /// Each line read on the image; empty if every read fails.
@@ -66,7 +75,14 @@ public enum TextReader {
             exit(1)
         }
         let lines = (request.results ?? []).compactMap { o in
-            o.topCandidates(1).first.map { Line(text: $0.string, x: o.boundingBox.midX, y: 1 - o.boundingBox.midY) }
+            o.topCandidates(1).first.map { best in
+                var line = Line(text: best.string, x: o.boundingBox.midX, y: 1 - o.boundingBox.midY)
+                line.words = best.string.split(separator: " ").compactMap { word in
+                    (try? best.boundingBox(for: word.startIndex..<word.endIndex))
+                        .map { Line(text: String(word), x: $0.boundingBox.midX, y: 1 - $0.boundingBox.midY) }
+                }
+                return line
+            }
         }
         FileHandle.standardOutput.write((try? JSONEncoder().encode(lines)) ?? Data("[]".utf8))
         exit(0)
@@ -80,15 +96,30 @@ public enum TextReader {
         p.environment = ProcessInfo.processInfo.environment.merging(
             [childKey: "\(url.path)\t\(languageCorrection ? 1 : 0)"]
         ) { $1 }
-        let out = Pipe()
+        // The lines go to a file, not a pipe: a read that never ends (Vision waiting on the Neural Engine, seen for 17
+        // minutes under load) is killed after `childSeconds` and counts as a failed attempt.
+        let outURL = FileManager.default.temporaryDirectory.appendingPathComponent("text-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: outURL) }
+        guard FileManager.default.createFile(atPath: outURL.path, contents: nil),
+            let out = try? FileHandle(forWritingTo: outURL)
+        else { return nil }
+        defer { try? out.close() }
         p.standardOutput = out
         p.standardInput = FileHandle.nullDevice
+        let done = DispatchSemaphore(value: 0)
+        p.terminationHandler = { _ in done.signal() }
         do { try p.run() } catch { return nil }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        guard p.terminationStatus == 0 else { return nil }
+        if done.wait(timeout: .now() + childSeconds) == .timedOut {
+            kill(p.processIdentifier, SIGKILL)
+            done.wait()
+            FileHandle.standardError.write(Data("TextReader: no answer in \(Int(childSeconds)) s\n".utf8))
+            return nil
+        }
+        guard p.terminationStatus == 0, let data = try? Data(contentsOf: outURL) else { return nil }
         return try? JSONDecoder().decode([Line].self, from: data)
     }
+
+    static let childSeconds = 60.0
 
     /// Names the process `<name>.vision/<inode>-<mtime>` of its executable before Vision first reads, so its cache is
     /// ~/Library/Caches/<name>.vision/<build>/. ponytail: old builds' caches (about 150 KB each) stay until macOS

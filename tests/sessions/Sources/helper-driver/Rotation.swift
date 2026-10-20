@@ -89,7 +89,7 @@ func interfaceDegrees(frame: URL, scan: CGSize) -> Int? {
     let upright = PanelCapture.quarterTurns(guestTurn: Board.guestTurn(scan: scan), deviceDegrees: 0)
     for quarter in 0..<4 {
         guard let turned = PanelCapture.rotated(image, clockwiseQuarterTurns: (upright + quarter) % 4),
-            let clock = TextReader.read(turned).first(where: { $0.text.contains(#/\d{1,2}:\d{2}/#) })
+            let clock = TextReader.clock(in: TextReader.read(turned))
         else { continue }
         if clock.y < 0.08 && abs(clock.x - 0.5) < 0.2 { return quarter * 90 }
     }

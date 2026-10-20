@@ -270,7 +270,14 @@ struct RotationCheck: ParsableCommand {
             "Rotate Right and Left with Safari in front: the picture as the window shows it is upright, a tap lands."
     )
     @Argument var base: String
-    @Option(help: "The overlay of a boot that walked Setup (5.x-7.x), cloned.", transform: path) var overlay: URL?
+    @Option(
+        help: """
+            The overlay of a boot that activated the device (2.x) or walked Setup (5.x-7.x), cloned (default: a first \
+            boot by sessions single makes one).
+            """,
+        transform: path
+    )
+    var overlay: URL?
     @OptionGroup var inputs: Inputs
 
     func run() { rotationCheck(self) }

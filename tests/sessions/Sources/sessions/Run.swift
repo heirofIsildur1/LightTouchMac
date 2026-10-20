@@ -188,3 +188,20 @@ func driverEnvironment(_ tools: Tools) -> [String: String] {
 }
 
 func format(_ value: Double?, _ digits: Int = 1) -> String { String(format: "%.\(digits)f", value ?? -1) }
+
+/// This executable again with `arguments` and the run's --app, --dylib, --usbmuxd and --allow-stale, its output
+/// inherited; its exit status.
+func sessions(_ arguments: [String], _ inputs: Inputs) -> Int32 {
+    var arguments = arguments
+    if let app = inputs.app { arguments += ["--app", app.path] }
+    if let dylib = inputs.dylib { arguments += ["--dylib", dylib.path] }
+    if let usbmuxd = inputs.usbmuxd { arguments += ["--usbmuxd", usbmuxd.path] }
+    if inputs.allowStale { arguments.append("--allow-stale") }
+    fflush(stdout)
+    let p = Process()
+    p.executableURL = Bundle.main.executableURL
+    p.arguments = arguments
+    guard (try? p.run()) != nil else { return -1 }
+    p.waitUntilExit()
+    return p.terminationStatus
+}

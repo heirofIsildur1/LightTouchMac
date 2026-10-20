@@ -12,23 +12,21 @@ import SessionKit
 /// opened again comes up landscape and the shell turns back. With Auto-Rotate with Device off, the shell stays where the
 /// device is held. The interface is read off each frame as published (where the status bar's clock stands) and handed
 /// to the app's rotation as its watch does; every frame keeps the panel's scan, whatever way the device is held.
-/// The helper alone boots the base, with no lockdown activation: a stock 2.x base stays at Connect to iTunes. A 5.x-7.x
-/// base sits in Setup on its first boot unless prepared --skip-setup: pass --overlay, the overlay of a boot that walked
-/// Setup, cloned.
+/// The helper alone boots the base, with no lockdown activation: a 2.x base would stay at Connect to iTunes, and a
+/// 5.x-7.x base not prepared --skip-setup in Setup, so those boot from the overlay of a first boot as the app boots
+/// them (activatedOverlay), or --overlay's, cloned.
 func rotationCheck(_ args: RotationCheck) -> Never {
     let base = Base(args.base, args.inputs)
     let work = workDirectory(args.inputs, "rotation")
     let tools = Tools.resolve(args.inputs, work: work)
     let r = Report()
-    if let source = args.overlay {
+    if let source = args.overlay ?? activatedOverlay(base, args.inputs, work: work) {
         let overlay = work.appendingPathComponent("rotation/overlay")
         try? FileManager.default.createDirectory(
             at: overlay.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
         run("/bin/cp", ["-cR", source.path, overlay.path])  // a clone: the source stays as it was
-    } else if base.armv7, base.major >= 5, base.lock["skip_setup"] as? Bool != true {
-        die("a \(base.version) base is in Setup on its first boot: pass --overlay")
     }
     // The lock screen's slider and Safari's address field as the window shows them (the iPad's panel lies on its side).
     let iPad = base.board == "k48ap"
@@ -154,7 +152,7 @@ private func loadImage(_ url: URL) -> CGImage? {
 /// any angle, so the clock's place, not its legibility, says which way up the picture is: upright, it is centered in
 /// the top band.
 private func clock(_ image: CGImage) -> (x: Double, y: Double)? {
-    TextReader.read(image).first { $0.text.contains(/\d{1,2}:\d{2}/) }.map { ($0.x, $0.y) }
+    TextReader.clock(in: TextReader.read(image)).map { ($0.x, $0.y) }
 }
 
 private func upright(_ image: CGImage) -> (ok: Bool, at: String) {
@@ -189,4 +187,19 @@ private func bottomLuminance(_ image: CGImage) -> Double {
         }
     }
     return n == 0 ? 0 : sum / Double(n) / 255
+}
+
+/// The overlay of a first boot as the app boots the base (`sessions single`, no install, its work kept under
+/// `work`), for a base the helper alone can't bring to the Home screen; nil for the rest. iPhone OS 2 out of the box
+/// stays at Connect to iTunes until a host activates it and sets its clock over lockdown, as the app does at every
+/// boot; iOS 5 and later sit in Setup until it is walked, unless prepared --skip-setup.
+func activatedOverlay(_ base: Base, _ inputs: Inputs, work: URL) -> URL? {
+    let setup = base.armv7 && base.major >= 5 && base.lock["skip_setup"] as? Bool != true
+    guard base.major == 2 || setup else { return nil }
+    let boot = work.appendingPathComponent("activation")
+    print("\(base.version): a first boot as the app boots it, for its overlay (sessions single, in \(boot.path))")
+    guard
+        sessions(["single", base.url.path, "--no-install", "--keep-work", "--work", boot.path], inputs) == 0
+    else { die("the first boot failed: see \(boot.path)") }
+    return boot.appendingPathComponent(base.driverBoard).appendingPathComponent("overlay")
 }

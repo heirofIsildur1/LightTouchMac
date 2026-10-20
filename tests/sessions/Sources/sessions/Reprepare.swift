@@ -64,9 +64,6 @@ func reprepare(_ args: ReprepareCheck) -> Never {
     if plan.option("skip_setup") { single.append("--skip-setup") }
     if plan.option("jailbreak") { single.append("--jailbreak") }
     if let language = plan.language { single += ["--language", language] }
-    if let app = args.inputs.app { single += ["--app", app.path] }
-    if let dylib = args.inputs.dylib { single += ["--dylib", dylib.path] }
-    if let usbmuxd = args.inputs.usbmuxd { single += ["--usbmuxd", usbmuxd.path] }
 
     let work = workDirectory(args.inputs, "reprepare")
     let entryFile = work.appendingPathComponent("entry.json")
@@ -107,13 +104,7 @@ func reprepare(_ args: ReprepareCheck) -> Never {
     guard run(tools.firmwarekit.path, create(tools).arguments, log: log, environment: environment) == 0 else {
         die("firmwarekit create failed; see \(log.path) (\(new.path) left for a look)")
     }
-    fflush(stdout)
-    let check = Process()
-    check.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
-    check.arguments = single
-    do { try check.run() } catch { die("can't run sessions single: \(error)") }
-    check.waitUntilExit()
-    guard check.terminationStatus == 0 else {
+    guard sessions(single, args.inputs) == 0 else {
         die("sessions single on \(new.path) failed: \(base.url.path) left as it was")
     }
     let users = output("/usr/sbin/lsof", ["+D", base.url.path]).split(separator: "\n").dropFirst()
