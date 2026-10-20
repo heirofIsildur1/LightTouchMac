@@ -279,8 +279,13 @@ extension MainWindowController: NSToolbarItemValidation {
             }
             return false
         }
-        // Custom views keep their own enabled state; the cases below narrow it.
-        if item.itemIdentifier != .recording { (item.view as? NSControl)?.isEnabled = true }
+        // Custom views keep their own enabled state; the cases below narrow it. Live Text sets its own: enabling it here
+        // first flipped a disabled button on and off at every validation, which AppKit runs after each event.
+        if item.itemIdentifier != .recording, item.itemIdentifier != .liveText, let control = item.view as? NSControl,
+            !control.isEnabled
+        {
+            control.isEnabled = true
+        }
         switch item.itemIdentifier {
         // Install is NOT gated on isInstalling: AppInstaller queues jobs behind
         // one another, so choosing a second .ipa mid-install is supported and

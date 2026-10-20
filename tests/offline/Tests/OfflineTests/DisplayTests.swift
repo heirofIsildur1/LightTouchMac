@@ -237,6 +237,21 @@ extension SharedState {
             }
         }
 
+        /// The display link steps at the guest's refresh (60 Hz, or 120 with the experimental setting), never at the
+        /// display's own top rate, which on a ProMotion Mac is 120 Hz: a link left at that holds the panel at 120 Hz and
+        /// steps twice for every 60 Hz frame while the device is shown, frames or not (issue 107).
+        @Test(arguments: [false, true]) func displayLinkRunsAtTheGuestsRefresh(_ refresh120: Bool) {
+            UserDefaults.standard.set(refresh120, forKey: DisplayRefresh.key)
+            defer { UserDefaults.standard.removeObject(forKey: DisplayRefresh.key) }
+            let display = DisplayView(frame: NSRect(x: 0, y: 0, width: 720, height: 640), profile: .n72)
+            let window = NSWindow(contentRect: display.frame, styleMask: [.titled], backing: .buffered, defer: true)
+            window.contentView = display
+            defer { window.contentView = nil }
+            let range = try? #require(display.displayLink?.preferredFrameRateRange)
+            let hz: Float = refresh120 ? 120 : 60
+            #expect(range?.maximum == hz && range?.preferred == hz, "the link asks for \(String(describing: range))")
+        }
+
         /// What changes with each guest frame stays out of the toolbar (issue 107): in the main window's full-size
         /// content window, with the sidebar shown or collapsed, at Fit and zoomed past the pane, no live layer (the
         /// flat screen, the 3D model's renderer) shows under the toolbar, where the glass would be composited again

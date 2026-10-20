@@ -63,13 +63,19 @@ extension MainWindowController {
     /// and it competed with the toolbar for space. A free-form screen adds its size.
     func updateSubtitle() {
         guard let emulator else {
-            window?.subtitle = selectedEntry.map { library.label(for: $0).subtitle } ?? ""
+            showSubtitle(selectedEntry.map { library.label(for: $0).subtitle } ?? "")
             return
         }
         let status =
             emulator.isRunning && !emulator.shuttingDown && !emulator.isSleeping
             ? (emulator.foregroundAppName ?? emulator.statusLine) : emulator.statusLine
-        window?.subtitle = ([status] + [deviceVC?.screen.freeFormReadout].compactMap { $0 }).joined(separator: " — ")
+        showSubtitle(([status] + [deviceVC?.screen.freeFormReadout].compactMap { $0 }).joined(separator: " — "))
+    }
+
+    /// Only a new subtitle is assigned: each assignment lays the titlebar out again, and with the sidebar collapsed the
+    /// title shares the toolbar's row, so its items move with it (issue 107).
+    private func showSubtitle(_ subtitle: String) {
+        if window?.subtitle != subtitle { window?.subtitle = subtitle }
     }
 
     private func updateStartupStatus() {

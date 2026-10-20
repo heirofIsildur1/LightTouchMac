@@ -182,7 +182,8 @@ final class DisplayView: NSView {
     let shellLayer = CALayer()
     let homeButton = HomeButton()
     let attitudeIndicator = AttitudeIndicatorButton(frame: .zero)
-    private var displayLink: CADisplayLink?
+    /// Steps the frames and the overlays while the view is in a window.
+    private(set) var displayLink: CADisplayLink?
     /// The ring serial on screen, and its surface (captures read it).
     var shownSerial: UInt64 = 0
     var shownSurface: IOSurface?
@@ -359,6 +360,10 @@ final class DisplayView: NSView {
         )
         bezelPreferenceChanged()
         let link = displayLink(target: self, selector: #selector(step))
+        // At the guest's refresh, not the display's: left alone a link runs at the display's highest rate, which
+        // holds a ProMotion panel at 120 Hz and steps twice for each 60 Hz frame (issue 107).
+        let hz = Float(DisplayRefresh.hz)
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: min(30, hz), maximum: hz, preferred: hz)
         link.add(to: .main, forMode: .common)
         displayLink = link
         // Moving between displays can change the backing pixel scale.
