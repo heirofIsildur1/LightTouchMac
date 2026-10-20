@@ -65,6 +65,11 @@ struct PreparationChangesTests {
         let sevenPrefs = Self.stale(try Self.lock("n90ap-11D257", serial: 15))
         #expect(sevenPrefs.count == 1 && sevenPrefs.first?.hasPrefix("e50c6d02") == true, "\(sevenPrefs)")
         #expect(Self.stale(try Self.lock("n90ap-9B206", serial: 15)) == [], "5.x takes it from the package at boot")
+        // fdfd67a4 (serial 17): 4.0 beta 1's seal boot set Auto-Lock Never where its SpringBoard doesn't read it
+        let betaLock = Self.stale(try Self.lock("n88ap-8A230m", serial: 16))
+        #expect(betaLock.count == 1 && betaLock.first?.hasPrefix("fdfd67a4") == true, "\(betaLock)")
+        #expect(Self.stale(try Self.lock("n88ap-8A248c", serial: 16)) == [], "beta 2's SpringBoard takes it")
+        #expect(Self.stale(try Self.lock("n72ap-8A230m", serial: 16)) == [], "the iPod runs it_prefs at first boot")
     }
 
     /// The 4.1 SpringBoard crash's base: prepared 2026-10-05 08:15, before the seal boots carried the modem.

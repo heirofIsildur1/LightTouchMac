@@ -278,5 +278,16 @@ nonisolated public enum PreparationChanges {
                 crashes in libdispatch at every boot
                 """
         ),
+        Change(
+            serial: 17,
+            commit: "fdfd67a4",
+            landed: "2026-10-20T22:35:15Z",
+            boards: ["n88ap", "n18ap"],
+            builds: ["8A230m"],
+            what: """
+                its seal boot set Auto-Lock Never only in ManagedConfiguration, which 4.0 beta 1's SpringBoard \
+                doesn't time the lock by, so the device locks a minute after the last touch
+                """
+        ),
     ]
 }
