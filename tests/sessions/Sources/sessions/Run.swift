@@ -101,7 +101,7 @@ func waitGone(_ pid: Int, _ seconds: Double) -> Double? {
 }
 
 /// The temporary work directory `finish` deletes when the run passes: none with --work or --keep.
-nonisolated(unsafe) private var disposableWork: URL?
+nonisolated(unsafe) var disposableWork: URL?
 
 /// A fresh work directory: `--work`, or a temporary one.
 func workDirectory(_ args: Inputs, _ name: String) -> URL {

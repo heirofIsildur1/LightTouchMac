@@ -373,6 +373,17 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
         return instance
     }
 
+    /// A new device from a prepared base left where it is (`sessions single --managed`): the base copied into
+    /// Preparing/<id> (an APFS clone) and published, so the device is exactly a preparation's and `base` is never
+    /// written.
+    public static func publish(copyOf base: URL, entry: FirmwareCatalog.Entry, state: URL) throws -> DeviceInstance {
+        let id = UUID()
+        let staging = preparing(state).appendingPathComponent(id.uuidString, isDirectory: true)
+        try StorageLocations.privateDirectory(staging.deletingLastPathComponent())
+        try FileManager.default.copyItem(at: base, to: staging)
+        return try publish(staging: staging, entry: entry, id: id, state: state)
+    }
+
     /// udid and die id from identity.json, else the lock's identity; the seed is ours.
     public static func identity(identityJSON: Data?, lock: DeviceLock?, seed: String) -> DeviceInstance.Identity {
         let file = identityJSON.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]

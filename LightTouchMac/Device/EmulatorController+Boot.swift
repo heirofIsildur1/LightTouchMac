@@ -16,15 +16,7 @@ extension EmulatorController {
         do {
             try Bundled.requireStorage()
             guard instance.format <= DeviceInstance.currentFormat else { throw DeviceInstance.NewerFormat() }
-            try DeviceStateStorage.checkBootPaths(
-                base: paths.base,
-                mutable: [
-                    paths.overlay, paths.snapshot, paths.snapshotMeta, paths.snapshotTmp, paths.snapshotBad,
-                    paths.usbmuxConf, paths.work, paths.lease,
-                ] + [paths.writableNOR].compactMap { $0 },
-                state: Bundled.stateDirectory,
-                owner: instance.id
-            )
+            try instance.checkBootPaths()
         } catch {
             logEvent("storage: \(error.localizedDescription)")
             failBoot(error)
@@ -85,23 +77,15 @@ extension EmulatorController {
                     try await FirmwareTool.writePreferences(device: device, changes: $0, executable: executable)
                 }
                 try Task.checkCancellation()
-                let admitted = try await FirmwareTool.admitBoot(
-                    device: self.instance.paths.directory,
-                    managed: true,
+                let admitted = try await FirmwareTool.admitStart(
+                    self.instance,
                     executable: executable,
                     log: self.instance.paths.logs.appendingPathComponent("firmwarekit.log")
                 )
                 // a storage update that couldn't run (no room, or it failed): the device starts as before
-                if let notice = admitted.notice { self.reportDeviceNotice(notice, for: .storageUpdate) }
-                try Task.checkCancellation()
-                let recordBytes = try Data(contentsOf: DeviceRecord.url(self.instance.paths.directory))
-                let refreshed = try DeviceInstance.decoder.decode(DeviceInstance.self, from: recordBytes)
-                guard refreshed.format <= DeviceInstance.currentFormat else { throw DeviceInstance.NewerFormat() }
-                guard refreshed.id == self.instance.id, refreshed.board == self.instance.board else {
-                    throw DeviceToolsError.failed("The device identity changed while preparing to start.")
-                }
-                self.instance = refreshed
-                self.admittedStorage = try StorageBootProof.capture(recordBytes: recordBytes)
+                if let notice = admitted.report.notice { self.reportDeviceNotice(notice, for: .storageUpdate) }
+                self.instance = admitted.instance
+                self.admittedStorage = admitted.proof
                 self.onStorageGenerationChanged?()
             }
         ) { [weak self] result in
@@ -155,15 +139,9 @@ extension EmulatorController {
                 throw DeviceToolsError.failed("The emulator library has no machine for this \(profile.shortName).")
             }
             machine = hardware
-            prepared = try PreparedDeviceBoot.prepare(
+            prepared = try instance.preparedBoot(
                 board: profile,
-                base: instance.paths.base,
-                overlay: overlayURL,
-                writableNOR: instance.paths.writableNOR,
-                storageKey: instance.storage.key,
                 bootrom: BootRecipe.bootrom(profile.bootrom, filesRoot: Bundled.filesRoot),
-                dieID: instance.identity?.dieID,
-                panel: instance.panel,
                 clock: tweaks.bootClock
             )
         } catch PreparedDeviceBoot.Failure.baseMismatch {

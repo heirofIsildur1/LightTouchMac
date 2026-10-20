@@ -172,17 +172,12 @@ extension String {
         self.base = base
     }
     var dir: URL { work.appendingPathComponent(name) }
-    /// When `dir` is an app state's device (a link to Devices/<uuid> with its device.plist): its storage key, and the
-    /// boot is admitted and pinned as the app's (EmulatorController: managed admission, instance.storage.key).
-    var managedKey: String? {
-        let device = dir.resolvingSymlinksInPath()
-        guard device.deletingLastPathComponent().lastPathComponent == "Devices",
-            UUID(uuidString: device.lastPathComponent) != nil,
-            let data = try? Data(contentsOf: DeviceRecord.url(device)),
-            let record = try? DeviceRecord.object(data)
-        else { return nil }
-        return (record["storage"] as? [String: Any])?["key"] as? String
-    }
+    /// An app device (`sessions single --managed`: State/Devices/<uuid> under the run's state, LTM_STATE_DIR): each
+    /// boot is admitted, built and offered from its record as a Start is (EmulatorController: FirmwareTool.admitStart,
+    /// DeviceInstance.preparedBoot, the record's `guest`). nil: the base booted directly on `dir`'s overlay.
+    var instance: DeviceInstance?
+    /// The managed admission's storage proof, which the helper checks before it boots.
+    private var proof: StorageBootProof?
 
     /// The same runtime boot preparation as the GUI, with explicit test paths and no audio.
     func boot(generation: Int, guestPackage: String? = nil) throws {
@@ -201,32 +196,28 @@ extension String {
         )
         // Preparation runs after hello, when the helper owns the storage lease.
         func configuration(_ hardware: DeviceInfo?) throws -> BootConfig {
-            // A managed device boots its record's overlay and NOR, as the app does: a stopped edit (1.x Tweaks, the
-            // SystemConfiguration step) publishes a generation whose storage lives under generations/<id>.
-            let device = dir.resolvingSymlinksInPath()
-            let recorded =
-                managedKey == nil
-                ? nil
-                : (try? Data(contentsOf: DeviceRecord.url(device))).flatMap {
-                    try? StorageRecordPaths(
-                        bytes: $0,
-                        relativeRoot: device.deletingLastPathComponent().deletingLastPathComponent()
-                    )
-                }
-            let overlay = recorded?.overlay ?? dir.appendingPathComponent("overlay")
             var offer = guestPackage
-            let nor =
-                !profile.isKBoot || FileManager.default.fileExists(atPath: base.appendingPathComponent("nor.bin").path)
-                ? recorded?.writableNOR ?? dir.appendingPathComponent("nor.bin") : nil
-            let prepared = try PreparedDeviceBoot.prepare(
-                board: profile,
-                base: base,
-                overlay: overlay,
-                writableNOR: nor,
-                storageKey: managedKey,
-                bootrom: BootRecipe.bootrom(profile.bootrom, filesRoot: Self.files),
-                panel: panel
-            )
+            let bootrom = BootRecipe.bootrom(profile.bootrom, filesRoot: Self.files)
+            let prepared: PreparedDeviceBoot
+            if var instance {
+                // the admitted record (a stopped edit publishes a generation whose storage is under generations/<id>)
+                if let panel { instance.panel = panel }
+                prepared = try instance.preparedBoot(board: profile, bootrom: bootrom)
+            } else {
+                let nor =
+                    !profile.isKBoot
+                        || FileManager.default.fileExists(atPath: base.appendingPathComponent("nor.bin").path)
+                    ? dir.appendingPathComponent("nor.bin") : nil
+                prepared = try PreparedDeviceBoot.prepare(
+                    board: profile,
+                    base: base,
+                    overlay: dir.appendingPathComponent("overlay"),
+                    writableNOR: nor,
+                    storageKey: nil,
+                    bootrom: bootrom,
+                    panel: panel
+                )
+            }
             if profile.isKBoot { offer = try iPadOffer(base: base) }
             let netdev =
                 profile.isKBoot
@@ -238,7 +229,7 @@ extension String {
                     restricted: restricted,
                     localNetwork: localNetwork
                 )
-            return try prepared.configuration(
+            var boot = try prepared.configuration(
                 hardware: hardware,
                 bootArgs: "amfi_allow_any_signature=1 cs_enforcement_disable=1",
                 usbAddress: mux.guestAddress,
@@ -249,12 +240,15 @@ extension String {
                 netdev: netdev,
                 webProxy: webProxy
             )
+            boot.storageProof = proof
+            return boot
         }
+        try instance?.checkBootPaths()
         processLog = try ProcessLogCapture(url: dir.appendingPathComponent("native.log"))
         let process = makeProcess(
             profile: profile,
             log: processLog!,
-            lease: dir.appendingPathComponent("work/lease"),
+            lease: instance?.paths.lease ?? dir.appendingPathComponent("work/lease"),
             helper: URL(fileURLWithPath: Self.helper),
             requirement: Self.requirement
         )
@@ -297,13 +291,25 @@ extension String {
                 guard FileManager.default.isExecutableFile(atPath: worker.path) else {
                     throw DeviceError.preflight("firmwarekit boot admission worker missing: \(worker.path)")
                 }
-                let changed = try await FirmwareTool.admitBoot(
-                    device: self.dir.resolvingSymlinksInPath(),
-                    managed: self.managedKey != nil,
-                    executable: worker
-                )
+                let report: FirmwareWire.BootAdmission
+                if let instance = self.instance {
+                    let admitted = try await FirmwareTool.admitStart(
+                        instance,
+                        executable: worker,
+                        log: self.dir.appendingPathComponent("firmwarekit.log")
+                    )
+                    (self.instance, report, self.proof) = admitted
+                } else {
+                    report = try await FirmwareTool.admitBoot(device: self.dir, managed: false, executable: worker)
+                }
                 self.admitted = Date()
-                emit("bootAdmission", ["device": self.name, "changed": changed.changed, "generation": generation])
+                emit(
+                    "bootAdmission",
+                    [
+                        "device": self.name, "changed": report.changed, "generation": generation,
+                        "notice": report.notice ?? "",
+                    ]
+                )
             }
         ) { result in
             switch result {
@@ -354,14 +360,23 @@ extension String {
         return offer == nil ? nil : dir.path
     }
 
-    /// The driver's device.plist `guest`: kept beside the overlay, so a device's later driver runs offer its verdicts.
+    /// The device.plist `guest`: a managed device's own record's, read fresh and written back as GuestPackageWatch
+    /// does; else kept beside the overlay, so a device's later driver runs offer its verdicts.
     var guestRecord: DeviceInstance.Guest {
         get {
-            (try? Data(contentsOf: dir.appendingPathComponent("guest-record.json"))).flatMap {
+            if let instance { return (try? DeviceInstance.read(instance.paths.directory))?.guest ?? .init() }
+            return (try? Data(contentsOf: dir.appendingPathComponent("guest-record.json"))).flatMap {
                 try? JSONDecoder().decode(DeviceInstance.Guest.self, from: $0)
             } ?? .init()
         }
-        set { try? JSONEncoder().encode(newValue).write(to: dir.appendingPathComponent("guest-record.json")) }
+        set {
+            if let instance, var record = try? DeviceInstance.read(instance.paths.directory) {
+                record.guest = newValue
+                try? record.write(state: Bundled.stateDirectory)
+                return
+            }
+            try? JSONEncoder().encode(newValue).write(to: dir.appendingPathComponent("guest-record.json"))
+        }
     }
 
     static var helper: String { config.helper }

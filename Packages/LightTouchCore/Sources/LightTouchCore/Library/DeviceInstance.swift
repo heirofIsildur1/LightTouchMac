@@ -191,6 +191,38 @@ public nonisolated struct DeviceInstance: Codable, Equatable, Identifiable, Send
         )
     }
 
+    /// A Start's first check (EmulatorController.start; sessions single --managed): the base and every path a boot
+    /// writes are this device's own.
+    public func checkBootPaths() throws {
+        let paths = paths
+        try DeviceStateStorage.checkBootPaths(
+            base: paths.base,
+            mutable: [
+                paths.overlay, paths.snapshot, paths.snapshotMeta, paths.snapshotTmp, paths.snapshotBad,
+                paths.usbmuxConf, paths.work, paths.lease,
+            ] + [paths.writableNOR].compactMap { $0 },
+            state: Bundled.stateDirectory,
+            owner: id
+        )
+    }
+
+    /// The boot a Start builds for this device (EmulatorController; sessions single --managed): its record's base,
+    /// overlay, NOR, storage key, die ID and panel, through PreparedDeviceBoot's repairs (the overlay's pin to its
+    /// base, the live NAND's clone, the S5L8920 kboot's audio clock).
+    public func preparedBoot(board: Board, bootrom: String, clock: Date? = nil) throws -> PreparedDeviceBoot {
+        try PreparedDeviceBoot.prepare(
+            board: board,
+            base: paths.base,
+            overlay: paths.overlay,
+            writableNOR: paths.writableNOR,
+            storageKey: storage.key,
+            bootrom: bootrom,
+            dieID: identity?.dieID,
+            panel: panel,
+            clock: clock
+        )
+    }
+
     /// The preparer records what activated the volume in device.lock.json
     /// `inputs.activation`; a base made without that step has null or nothing
     /// there (a device.py base: `activation_hook: null`). False for an

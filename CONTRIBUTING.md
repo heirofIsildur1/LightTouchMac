@@ -114,6 +114,10 @@ Three commands, no runner around them:
 xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit
 # emulator sessions on prepared bases (firmwarekit create output), one boot at a time; `sessions --help` for the rest
 swift run --package-path tests/sessions sessions single BASE [--launch] [--reboot]
+# as a device the user already has, through the app's boot admission; an old device must take its admission steps
+# (the old devices in ~/Developer/qemu-ios-files/old-devices: tests/sessions/Sources/sessions/Managed.swift)
+swift run --package-path tests/sessions sessions single BASE --managed
+swift run --package-path tests/sessions sessions single OLD_DEVICE --expect-admission STEP
 swift run --package-path tests/sessions sessions phone N90_BASE --only carrier --overlay PAST_SETUP_OVERLAY
 swift run --package-path tests/sessions sessions local-network N72_BASE
 # a built app (Releases, step 3)

@@ -136,10 +136,27 @@ struct SingleCheck: ParsableCommand {
     @Option(transform: path) var itpack: URL?
     @Option(help: "Where the guest's WAV goes (default: the work directory's guest.wav).", transform: path)
     var audioWAV: URL?
+    @Flag(
+        help: """
+            Boot it as a device the user already has: published under the run's state as the app publishes one (the \
+            base an APFS clone), every boot through the app's boot admission and its record's boot.
+            """
+    )
+    var managed = false
+    @Option(
+        help: """
+            Implies --managed and --allow-stale: an old device's admission step, which the base must need and \
+            the device must have taken by the end of the run (repeatable; Managed.swift lists the old devices): \
+            \(ManagedDevice.Step.allCases.map(\.rawValue).joined(separator: ", ")).
+            """
+    )
+    var expectAdmission: [ManagedDevice.Step] = []
     @OptionGroup var inputs: Inputs
 
     func run() { single(self) }
 }
+
+extension ManagedDevice.Step: ExpressibleByArgument {}
 
 struct BasesCheck: ParsableCommand {
     static let configuration = CommandConfiguration(

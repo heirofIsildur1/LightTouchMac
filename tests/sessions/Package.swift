@@ -31,6 +31,7 @@ let package = Package(
             name: "sessions",
             dependencies: [
                 "SessionKit", parser, .product(name: "ReleaseChecks", package: "ReleaseChecks"),
+                .product(name: "HostRuntime", package: "HostRuntime"),
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
                 .product(name: "FirmwareSchema", package: "FirmwareKit"),
             ]

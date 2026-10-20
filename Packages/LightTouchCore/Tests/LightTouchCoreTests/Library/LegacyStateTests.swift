@@ -80,11 +80,7 @@ import Testing
 
     /// A preparation's last step: its output copied into Preparing/<id>/, published.
     func publishPrepared(_ base: URL, state: URL) throws -> DeviceInstance {
-        let id = UUID()
-        let staging = PreparationJob.preparing(state).appendingPathComponent(id.uuidString, isDirectory: true)
-        try StorageLocations.privateDirectory(staging.deletingLastPathComponent())
-        try fm.copyItem(at: base, to: staging)
-        return try PreparationJob.publish(staging: staging, entry: entry, id: id, state: state)
+        try PreparationJob.publish(copyOf: base, entry: entry, state: state)
     }
     func mode(_ url: URL) throws -> Int {
         try (fm.attributesOfItem(atPath: url.path)[.posixPermissions] as! NSNumber).intValue
@@ -113,6 +109,41 @@ import Testing
                 #expect(!fm.fileExists(atPath: DeviceInstance.directory(id, state: state).path), "no record published")
                 try fm.removeItem(at: staging)
             }
+        }
+    }
+
+    /// `sessions single --managed`'s device: a copy published as a preparation is, its record one boot admission's
+    /// managed policy owns, the base left as it was; format 1 over a page store, 2 over an image store.
+    @Test func aCopyOfABasePublishesAsADeviceAndLeavesTheBase() async throws {
+        try await LibraryFixtures.withScratch { root in
+            let state = root.appendingPathComponent("state")
+            let base = try base(root)
+            let tree = { (url: URL) in
+                (fm.subpaths(atPath: url.path) ?? []).sorted().map {
+                    "\($0) \(fm.contents(atPath: url.appendingPathComponent($0).path)?.count ?? -1)"
+                }
+            }
+            let before = tree(base)
+            for imageStore in [false, true] {
+                if imageStore {
+                    try JSONSerialization.data(withJSONObject: ["storage_format": "nand-xor-blank-v2"])
+                        .write(to: base.appendingPathComponent("nand/geometry.json"))
+                }
+                let instance = try PreparationJob.publish(copyOf: base, entry: entry, state: state)
+                let device = DeviceInstance.directory(instance.id, state: state)
+                #expect(try DeviceInstance.read(device) == instance)
+                #expect(instance.format == (imageStore ? DeviceRecord.imageFormat : 1))
+                #expect(instance.base.path == "Devices/\(instance.id.uuidString)/base")
+                let paths = instance.paths(state: state, logs: root)
+                #expect(tree(paths.base) == tree(base), "the device's base is the base's copy")
+                let record = try StorageRecordPaths(
+                    bytes: Data(contentsOf: DeviceRecord.url(device)),
+                    relativeRoot: state
+                )
+                try record.validate(.managedDeviceDirectory(device), device: device)
+                if !imageStore { #expect(tree(base) == before, "the base is where it was, unchanged") }
+            }
+            #expect(fm.subpaths(atPath: PreparationJob.preparing(state).path)?.isEmpty ?? true, "no staging left")
         }
     }
 

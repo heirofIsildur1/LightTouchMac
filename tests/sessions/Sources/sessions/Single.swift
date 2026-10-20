@@ -8,7 +8,7 @@ import SessionKit
 /// reference), the backlight at the firmware's 100%, AFC round trips past 16 KiB, an IPA install (2.x on), a clean
 /// shutdown confirmed by the guest, and the base untouched.
 func single(_ args: SingleCheck) -> Never {
-    let base = Base(args.base, args.inputs)
+    let base = Base(args.base, allowStale: args.inputs.allowStale || !args.expectAdmission.isEmpty)
     let work = workDirectory(args.inputs, "single")
     let tools = Tools.resolve(args.inputs, work: work)
     let d = base.driverBoard
@@ -16,6 +16,21 @@ func single(_ args: SingleCheck) -> Never {
     let ipa = args.ipa ?? checkout("qemu-ios").appendingPathComponent("contrib/it-harness/build/Harness.ipa")
     if install, !FileManager.default.fileExists(atPath: ipa.path) { die("no test IPA at \(ipa.path) (--ipa)") }
     let before = SessionJudge.tree(base.url)
+    // The driver's state is the work directory (LTM_STATE_DIR), so the device is under its Devices/.
+    var managed: DeviceInstance?
+    if args.managed || !args.expectAdmission.isEmpty {
+        do {
+            let catalog = try FirmwareCatalog.load(
+                from: repository.appendingPathComponent("LightTouchMac/Resources/firmware-catalog.json")
+            )
+            managed = try ManagedDevice.make(base: base.url, state: work, catalog: catalog)
+        } catch { die("can't make a device for \(base.url.path): \(error)") }
+        print("managed: \(managed!.paths(state: work, logs: work).directory.path)")
+        for step in args.expectAdmission where ManagedDevice.done(step, managed!, state: work) {
+            if work == disposableWork { try? DeviceStateStorage.removeTree(work) }
+            die("\(base.url.path) doesn't need admission step \(step.rawValue)")
+        }
+    }
 
     var single: [String: Any] = [
         "board": d, "base": base.url.path, "lockdownTZ": tools.services.path,
@@ -40,6 +55,7 @@ func single(_ args: SingleCheck) -> Never {
         single["mediaTools"] =
             (args.mediaTools ?? checkout("qemu-ios").appendingPathComponent("contrib/it-media")).path
     }
+    if let managed { single["managed"] = managed.paths(state: work, logs: work).directory.path }
     if args.skipSetup { single["skipSetup"] = true }
     if args.jailbreak { single["jailbreak"] = true }
     if let panel = args.panel { single["panel"] = panel }
@@ -489,6 +505,9 @@ func single(_ args: SingleCheck) -> Never {
                             ? ": the base's own crash reports couldn't be read"
                             : crashed.isEmpty ? "" : ": " + crashed.joined(separator: ", ") + " crashed")
         )
+    }
+    if let managed {
+        ManagedDevice.judge(r, d, managed, state: work, expect: args.expectAdmission, events: events)
     }
     let after = SessionJudge.tree(base.url)
     r.check(

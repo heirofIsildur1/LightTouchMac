@@ -1,5 +1,6 @@
 import FirmwareSchema
 import Foundation
+import HostRuntime
 import HostServiceWire
 import Subprocess
 import System
@@ -27,6 +28,28 @@ public nonisolated enum FirmwareTool {
             throw DeviceToolsError.failed("The firmware worker did not admit this device.")
         }
         return report
+    }
+
+    /// A stopped device's boot admission as Start runs it (EmulatorController.start; sessions single --managed):
+    /// admitBoot under the managed policy, then the record it left, which must still be this device, and the
+    /// storage proof the helper checks before it boots.
+    public static func admitStart(_ instance: DeviceInstance, executable: URL, log: URL? = nil) async throws
+        -> (instance: DeviceInstance, report: FirmwareWire.BootAdmission, proof: StorageBootProof)
+    {
+        let report = try await admitBoot(
+            device: instance.paths.directory,
+            managed: true,
+            executable: executable,
+            log: log
+        )
+        try Task.checkCancellation()
+        let recordBytes = try Data(contentsOf: DeviceRecord.url(instance.paths.directory))
+        let refreshed = try DeviceInstance.decoder.decode(DeviceInstance.self, from: recordBytes)
+        guard refreshed.format <= DeviceInstance.currentFormat else { throw DeviceInstance.NewerFormat() }
+        guard refreshed.id == instance.id, refreshed.board == instance.board else {
+            throw DeviceToolsError.failed("The device identity changed while preparing to start.")
+        }
+        return (refreshed, report, try StorageBootProof.capture(recordBytes: recordBytes))
     }
 
     /// iPhone OS 1.x: `certificate` (DER) as a system anchor in the stopped device (`firmwarekit edit --action

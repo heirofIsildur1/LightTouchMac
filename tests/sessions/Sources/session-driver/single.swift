@@ -104,6 +104,9 @@ struct SingleConfig: Decodable {
     /// libraries are read back before, after and at every later Home (`mediaImport`, `mediaCount`).
     var media: [String]?
     var mediaTools: String?
+    /// An app device made for the base (`--managed`: State/Devices/<uuid> under the run's state): every boot goes
+    /// through the app's boot admission and builds from its record (Device.instance).
+    var managed: String?
 }
 
 /// A page only wifi0 serves (a guestfwd to a shell that answers any request), so a cellular route can't stand in for
@@ -135,6 +138,9 @@ nonisolated enum WiFiProbe {
     let a4 = profile.isKBoot
     let b = URL(fileURLWithPath: s.base)
     let d = Device(name: s.board, profile: profile, base: b)
+    if let managed = s.managed {
+        do { d.instance = try DeviceInstance.read(URL(fileURLWithPath: managed)) } catch { fail("managed: \(error)") }
+    }
     if s.httpget != nil { d.netdevExtra = WiFiProbe.guestForward }
     // A jailbroken base boots with the app's web proxy on (Direct), its CA trusted at Home: Cydia's online check.
     var proxyCA: Data?
