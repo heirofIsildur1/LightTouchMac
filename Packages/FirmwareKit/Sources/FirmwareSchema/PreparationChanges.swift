@@ -267,5 +267,16 @@ nonisolated public enum PreparationChanges {
                 never looks, so it joins nothing at boot
                 """
         ),
+        Change(
+            serial: 16,
+            commit: "e50c6d02",
+            landed: "2026-10-20T19:51:47Z",
+            boards: ["n90ap"],
+            versions: ["7"],
+            what: """
+                the read-only root keeps the guest package it was prepared with (before serial 36), whose it_prefs \
+                crashes in libdispatch at every boot
+                """
+        ),
     ]
 }
