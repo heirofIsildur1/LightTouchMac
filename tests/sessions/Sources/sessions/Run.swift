@@ -100,7 +100,9 @@ func waitGone(_ pid: Int, _ seconds: Double) -> Double? {
     return nil
 }
 
-/// The temporary work directory `finish` deletes when the run passes: none with --work or --keep.
+/// The work directory `finish` prunes to its logs when the run passes (WorkPrune): none with --keep-work.
+nonisolated(unsafe) private var prunedWork: URL?
+/// A temporary work directory (no --work, no --keep-work), which a run that stops before it boots removes whole.
 nonisolated(unsafe) var disposableWork: URL?
 
 /// A fresh work directory: `--work`, or a temporary one.
@@ -109,7 +111,8 @@ func workDirectory(_ args: Inputs, _ name: String) -> URL {
         args.work
         ?? FileManager.default.temporaryDirectory
         .appendingPathComponent("ltm-\(name)-\(UUID().uuidString.prefix(8))")
-    if args.work == nil, !args.keep { disposableWork = work }
+    if !args.keepWork { prunedWork = work }
+    if args.work == nil, !args.keepWork { disposableWork = work }
     try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
     print("work: \(work.path)")
     return work
@@ -122,10 +125,38 @@ let realAppLog = URL(fileURLWithPath: getpwuid(getuid()).map { String(cString: $
 func finish(_ report: Report, work: URL) -> Never {
     let real = (try? String(contentsOf: realAppLog, encoding: .utf8)) ?? ""
     report.check(!real.contains(work.path), "the run left the real \(realAppLog.path) alone")
-    // A base the drivers published under work is locked (uchg) and its NAND read only: removeTree unlocks first.
-    let removed = report.allPassed && work == disposableWork && (try? DeviceStateStorage.removeTree(work)) != nil
-    print("\n\(report.allPassed ? "PASS" : "FAIL"): \(report.summary)" + (removed ? "" : "; logs in \(work.path)"))
+    let verdict = "\(report.allPassed ? "PASS" : "FAIL"): \(report.summary)"
+    try? (report.lines + ["", verdict, ""]).joined(separator: "\n")
+        .write(to: work.appendingPathComponent("summary.txt"), atomically: true, encoding: .utf8)
+    let pruned = report.allPassed && work == prunedWork && prune(work)
+    print("\n\(verdict); \(pruned ? "logs" : "everything") in \(work.path)")
     exit(report.allPassed ? 0 : 1)
+}
+
+/// `work` down to what WorkPrune keeps: those files are set aside, the directory removed (a base the drivers
+/// published under it is locked, uchg, and its NAND read only: removeTree unlocks first), and they are put back.
+func prune(_ work: URL) -> Bool {
+    let fm = FileManager.default
+    let kept = WorkPrune.kept(under: work)
+    let aside = work.deletingLastPathComponent().appendingPathComponent(".\(work.lastPathComponent).kept")
+    do {
+        try? fm.removeItem(at: aside)
+        for path in kept {
+            let to = aside.appendingPathComponent(path)
+            try fm.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.copyItem(at: work.appendingPathComponent(path), to: to)
+        }
+        try DeviceStateStorage.removeTree(work)
+        if fm.fileExists(atPath: aside.path) {
+            try fm.moveItem(at: aside, to: work)
+        } else {
+            try fm.createDirectory(at: work, withIntermediateDirectories: true)
+        }
+        return true
+    } catch {
+        print("could not prune \(work.path): \(error)")
+        return false
+    }
 }
 
 /// The base fields every session-driver config carries.

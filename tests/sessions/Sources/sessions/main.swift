@@ -22,11 +22,18 @@ struct Inputs: ParsableArguments {
     @Option(help: "The guest's HTTP client (default: the pinned qemu-ios's contrib/it-proxy/httpget).", transform: path)
     var httpget: URL?
     @Option(
-        help: "Keeps the logs, screenshots and events (default: a temporary directory, deleted if the run passes).",
+        help: "Where the run's logs, events, frames and overlays go (default: a temporary directory).",
         transform: path
     )
     var work: URL?
-    @Flag(help: "Keeps the temporary work directory of a run that passes.") var keep = false
+    @Flag(
+        name: [.customLong("keep-work"), .customLong("keep")],
+        help: """
+            Keeps all of a passed run's work directory: by default only its logs, events and summary.txt stay \
+            (overlays, NAND copies, the guest archive and frames go). A failed run keeps everything.
+            """
+    )
+    var keepWork = false
     @Option(help: "The signing requirement the driver pins the helper to.") var requirement: String?
     @Flag(
         help: """

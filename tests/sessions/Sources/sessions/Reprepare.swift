@@ -129,6 +129,6 @@ func reprepare(_ args: ReprepareCheck) -> Never {
     do { try DeviceStateStorage.removeTree(new) } catch { print("the old copy stays at \(new.path): \(error)") }
     print("swapped into \(base.url.path); the old copy removed")
     _ = Base(base.url.path, allowStale: true)
-    try? DeviceStateStorage.removeTree(work)
+    _ = prune(work)
     exit(0)
 }

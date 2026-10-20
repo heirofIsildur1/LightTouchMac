@@ -36,16 +36,20 @@ public struct Events {
 /// ok/FAIL lines and the tally.
 public final class Report {
     public private(set) var passed = 0, failed = 0
+    /// Every line printed, for the run's summary.txt.
+    public private(set) var lines: [String] = []
     public init() {}
     @discardableResult
     public func check(_ ok: Bool, _ what: @autoclosure () -> String) -> Bool {
         if ok { passed += 1 } else { failed += 1 }
-        print("  \(ok ? "ok  " : "FAIL") \(what())")
+        lines.append("  \(ok ? "ok  " : "FAIL") \(what())")
+        print(lines.last!)
         fflush(stdout)
         return ok
     }
     public func note(_ text: String) {
-        print("  --   \(text)")
+        lines.append("  --   \(text)")
+        print(lines.last!)
         fflush(stdout)
     }
     public var allPassed: Bool { failed == 0 && passed > 0 }
