@@ -21,6 +21,30 @@ func killLeftovers(_ events: Events, pidFile: URL? = nil) {
 }
 
 /// A started driver process writing JSON lines to `out`.
+/// The drivers this process has brought up to date.
+nonisolated(unsafe) private var builtDrivers: Set<String> = []
+
+/// `tool` built from the current sources (DriverBuild) once per run before it first starts; a build that fails stops
+/// the run rather than start a driver that may be old.
+func upToDate(_ tool: String) {
+    guard !builtDrivers.contains(tool),
+        let arguments = DriverBuild.arguments(
+            product: tool,
+            bin: binDirectory,
+            package: repository.appendingPathComponent("tests/sessions")
+        )
+    else { return }
+    let log = FileManager.default.temporaryDirectory.appendingPathComponent("ltm-sessions-build-\(tool).log")
+    try? FileManager.default.removeItem(at: log)
+    guard run("/usr/bin/xcrun", ["swift"] + arguments, log: log) == 0 else {
+        die(
+            "\(tool) may be older than these sources and building it failed (see \(log.path)): swift "
+                + arguments.joined(separator: " ")
+        )
+    }
+    builtDrivers.insert(tool)
+}
+
 final class DriverProcess {
     let process = Process()
     let out: URL
@@ -28,6 +52,7 @@ final class DriverProcess {
     init(_ tool: String, _ arguments: [String], out: URL, environment: [String: String] = [:]) {
         self.out = out
         FileManager.default.createFile(atPath: out.path, contents: nil)
+        upToDate(tool)
         process.executableURL = binDirectory.appendingPathComponent(tool)
         process.arguments = arguments
         process.environment = ProcessInfo.processInfo.environment.merging(environment) { $1 }
