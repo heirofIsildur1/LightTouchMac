@@ -34,12 +34,12 @@ struct USBBridgeTests {
         #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
         defer { pair.forEach { close($0) } }
         // the helper asks; the app connects and answers with the descriptor
-        #expect(USBBridgeSocket.send(pair[1]))
-        #expect(USBBridgeSocket.receive(pair[0]) == (true, -1))
-        let host = try #require(USBBridgeSocket.connect(path))
-        #expect(USBBridgeSocket.send(pair[0], descriptor: host))
+        #expect(BridgeSocket.send(pair[1]))
+        #expect(BridgeSocket.receive(pair[0]) == (true, .usb, -1))
+        let host = try #require(BridgeSocket.connect(path))
+        #expect(BridgeSocket.send(pair[0], descriptor: host))
         close(host)
-        let (ok, received) = USBBridgeSocket.receive(pair[1])
+        let (ok, _, received) = BridgeSocket.receive(pair[1])
         #expect(ok && received >= 0)
         let server = accept(listener, nil, nil)
         #expect(write(received, "usb", 3) == 3)
@@ -48,13 +48,13 @@ struct USBBridgeTests {
         close(server)
         close(received)
         // with nothing to connect to, the answer carries none
-        #expect(USBBridgeSocket.connect(dir.appendingPathComponent("none.sock").path) == nil)
-        #expect(USBBridgeSocket.send(pair[0]))
-        #expect(USBBridgeSocket.receive(pair[1]) == (true, -1))
+        #expect(BridgeSocket.connect(dir.appendingPathComponent("none.sock").path) == nil)
+        #expect(BridgeSocket.send(pair[0]))
+        #expect(BridgeSocket.receive(pair[1]) == (true, .usb, -1))
         // and the bridge's end sees the app's close
         close(pair[0])
         pair[0] = -1
-        #expect(USBBridgeSocket.receive(pair[1]).ok == false)
+        #expect(BridgeSocket.receive(pair[1]).ok == false)
     }
 
     /// The helper's bridge port admits this process's connections and refuses another process's (nc).
@@ -107,5 +107,59 @@ struct USBBridgeTests {
         #expect(bridged[2] == "iPod-Touch,nand=/b/nand,usb-tcp-addr=127.0.0.1:5000,osk=on")
         #expect(BootRecipe.usbAddress(in: ["x", "ipad1,nand=/n,usb-tcp-addr=/g.sock"]) == "/g.sock")
         #expect(BootRecipe.usbAddress(in: ["x", "ipad1,nand=/n"]) == nil)
+    }
+
+    /// A sandboxed helper names neither its web proxy's socket nor its Debug Port's: QEMU hands the proxy each guest
+    /// connection over a socket pair (fdpass:), and the gdbstub accepts on the listener the app bound.
+    @Test func argvsWebProxyAndDebugPortAreHandedOver() {
+        let netdev =
+            "user,id=wifi0,restrict=on,guestfwd=tcp:10.0.2.100:3128-unix-connect:/T/ltm-proxy-a,,b.sock,lan=off"
+        let argv = ["LightTouchMac", "-netdev", netdev] + DebugPort.arguments(socket: "/T/ltm-gdb-1.sock") + ["-S"]
+        let forwarded = BootRecipe.replacingGuestForward(in: argv, withSocket: 7)
+        #expect(forwarded[2] == "user,id=wifi0,restrict=on,guestfwd=tcp:10.0.2.100:3128-fdpass:7,lan=off")
+        #expect(!forwarded.joined().contains("ltm-proxy"))
+        #expect(DebugPort.socket(in: argv) == "/T/ltm-gdb-1.sock")
+        #expect(DebugPort.socket(in: ["x", "-gdb", "unix:/T/a,,b.sock,server=on,wait=off"]) == "/T/a,b.sock")
+        let debugged = DebugPort.replacingSocket(in: forwarded, withListener: 9)
+        #expect(
+            debugged == [
+                "LightTouchMac", "-netdev", forwarded[2], "-chardev", "socket,id=ltm-gdb,fd=9,server=on,wait=off",
+                "-gdb",
+                "chardev:ltm-gdb", "-S"
+            ]
+        )
+        #expect(
+            DebugPort.replacingSocket(in: forwarded, withListener: nil) == [
+                "LightTouchMac", "-netdev", forwarded[2], "-S"
+            ])
+        #expect(DebugPort.socket(in: debugged) == nil)
+    }
+
+    /// The app binds the Debug Port where the helper can't, and hands the listener over the bridge.
+    @Test func theDebugPortsListenerCrossesTheBridge() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("gdb.sock").path
+        let listener = try #require(DebugPort.listen(at: path))
+        var info = stat()
+        #expect(stat(path, &info) == 0 && info.st_mode & 0o777 == 0o600)
+        var pair: [Int32] = [-1, -1]
+        #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
+        defer { pair.forEach { close($0) } }
+        #expect(BridgeSocket.send(pair[1], .gdb))
+        #expect(BridgeSocket.receive(pair[0]) == (true, .gdb, -1))
+        #expect(BridgeSocket.send(pair[0], .gdb, descriptor: listener))
+        close(listener)
+        let (ok, kind, received) = BridgeSocket.receive(pair[1])
+        #expect(ok && kind == .gdb && received >= 0)
+        // a debugger on the app's path reaches whoever accepts on the handed-over listener
+        let debugger = try #require(BridgeSocket.connect(path))
+        let accepted = accept(received, nil, nil)
+        #expect(accepted >= 0 && write(debugger, "$?#3f", 5) == 5)
+        var buffer = [UInt8](repeating: 0, count: 5)
+        #expect(read(accepted, &buffer, 5) == 5 && buffer == Array("$?#3f".utf8))
+        close(accepted)
+        close(debugger)
+        close(received)
     }
 }

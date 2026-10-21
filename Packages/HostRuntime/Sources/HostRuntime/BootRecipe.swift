@@ -75,6 +75,28 @@ public nonisolated enum BootRecipe {
         return nil
     }
 
+    /// `argv` with its web proxy's guestfwd (guestForward's unix-connect:PATH) handed to QEMU as fdpass:`fd` instead: each
+    /// guest connection comes over that socket, with no path (a sandboxed helper's web proxy).
+    public static func replacingGuestForward(in argv: [String], withSocket fd: Int32) -> [String] {
+        argv.map { value in
+            guard let range = value.range(of: "-unix-connect:") else { return value }
+            // the path ends at a lone comma (",," is an escaped one)
+            var end = range.upperBound
+            while end < value.endIndex {
+                if value[end] == "," {
+                    let next = value.index(after: end)
+                    if next < value.endIndex, value[next] == "," {
+                        end = value.index(after: next)
+                        continue
+                    }
+                    break
+                }
+                end = value.index(after: end)
+            }
+            return value.replacingCharacters(in: range.lowerBound..<end, with: "-fdpass:\(fd)")
+        }
+    }
+
     /// `argv` with its usb-tcp-addr's value replaced by `address` (a sandboxed helper's USB bridge).
     public static func replacingUSBAddress(in argv: [String], with address: String) -> [String] {
         argv.map { value in

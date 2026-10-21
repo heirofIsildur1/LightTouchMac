@@ -154,6 +154,21 @@ final class WebProxy: @unchecked Sendable {
         accepting(fd, name: "web-proxy", limit: ConnectionLimit(capacity: 48), from: getpid()) { self.serve($0) }
     }
 
+    /// Serves each connection QEMU passes over `fd` (guestfwd fdpass:, a sandboxed helper's: no socket path), at most
+    /// 48 at once as listen(socket:)'s.
+    func serve(passedOver fd: Int32) {
+        let limit = ConnectionLimit(capacity: 48)
+        let thread = Thread {
+            while true {
+                let (ok, _, connection) = BridgeSocket.receive(fd)
+                guard ok else { return }
+                if connection >= 0 { limit.start(connection) { self.serve($0) } }
+            }
+        }
+        thread.name = "web-proxy"
+        thread.start()
+    }
+
     /// One thread accepting on `fd`, one more per connection (with `limit`, only as many as it admits; with `peer`, only
     /// connections from that process, the rest closed and logged).
     private func accepting(

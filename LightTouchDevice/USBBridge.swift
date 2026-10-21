@@ -1,4 +1,4 @@
-// A sandboxed helper's USB cable. Unsandboxed, QEMU dials usbmuxd's guest socket in the user's temporary directory
+// A sandboxed helper's USB cable (and the way it gets its Debug Port's listener, gdbListener()). Unsandboxed, QEMU dials usbmuxd's guest socket in the user's temporary directory
 // itself. Sandboxed, it can't reach that directory, and a socket in the app group's container could be taken by
 // another device's helper (every helper can write the whole container), so the helper never has a path to usbmuxd:
 // QEMU dials this bridge on 127.0.0.1 (a bound port can't be taken over), the bridge admits only this process's own
@@ -72,11 +72,20 @@ final class USBBridge: @unchecked Sendable {
     }
 
     /// A socket connected to this device's usbmuxd, from the app; nil when it has none.
-    private func requestHost() -> Int32? {
+    private func requestHost() -> Int32? { request(.usb) }
+
+    /// The listening socket the app bound for this boot's Debug Port (its -gdb unix: path), nil without one.
+    func gdbListener() -> Int32? { request(.gdb) }
+
+    private func request(_ kind: BridgeSocket.Kind) -> Int32? {
         lock.withLock {
-            guard USBBridgeSocket.send(Self.control) else { return nil }
-            let (ok, fd) = USBBridgeSocket.receive(Self.control)
-            return ok && fd >= 0 ? fd : nil
+            guard BridgeSocket.send(Self.control, kind) else { return nil }
+            let (ok, answer, fd) = BridgeSocket.receive(Self.control)
+            guard ok, answer == kind, fd >= 0 else {
+                if fd >= 0 { close(fd) }
+                return nil
+            }
+            return fd
         }
     }
 

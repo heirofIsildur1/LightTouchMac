@@ -111,19 +111,6 @@ struct HelperSandboxTests {
         free(direct)
     }
 
-    @Test func everySocketNameFitsSunPathForUserNamesUpTo29Characters() {
-        #expect(HelperSandbox.socketsFit(home: "/Users/" + String(repeating: "u", count: 29)))
-        #expect(!HelperSandbox.socketsFit(home: "/Users/" + String(repeating: "u", count: 30)))
-        // The names, as the temporary directory's "ltm-<name>" shows them (unsandboxed here).
-        let keybag = DebugPort.socketPath("keybag")
-        #expect(keybag.dropFirst((NSTemporaryDirectory() + "ltm-").count).utf8.count == HelperSandbox.longestName)
-        // the longest path the budget allows fills sun_path (104 bytes with its NUL)
-        let path =
-            "/Users/" + String(repeating: "u", count: 29) + "/Library/Group Containers/SM75355Y6R.ltm/99999/"
-            + String(repeating: "k", count: HelperSandbox.longestName)
-        #expect(path.utf8.count == 103)
-    }
-
     /// Launch sweeps the folders of processes that are gone and nothing else.
     @Test func theSweepRemovesOnlyGoneProcessesFolders() throws {
         let container = try scratch()

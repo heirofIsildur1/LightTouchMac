@@ -82,8 +82,8 @@ public struct WebProxyConfiguration: Codable, Equatable {
         try PropertyListFile.write(self, to: Self.preferencesFile(in: directory))
     }
     /// What the helper serves (BootConfig.webProxy): this directory's routing, and a socket named for it in the
-    /// temporary directory or where a sandboxed helper reaches it (HelperSandbox; a Unix socket path stays under 104
-    /// bytes; the device directory may not).
+    /// temporary directory (a Unix socket path stays under 104 bytes; the device directory may not). A sandboxed
+    /// helper binds none: QEMU hands it each connection (guestfwd fdpass:, BootRecipe.replacingGuestForward).
     public static func endpoint(directory: URL) -> WebProxyEndpoint {
         let config = file(in: directory).path
         let hash = config.utf8.reduce(UInt64(14_695_981_039_346_656_037)) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }

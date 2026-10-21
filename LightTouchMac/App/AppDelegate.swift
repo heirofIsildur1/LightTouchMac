@@ -314,7 +314,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for record in records { USBMux.secure(DeviceInstance.url(record.storage.usbmuxConf, state: state)) }
         // A crashed or killed run's daemons, reparented to launchd: a device not started again kept its daemon.
         USBMux.reapOrphans(records, state: state, logs: logs)
-        // A sandboxed helper's sockets that a crashed or killed run left (HelperSandbox's folder per process).
+        // The socket folders earlier builds made in the app group's container for runs that are gone.
         let stale = HelperSandbox.sweepStaleSockets()
         if !stale.isEmpty { logEvent("sockets: removed the folders of processes that are gone: \(stale)") }
         // Bases published by earlier builds become immutable too (a development base, outside State, is left alone).

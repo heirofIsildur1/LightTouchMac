@@ -116,6 +116,8 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
     private var audit: audit_token_t?
     /// The boot's usbmuxd guest socket (its usb-tcp-addr), which the USB bridge connects to for a sandboxed helper.
     private var usbAddress: String?
+    /// The boot's Debug Port socket (its -gdb unix: path), which this process binds for a sandboxed helper.
+    private var gdbSocket: String?
     #if DEBUG
         private static let debugBuild = true
     #else
@@ -347,7 +349,11 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         if sandboxed, case .boot(let config) = request {
             grantBoot(config)
             let address = BootRecipe.usbAddress(in: config.argv)
-            lock.withLock { usbAddress = address }
+            let gdb = DebugPort.socket(in: config.argv)
+            lock.withLock {
+                usbAddress = address
+                gdbSocket = gdb
+            }
         }
         let (id, channel, dead): (UInt64, LinkChannel<HelperMessage, AppMessage>?, Bool) = lock.withLock {
             let id = nextID
@@ -391,14 +397,25 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
     /// Answers the helper's USB bridge until it closes: for each request, a socket connected to the boot's usbmuxd
     /// guest socket (in the temporary directory, where no sandboxed helper reaches), or none when there isn't one yet.
     /// The socket is private to this helper: no path in the app group's container that another helper could take.
+    /// The Debug Port's gdbstub listens on a socket this process binds (the -gdb unix: path, in the temporary
+    /// directory, where no sandboxed helper reaches) and hands over the same bridge.
     private func serveUSBBridge(_ fd: Int32) {
         Thread.detachNewThread { [weak self] in
             defer { close(fd) }
-            while USBBridgeSocket.receive(fd).ok {
-                let address = self?.lock.withLock { self?.usbAddress } ?? nil
-                let host = address.flatMap { USBBridgeSocket.connect($0) } ?? -1
-                _ = USBBridgeSocket.send(fd, descriptor: host)
-                if host >= 0 { close(host) }
+            while true {
+                let (ok, kind, _) = BridgeSocket.receive(fd)
+                guard ok, let kind else { return }
+                let answer: Int32
+                switch kind {
+                case .usb:
+                    let address = self?.lock.withLock { self?.usbAddress } ?? nil
+                    answer = address.flatMap { BridgeSocket.connect($0) } ?? -1
+                case .gdb:
+                    let path = self?.lock.withLock { self?.gdbSocket } ?? nil
+                    answer = path.flatMap { DebugPort.listen(at: $0) } ?? -1
+                }
+                _ = BridgeSocket.send(fd, kind, descriptor: answer)
+                if answer >= 0 { close(answer) }
             }
         }
     }
@@ -617,17 +634,24 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
     }
 }
 
-/// A sandboxed helper's USB bridge socket (fd 4 in the helper): a one-byte request from the helper, a one-byte answer
-/// carrying a connected descriptor (SCM_RIGHTS) or none.
-nonisolated public enum USBBridgeSocket {
-    public static func send(_ socket: Int32, descriptor: Int32 = -1) -> Bool {
-        ltm_send_fd(socket, 85, descriptor) == 0
+/// A sandboxed helper's bridge socket (fd 4 in the helper): a one-byte request from the helper, a one-byte answer of the
+/// same kind carrying a descriptor (SCM_RIGHTS) or none.
+nonisolated public enum BridgeSocket {
+    /// What the helper asks for: a connection to its usbmuxd, or the listener its gdbstub accepts on.
+    public enum Kind: CChar, Sendable {
+        case usb = 85  // "U"
+        case gdb = 71  // "G"
     }
-    /// Whether a message came (false at end of file), and its descriptor (-1 without one).
-    public static func receive(_ socket: Int32) -> (ok: Bool, descriptor: Int32) {
+
+    public static func send(_ socket: Int32, _ kind: Kind = .usb, descriptor: Int32 = -1) -> Bool {
+        ltm_send_fd(socket, kind.rawValue, descriptor) == 0
+    }
+    /// Whether a message came (false at end of file), what it was about, and its descriptor (-1 without one).
+    public static func receive(_ socket: Int32) -> (ok: Bool, kind: Kind?, descriptor: Int32) {
         var byte: CChar = 0
         var fd: Int32 = -1
-        return (ltm_recv_fd(socket, &byte, &fd) == 1, fd)
+        let ok = ltm_recv_fd(socket, &byte, &fd) == 1
+        return (ok, Kind(rawValue: byte), fd)
     }
 
     /// A socket connected to the Unix socket `path`, or nil.

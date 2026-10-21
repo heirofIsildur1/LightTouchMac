@@ -136,16 +136,19 @@ license pixman pixman-0.46.4 COPYING
 license libslirp libslirp-v4.9.4 COPYRIGHT LICENSE
 "$MESON" setup pixman-out pixman-0.46.4 ${MESON_CROSS[@]+"${MESON_CROSS[@]}"} --prefix="$P" --buildtype=release -Ddefault_library=static -Dtests=disabled -Ddemos=disabled --wrap-mode=nofallback
 ninja -C pixman-out -j"$JOBS" && ninja -C pixman-out install
-# qemu-ios's slirp_set_restricted(): the in-place restrict flip behind netdev_set_restrict /
-# qemu_ios_ui_net_restrict (5.x networking on after Setup). Older qemu-ios pins lack the patch file.
-SLIRP_PATCH="$QEMU/subprojects/packagefiles/libslirp-set-restricted.patch"
-if [ -f "$SLIRP_PATCH" ]; then
-    (cd libslirp-v4.9.4 && patch -p1 < "$SLIRP_PATCH")
-    cp "$SLIRP_PATCH" "$P/share/licenses/libslirp/"
-    source_note slirp libslirp "$(basename "$SLIRP_PATCH")"
-else
-    source_note slirp libslirp
-fi
+# qemu-ios's libslirp patches, in its wrap's order (subprojects/slirp.wrap diff_files): slirp_set_restricted(), the
+# in-place restrict flip behind netdev_set_restrict / qemu_ios_ui_net_restrict (5.x networking on after Setup), and
+# slirp_add_guestfwd_connector(), behind guestfwd's fdpass: (a sandboxed helper's web proxy). Older qemu-ios pins
+# lack one or both files; their qemu-ios builds take a found libslirp only with both functions.
+SLIRP_PATCHES=()
+for name in libslirp-set-restricted.patch libslirp-guestfwd-connector.patch; do
+    patch_file="$QEMU/subprojects/packagefiles/$name"
+    [ -f "$patch_file" ] || continue
+    (cd libslirp-v4.9.4 && patch -p1 < "$patch_file")
+    cp "$patch_file" "$P/share/licenses/libslirp/"
+    SLIRP_PATCHES+=("$name")
+done
+source_note slirp libslirp ${SLIRP_PATCHES[@]+"${SLIRP_PATCHES[@]}"}
 "$MESON" setup slirp-out libslirp-v4.9.4 ${MESON_CROSS[@]+"${MESON_CROSS[@]}"} --prefix="$P" --buildtype=release -Ddefault_library=static --wrap-mode=nofallback
 ninja -C slirp-out -j"$JOBS" && ninja -C slirp-out install
 # libusb: only the usbmuxd fork's configure.ac asks for it (PKG_CHECK_MODULES, no flag); its QEMU backend

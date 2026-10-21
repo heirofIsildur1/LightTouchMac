@@ -225,21 +225,41 @@ final class DeviceHost: @unchecked Sendable {
         }
         guard first else { return false }
         for (k, v) in config.environment { setenv(k, v, 1) }
+        // A sandboxed helper (it has a bridge to its spawner) names no socket: QEMU hands the web proxy each guest
+        // connection over a socket pair (guestfwd fdpass:), and the Debug Port's gdbstub accepts on the listener the
+        // app bound in its own temporary directory.
+        var argv = config.argv
         if let endpoint = config.webProxy {
             let proxy = WebProxy(config: URL(fileURLWithPath: endpoint.config))
             proxy.offline = config.wifiRestricted  // Setup offline: the PAC's proxy too, not just slirp
             proxy.localNetwork = config.wifiLocalNetwork
-            do {
-                try proxy.listen(socket: endpoint.socket)
-                webProxy = proxy
-            } catch { helperLog("web proxy: \(error)") }
+            if usbBridge != nil {
+                var pair: [Int32] = [-1, -1]
+                if socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0 {
+                    proxy.serve(passedOver: pair[0])
+                    argv = BootRecipe.replacingGuestForward(in: argv, withSocket: pair[1])
+                    webProxy = proxy
+                } else {
+                    helperLog("web proxy: no socket pair: \(String(cString: strerror(errno)))")
+                }
+            } else {
+                do {
+                    try proxy.listen(socket: endpoint.socket)
+                    webProxy = proxy
+                } catch { helperLog("web proxy: \(error)") }
+            }
+        }
+        if let bridge = usbBridge, DebugPort.socket(in: argv) != nil {
+            let listener = bridge.gdbListener()
+            if listener == nil { helperLog("debug port: no listener from the app; the gdbstub is off") }
+            argv = DebugPort.replacingSocket(in: argv, withListener: listener)
         }
         pumpQueue.async { [self] in pace() }
         qemu.attach(nil, nil)
         status[.qemuState] = QemuState.running.rawValue
         // A sandboxed helper's QEMU dials its USB bridge, which gets each connection to usbmuxd from the app.
-        let argv = usbBridge.map { BootRecipe.replacingUSBAddress(in: config.argv, with: $0.address) } ?? config.argv
-        let thread = Thread { [self] in
+        if let usbBridge { argv = BootRecipe.replacingUSBAddress(in: argv, with: usbBridge.address) }
+        let thread = Thread { [self, argv] in
             var cargs = argv.map { strdup($0) }
             cargs.append(nil)
             let rc = qemu.main(Int32(argv.count), &cargs)

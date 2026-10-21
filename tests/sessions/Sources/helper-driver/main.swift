@@ -49,6 +49,8 @@ struct Scenario: Decodable {
         var itpack: String?
         /// The panel's refresh, as Settings ▸ General's experimental 120 Hz boots it; default 60.
         var refreshHz: Int?
+        /// The Debug Port's gdbstub on this Unix socket, as the app adds it (DebugPort.arguments); "gdb" attaches.
+        var debugPort: String?
     }
     var dylib: String?
     var board: String?
@@ -73,7 +75,7 @@ func preparedBoot(_ p: Scenario.Prepared, hardware: DeviceInfo?) throws -> BootC
         ),
         clock: p.clock.map(Date.init(timeIntervalSince1970:))
     )
-    return try prepared.configuration(
+    var config = try prepared.configuration(
         hardware: hardware,
         bootArgs: "amfi_allow_any_signature=1 cs_enforcement_disable=1",  // the app's default (DeviceOptions.bootArgs)
         usbAddress: nil,
@@ -97,6 +99,8 @@ func preparedBoot(_ p: Scenario.Prepared, hardware: DeviceInfo?) throws -> BootC
         carrier: p.carrier,
         refreshHz: p.refreshHz ?? 60
     )
+    if let socket = p.debugPort { config.argv += DebugPort.arguments(socket: socket) }
+    return config
 }
 
 let t0 = Date()
@@ -706,6 +710,22 @@ Thread.detachNewThread {
                 ]
             )
             if code != 2 { fail("snapshot failed") }
+        case "gdb":  // gdb SOCKET: a debugger attaches to the Debug Port (lldb's unix-connect) and asks why it stopped
+            guard let s = BridgeSocket.connect(p[1]) else { fail("no gdbstub at \(p[1])") }
+            var tv = timeval(tv_sec: 10, tv_usec: 0)
+            setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+            _ = write(s, "$?#3f", 5)
+            // the stub's "+" ack, then its packet: read until a whole "$…#xx" came, or the 10 s timeout
+            var text = ""
+            var chunk = [UInt8](repeating: 0, count: 64)
+            while !(text.contains("$") && text.range(of: "#[0-9a-f]{2}", options: .regularExpression) != nil) {
+                let n = read(s, &chunk, chunk.count)
+                guard n > 0 else { break }
+                text += String(decoding: chunk.prefix(n), as: UTF8.self)
+            }
+            close(s)
+            emit("gdb", ["socket": p[1], "reply": text])
+            guard text.contains("$T") || text.contains("$S") else { fail("the gdbstub didn't answer ?: \(text)") }
         case "resume":
             link.send(.snapshotResume)
         case "pause", "unpause":  // the app's Pause and Resume (MachineOp.pause, .resume)

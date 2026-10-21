@@ -155,7 +155,7 @@ public enum Preparer {
     static func esc(_ p: URL) -> String { p.path.replacingOccurrences(of: ",", with: ",,") }
 
     /// One `LightTouchDevice` oneshot boot of `argv` (which routes -serial to `serial`). `during` runs on its own
-    /// thread once the helper is started, with its pid (the iPod keybag's gdbstub handoff); if it throws, the helper is stopped
+    /// thread once the helper is started (the iPod keybag's gdbstub handoff); if it throws, the helper is stopped
     /// and the error rethrown. `grants`: what argv opens outside `work`, by role, for a sandboxed helper.
     static func oneshot(
         _ helper: URL,
@@ -167,8 +167,9 @@ public enum Preparer {
         timeout: Double,
         work: URL,
         grants: [SandboxExtension.Grant],
+        inherit: [Int32: Int32] = [:],
         log: (String) -> Void,
-        during: (@Sendable (pid_t) throws -> Void)? = nil
+        during: (@Sendable () throws -> Void)? = nil
     ) throws -> (OneShot, String) {
         var config: [String: Any] = [
             "boot": ["argv": argv, "environment": [String: String](), "machine": machine],
@@ -178,22 +179,24 @@ public enum Preparer {
         if let stopPattern { config["stopPattern"] = stopPattern }
         let cfg = work.appendingPathComponent("oneshot.json")
         try JSONSerialization.data(withJSONObject: config).write(to: cfg)
-        let p = Process()
         let out = Pipe()
-        p.executableURL = helper
-        p.arguments = HelperLaunch(.oneshot(config: cfg.path)).arguments
         // A sandboxed helper's files, issued to its pid once it runs (an unreaped child) and passed on its standard
         // input (SandboxExtension): the work folder (this config) and the serial log's read-write, and `grants`.
         let sandboxed = HelperSandbox.isSandboxed(helper)
         let grantPipe = sandboxed ? Pipe() : nil
-        p.standardInput = grantPipe ?? FileHandle.nullDevice
-        p.standardOutput = out
-        p.standardError = FileHandle.standardError
-        try p.run()
+        let pid = try spawn(
+            helper,
+            HelperLaunch(.oneshot(config: cfg.path)).arguments,
+            stdin: grantPipe?.fileHandleForReading.fileDescriptor,
+            stdout: out.fileHandleForWriting.fileDescriptor,
+            inherit: inherit
+        )
+        try? out.fileHandleForWriting.close()
+        try? grantPipe?.fileHandleForReading.close()
         if let grantPipe {
             let (tokens, refused) = SandboxExtension.issue(
                 grants + [.init(work, .readWrite), .init(serial.deletingLastPathComponent(), .readWrite)],
-                to: .pid(p.processIdentifier)
+                to: .pid(pid)
             )
             if !refused.isEmpty { log("one-shot: no sandbox grant for \(refused.joined(separator: ", "))") }
             try? grantPipe.fileHandleForWriting.write(contentsOf: JSONEncoder().encode(tokens))
@@ -204,9 +207,9 @@ public enum Preparer {
         let finished = DispatchSemaphore(value: 0)
         if let during {
             Thread.detachNewThread {
-                do { try during(p.processIdentifier) } catch {
+                do { try during() } catch {
                     failure.error = error
-                    p.terminate()
+                    kill(pid, SIGTERM)
                 }
                 finished.signal()
             }
@@ -214,7 +217,8 @@ public enum Preparer {
             finished.signal()
         }
         let lines = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        p.waitUntilExit()
+        var status: Int32 = 0
+        while waitpid(pid, &status, 0) < 0 && errno == EINTR {}
         finished.wait()
         if let error = failure.error { throw error }
         let text = (try? String(contentsOf: serial, encoding: .isoLatin1)) ?? ""
@@ -223,7 +227,7 @@ public enum Preparer {
         else {
             throw FirmwareError(
                 .oneshotFailed,
-                "\(helper.lastPathComponent) oneshot exited \(p.terminationStatus) without a result"
+                "\(helper.lastPathComponent) oneshot exited \(status >> 8 & 0xff) without a result"
             )
         }
         log(
@@ -235,6 +239,44 @@ public enum Preparer {
             )
         )
         return (r, text)
+    }
+
+    /// `executable` with `arguments`, standard input `stdin` (/dev/null when nil), standard output `stdout`, this
+    /// process's standard error, and `inherit`'s descriptors (child's number: this process's), nothing else; its pid.
+    /// (Process passes no descriptor beyond the standard three: a sandboxed one-shot's gdbstub listener is one.)
+    static func spawn(
+        _ executable: URL,
+        _ arguments: [String],
+        stdin: Int32?,
+        stdout: Int32,
+        inherit: [Int32: Int32]
+    ) throws -> pid_t {
+        var actions: posix_spawn_file_actions_t?
+        var attributes: posix_spawnattr_t?
+        posix_spawn_file_actions_init(&actions)
+        posix_spawnattr_init(&attributes)
+        defer {
+            posix_spawn_file_actions_destroy(&actions)
+            posix_spawnattr_destroy(&attributes)
+        }
+        if let stdin {
+            posix_spawn_file_actions_adddup2(&actions, stdin, 0)
+        } else {
+            posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+        }
+        posix_spawn_file_actions_adddup2(&actions, stdout, 1)
+        posix_spawn_file_actions_adddup2(&actions, 2, 2)
+        for (child, parent) in inherit { posix_spawn_file_actions_adddup2(&actions, parent, child) }
+        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        let argv = ([executable.path] + arguments).map { strdup($0) } + [nil]
+        defer { argv.forEach { free($0) } }
+        var pid: pid_t = 0
+        let rc = posix_spawn(&pid, executable.path, &actions, &attributes, argv, environ)
+        guard rc == 0 else {
+            throw FirmwareError(
+                .oneshotFailed, "can't start \(executable.lastPathComponent): \(String(cString: strerror(rc)))")
+        }
+        return pid
     }
 
     /// The sibling entry's restore ramdisk (Update, else Restore), decrypted with that entry's key into `work`.

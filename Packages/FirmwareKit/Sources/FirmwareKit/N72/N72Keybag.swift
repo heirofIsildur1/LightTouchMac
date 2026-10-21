@@ -41,6 +41,15 @@ enum N72Keybag {
         // free-port pick to race, nothing on TCP.
         let socket = DebugPort.socketPath("keybag")
         defer { unlink(socket) }
+        // A sandboxed helper can't bind there: this process does, and QEMU accepts on the listener as fd 5.
+        var listener: Int32?
+        if HelperSandbox.isSandboxed(helper) {
+            guard let fd = DebugPort.listen(at: socket) else {
+                throw FirmwareError(.oneshotFailed, "can't listen at \(socket): \(String(cString: strerror(errno)))")
+            }
+            listener = fd
+        }
+        defer { listener.map { _ = close($0) } }
         let file = { (n: String) in Preparer.esc(out.appendingPathComponent(n)) }
         Machines.helper = helper
         guard let hardware = HostRuntime.Board.n72.hardware else {
@@ -60,7 +69,7 @@ enum N72Keybag {
                 "-monitor",
                 "none",
                 "-serial", "file:\(serial.path)"
-            ] + DebugPort.arguments(socket: socket) + ["-S"]
+            ] + (listener == nil ? DebugPort.arguments(socket: socket) : DebugPort.listenerArguments(fd: 5)) + ["-S"]
         let kc = try Data(contentsOf: dec.appendingPathComponent("kernelcache.mach"))
         let image = try Data(contentsOf: rd)
         final class Note: @unchecked Sendable { var text = "" }
@@ -75,9 +84,10 @@ enum N72Keybag {
             work: work,
             // the base being built (its NAND is booted in place), and the SecureROM's folder
             grants: [.init(out, .readWrite), .init(bootrom.deletingLastPathComponent(), .read)],
+            inherit: listener.map { [5: $0] } ?? [:],
             log: log
         ) {
-            note.text = try handoff(GDBRemote(socket: socket, helper: $0), kernelcache: kc, ramdisk: image)
+            note.text = try handoff(GDBRemote(socket: socket), kernelcache: kc, ramdisk: image)
         }
         log(note.text)
         for line in text.split(separator: "\n") where line.contains("it_keybag:") {
@@ -198,10 +208,9 @@ final class GDBRemote {
     let fd: Int32
     var buffer: [UInt8] = []
 
-    /// Connects to the stub's Unix socket (in the user's own 0700 temporary directory, or the app group's container),
-    /// retrying for up to 10 s while the helper starts QEMU. The stub must be `helper`'s: in the group container
-    /// another device's sandboxed helper could have bound the path first.
-    init(socket path: String, helper: pid_t) throws {
+    /// Connects to the stub's Unix socket (in the user's own 0700 temporary directory, which no sandboxed helper
+    /// reaches), retrying for up to 10 s while the helper starts QEMU.
+    init(socket path: String) throws {
         var a = sockaddr_un()
         a.sun_family = sa_family_t(AF_UNIX)
         let bytes = Array(path.utf8)
@@ -216,11 +225,6 @@ final class GDBRemote {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                     connect(s, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) == 0
                 }
-            }
-            if ok, let peer = HelperSandbox.peerPID(s), peer != helper {
-                close(s)
-                throw FirmwareError(
-                    .oneshotFailed, "the gdbstub at \(path) is pid \(peer)'s, not the helper's (\(helper))")
             }
             if ok {
                 var tv = timeval(tv_sec: 120, tv_usec: 0)  // `c` waits for iBoot to reach the kernel
