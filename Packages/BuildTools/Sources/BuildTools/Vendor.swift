@@ -61,12 +61,6 @@ public struct Vendor {
     static let tools = [
         "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources", "Packages/ReleaseChecks/Sources",
     ]
-    static let keyed =
-        [
-            "build-support/sources.json", "build-support/dependencies.json", "scripts/build-package-native.sh",
-            "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh", developerImages,
-            "build-support/checks",
-        ] + tools
     static let staticKeyed = [
         "scripts/build-static-deps.sh", "build-support/dependencies.json",
         "build-support/patches/libplist-bin-limits.patch",
@@ -119,10 +113,9 @@ public struct Vendor {
         return sha256Hex(Data(text.utf8))
     }
 
+    /// `scripts/vendor-check --key`, the one implementation of the pin key (Xcode's first phase keys with it too).
     func pinKey() throws -> String {
-        let patches = try entries(root.appendingPathComponent("build-support/patches"))
-            .map { "build-support/patches/\($0.lastPathComponent)" }
-        return String(try treeHash(Self.keyed + patches).prefix(12))
+        try output(["/bin/bash", scripts.appendingPathComponent("vendor-check").path, "--key", root.path])
     }
 
     public func directory() throws -> URL {

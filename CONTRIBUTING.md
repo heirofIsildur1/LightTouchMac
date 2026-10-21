@@ -88,7 +88,7 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    `~/Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk`), `LTM_ASSETS` (the SecureROMs, default
    `~/Developer/qemu-ios-files`), the n72ap-7E18 IPSW in the app's IPSW cache, and the network for the pinned
    source archives. Firmware and the iPhoneOS SDK are never downloaded or redistributed. Xcode finds the directory
-   itself: the services helper's first phase (`scripts/vendor-check`) keys the pins as `scripts/vendor` does, points
+   itself: the services helper's first phase (`scripts/vendor-check`) keys the pins (`scripts/vendor` keys with it too), points
    the gitignored `build/vendor` (the default `VENDOR_DIR`) at that directory, and fails the build with "run
    scripts/vendor" when there is none, rather than build with another pin's. `LTM_VENDOR_ROOT` counts for Debug builds
    only. A `VENDOR_DIR` in `Configuration/Local.xcconfig` is held to the current pins the same way.
