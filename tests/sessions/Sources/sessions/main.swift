@@ -69,7 +69,7 @@ struct Sessions: ParsableCommand {
             SingleCheck.self, PairCheck.self, ProxyTrustCheck.self, LocalNetworkCheck.self, HelperCheck.self,
             HelperBootCheck.self, PhoneCheck.self, RotationCheck.self, KeyboardCheck.self, FlickCheck.self,
             ScrollTopCheck.self,
-            TweaksCheck.self, RespringCheck.self, ClipboardCheck.self, BasesCheck.self, ReprepareCheck.self,
+            TweaksCheck.self, RespringCheck.self, ClipboardCheck.self, BasesCheck.self, ReprepareCheck.self
         ]
     )
 }
@@ -141,7 +141,7 @@ struct SingleCheck: ParsableCommand {
     @Flag var noOffer = false
     @Option(transform: path) var ipa: URL?
     @Option(transform: path) var itpack: URL?
-    @Option(help: "Where the guest's WAV goes (default: the work directory's guest.wav).", transform: path)
+    @Option(help: "Where the guest's WAV goes (default: the work directory's audio/guest.wav).", transform: path)
     var audioWAV: URL?
     @Flag(
         help: """

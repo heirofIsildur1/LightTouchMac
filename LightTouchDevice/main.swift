@@ -21,6 +21,20 @@ let launch: HelperLaunch = {
     }
 }()
 
+// A sandboxed helper's grants from DeviceLink or firmwarekit, on standard input (a pipe they close), before anything
+// opens a file (HostRuntime SandboxExtension); given back at exit. Unsandboxed, standard input is /dev/null.
+switch launch.mode {
+case .connect, .oneshot:
+    let (tokens, refused) = SandboxExtension.consumeStandardInput()
+    if tokens > 0 {
+        helperLog(
+            "sandbox: \(tokens - refused.count) of \(tokens) grants taken\(refused.isEmpty ? "" : "; refused: \(refused)")"
+        )
+    }
+    atexit { SandboxExtension.releaseAll() }
+case .headless, .machines: break
+}
+
 /// Never dispatchMain(): it pthread_exit()s the main thread, and the dylib's
 /// rcu_init constructor registered that thread as an RCU reader, so
 /// call_rcu_thread then walks a freed TLS record (random heap corruption in
@@ -278,7 +292,7 @@ func useDylib(_ dylib: String?) {
                 let url = URL(fileURLWithPath: "\(dir)/\(p[1]).png")
                 emit([
                     "event": "dump", "path": url.path, "ok": FrameTools.writePNG(s, to: url),
-                    "brightness": FrameTools.brightness(s),
+                    "brightness": FrameTools.brightness(s)
                 ])
             case "tap":
                 host.perform(.touch(slot: 0, phase: 0, x: v[0], y: v[1]))
@@ -318,7 +332,7 @@ func useDylib(_ dylib: String?) {
                 }
                 let (code, error) = result.withLock { $0 }
                 emit([
-                    "event": "snapshot", "status": code, "error": error ?? "", "seconds": Date().timeIntervalSince(t0),
+                    "event": "snapshot", "status": code, "error": error ?? "", "seconds": Date().timeIntervalSince(t0)
                 ])
             case "resume": host.perform(.snapshotResume)
             case "shutdown": host.halt(reason: "action")
@@ -338,7 +352,7 @@ func describe(_ s: SharedStatus) -> [String: Any] {
         "iconGeneration": s.iconGeneration, "qemuState": s.qemuState.rawValue, "exitCode": s.exitCode,
         "guestPackage": s.guestPackage.map { ["serial": $0.serial, "result": $0.result] } ?? NSNull(),
         "glesProtocol": s.glesProtocol, "glesSerial": s.glesSerial, "backlightLevel": s.backlightLevel,
-        "vibrating": s.vibrating, "vibratorPulses": s.vibratorPulses,
+        "vibrating": s.vibrating, "vibratorPulses": s.vibratorPulses
     ]
 }
 
@@ -374,7 +388,7 @@ struct OneShotConfig: Decodable {
         let marker = flags.withLock { $0.marker }
         emit([
             "event": "oneshot", "exited": exited, "exitCode": code, "marker": marker,
-            "seconds": Date().timeIntervalSince(start),
+            "seconds": Date().timeIntervalSince(start)
         ])
         exit(marker ? 0 : exited ? code : 124)
     }

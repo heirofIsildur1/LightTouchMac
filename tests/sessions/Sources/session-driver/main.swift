@@ -65,6 +65,13 @@ func fail(_ why: String) -> Never {
     exit(1)
 }
 
+/// Whether `pid` runs under a sandbox (libsystem_sandbox's sandbox_check with no operation).
+func sandboxCheck(_ pid: pid_t) -> Bool {
+    typealias Check = @convention(c) (pid_t, UnsafePointer<CChar>?, Int32) -> Int32
+    guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "sandbox_check") else { return false }
+    return unsafeBitCast(symbol, to: Check.self)(pid, nil, 0) != 0
+}
+
 struct Options: ParsableArguments {
     @Argument(help: "The run's configuration, as JSON (sessions writes it).") var config: String
 }
@@ -76,6 +83,8 @@ let config = try! JSONDecoder().decode(
 setenv("LTM_STATE_DIR", config.work, 1)
 setenv("LTM_FILES", config.files, 1)
 let work = URL(fileURLWithPath: config.work)
+// The helper's signature decides the rendezvous name and where the sockets go (HelperSandbox), as in the app.
+HelperSandbox.use(helper: URL(fileURLWithPath: config.helper))
 // `sessions` looks for this line in the real app.log afterwards: it must land in the run's own Logs.
 logEvent("session-driver: \(config.work)")
 
@@ -85,18 +94,19 @@ final class Mux {
     let clientSocket: String, guestAddress: String
     let process = Process()
     init(name: String) throws {
-        // As USBMux.Session.make: both ends Unix sockets in the per-user temporary directory.
-        let base = NSTemporaryDirectory() + "ltm-mux-" + UUID().uuidString.prefix(8)
+        // As USBMux.Session.make: both ends Unix sockets in the per-user temporary directory, or the app group's
+        // container for a sandboxed helper.
+        let base = HelperSandbox.socketPath("mux-" + UUID().uuidString.prefix(8))
         clientSocket = "UNIX:" + base + "-c.sock"
         guestAddress = base + "-g.sock"
         let conf = work.appendingPathComponent("\(name)/usbmuxd-conf")
         try FileManager.default.createDirectory(at: conf, withIntermediateDirectories: true)
         process.executableURL = URL(fileURLWithPath: config.usbmuxd)
         process.arguments = [
-            "-f", "-v", "-S", String(clientSocket.dropFirst("UNIX:".count)), "-P", "NONE", "-C", conf.path,
+            "-f", "-v", "-S", String(clientSocket.dropFirst("UNIX:".count)), "-P", "NONE", "-C", conf.path
         ]
         process.environment = ProcessInfo.processInfo.environment.merging([
-            "USBMUXD_QEMU_ADDR": guestAddress, "USBMUXD_QEMU_DELAY": "0",
+            "USBMUXD_QEMU_ADDR": guestAddress, "USBMUXD_QEMU_DELAY": "0"
         ]) { $1 }
         let log =
             FileHandle(forWritingAtPath: work.appendingPathComponent("\(name)/usbmuxd.log").path)
@@ -264,11 +274,17 @@ extension String {
         process.start(
             { info in
                 self.helloPID = info.pid
+                // The helper runs sandboxed exactly when its signature says so (the release boot checks rely on it).
+                let sandboxed = sandboxCheck(info.pid)
+                emit("sandbox", ["device": self.name, "sandboxed": sandboxed])
+                if sandboxed != HelperSandbox.enabled {
+                    fail("the helper is \(sandboxed ? "" : "not ")sandboxed but its signature says otherwise")
+                }
                 emit(
                     "hello",
                     [
                         "device": self.name, "pid": info.pid, "dylib": info.dylibPath, "build": info.buildID ?? "",
-                        "width": info.deviceInfo?.screenWidth ?? 0, "height": info.deviceInfo?.screenHeight ?? 0,
+                        "width": info.deviceInfo?.screenWidth ?? 0, "height": info.deviceInfo?.screenHeight ?? 0
                     ]
                 )
                 do { return try configuration(info.deviceInfo) } catch {
@@ -307,7 +323,7 @@ extension String {
                     "bootAdmission",
                     [
                         "device": self.name, "changed": report.changed, "generation": generation,
-                        "notice": report.notice ?? "",
+                        "notice": report.notice ?? ""
                     ]
                 )
             }
@@ -318,7 +334,7 @@ extension String {
                     "booted",
                     [
                         "device": self.name, "pid": process.link.pid, "seconds": Date().timeIntervalSince(started),
-                        "generation": generation,
+                        "generation": generation
                     ]
                 )
             case .failure(let error):
@@ -354,7 +370,7 @@ extension String {
             "offer",
             [
                 "device": name, "serial": offer?.serial ?? -1, "seed": GuestPackage.lockRecord(lock)?.seed ?? -1,
-                "lastGood": record.lastGood ?? -1,
+                "lastGood": record.lastGood ?? -1
             ]
         )
         return offer == nil ? nil : dir.path
@@ -397,7 +413,7 @@ extension String {
             [
                 "device": name, "path": url.path, "serial": frame.serial,
                 "width": frame.surface.width, "height": frame.surface.height,
-                "brightness": FrameTools.brightness(frame.surface),
+                "brightness": FrameTools.brightness(frame.surface)
             ]
         )
         return url.path
@@ -533,7 +549,7 @@ extension String {
                 "installed",
                 [
                     "device": d.name, "attempt": attempt, "seconds": Date().timeIntervalSince(start),
-                    "apps": apps.map(\.id), "has": apps.contains { $0.id == config.bundleID },
+                    "apps": apps.map(\.id), "has": apps.contains { $0.id == config.bundleID }
                 ]
             )
             return
@@ -697,7 +713,7 @@ func checkPreparedFiles() throws {
             "overlay": fm.fileExists(atPath: overlay.path), "cloneMode": mode, "cloneMatches": cloneMatches,
             "secondBootKeeps": kept, "stamp": stamp.timeIntervalSince1970, "missingThrows": missingThrows,
             "baseUntouched": try listing() == before
-                && (try Data(contentsOf: base.appendingPathComponent("nor.bin"))) == nor,
+                && (try Data(contentsOf: base.appendingPathComponent("nor.bin"))) == nor
         ]
     )
 }
@@ -720,7 +736,7 @@ func checkPreparedFiles() throws {
         "concurrent",
         [
             "ipodPID": ipod.process.link.pid, "ipadPID": ipad.process.link.pid,
-            "ipodHeartbeat": ipod.process.status?.heartbeat ?? 0, "ipadHeartbeat": ipad.process.status?.heartbeat ?? 0,
+            "ipodHeartbeat": ipod.process.status?.heartbeat ?? 0, "ipadHeartbeat": ipad.process.status?.heartbeat ?? 0
         ]
     )
     // USB first: lockdown answering means SpringBoard is up (a lit boot logo doesn't).
@@ -762,7 +778,7 @@ func checkPreparedFiles() throws {
         "killed",
         [
             "device": "ipad", "pid": killedPID, "noticed": ipad.process.isDead,
-            "seconds": Date().timeIntervalSince(killed), "reason": ipad.process.deathReason ?? "",
+            "seconds": Date().timeIntervalSince(killed), "reason": ipad.process.deathReason ?? ""
         ]
     )
     ipod.process.link.send(.button(0, down: true))
@@ -775,7 +791,7 @@ func checkPreparedFiles() throws {
         [
             "device": "ipod", "dead": ipod.process.isDead,
             "heartbeat": (ipod.process.status?.heartbeat ?? 0) - beat0,
-            "frames": (ipod.process.status?.frameSerial ?? 0) - frames0, "productType": ipodType ?? "",
+            "frames": (ipod.process.status?.frameSerial ?? 0) - frames0, "productType": ipodType ?? ""
         ]
     )
     ipod.screenshot("ipod-after-kill")
@@ -802,7 +818,7 @@ func checkPreparedFiles() throws {
         "quit",
         [
             "ipodExited": exited0, "ipadExited": exited1, "seconds": Date().timeIntervalSince(quit),
-            "ipodReason": ipod.process.deathReason ?? "", "ipadReason": ipad.process.deathReason ?? "",
+            "ipodReason": ipod.process.deathReason ?? "", "ipadReason": ipad.process.deathReason ?? ""
         ]
     )
     ipod.mux.stop()
@@ -869,7 +885,7 @@ func checkPreparedFiles() throws {
         ("external", external.appendingPathComponent("lease"), true),
         ("busy", external.appendingPathComponent("lease"), false),
         ("pending", external.appendingPathComponent("lease"), false),
-        ("symlink", alias, false),
+        ("symlink", alias, false)
     ]
     for (name, lease, admitted) in cases {
         let held = name == "busy" ? try! StorageLease(lease) : nil
@@ -941,7 +957,7 @@ func checkPreparedFiles() throws {
             "leaseAdmissionVerified",
             [
                 "case": name, "admitted": admitted, "hello": hello,
-                "reaped": reaped, "targetUnchanged": true, "guestStarted": false,
+                "reaped": reaped, "targetUnchanged": true, "guestStarted": false
             ]
         )
     }
@@ -991,7 +1007,7 @@ func checkPreparedFiles() throws {
         "killBeforeBootVerified",
         [
             "pid": pid, "configured": configured, "completions": completions,
-            "deaths": deaths, "reaped": reaped, "guestStarted": false,
+            "deaths": deaths, "reaped": reaped, "guestStarted": false
         ]
     )
     exit(0)
@@ -1027,6 +1043,10 @@ CFRunLoopRun()
     configuration.helper = helper
     configuration.requirement = requirement
     configuration.lease = lease
+    // The socket shim's log (sessions local-network), which a sandboxed helper writes too.
+    if let log = ProcessInfo.processInfo.environment["LTM_SOCKET_LOG"] {
+        configuration.grants = [.init(URL(fileURLWithPath: log).deletingLastPathComponent(), .readWrite)]
+    }
     let process = DeviceSessionProcess(configuration: configuration)
     process.onTermination = { pid, termination, code in
         logEvent("device helper \(pid): \(termination), QEMU exit \(code.map(String.init) ?? "none")")

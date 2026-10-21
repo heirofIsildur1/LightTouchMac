@@ -286,7 +286,9 @@ final class K48Board: Board {
                     let patched = try? SandboxPatch.rewrapKernelcache(
                         original: raw, plaintextKernel: [UInt8](plain), iv: iv, key: key)
                 {
-                    c.log("[sandbox] kernelcache re-wrapped with sb_evaluate patched at 0x\(String(patched.found.address, radix: 16))")
+                    c.log(
+                        "[sandbox] kernelcache re-wrapped with sb_evaluate patched at 0x\(String(patched.found.address, radix: 16))"
+                    )
                     kernelcacheImg3 = patched.img3
                 }
             }
@@ -501,6 +503,8 @@ final class K48Board: Board {
             stopPattern: stopPattern,
             timeout: timeout,
             work: c.work,
+            // the base being built: the store, booted in place, and its NOR, iBoot or kboot and gid blobs
+            grants: [.init(c.o.out, .readWrite)],
             log: c.log
         )
     }
@@ -531,17 +535,17 @@ final class K48Board: Board {
                         ? ["path": patcher.path, "sha256": try Preparer.digest(patcher, SHA256())] as [String: Any]
                         : nil
                 ),
-                "built": ["OpenGLES": opt(vols.engine)],
+                "built": ["OpenGLES": opt(vols.engine)]
             ],
             "inputs": [
                 "kernelcache": "kernelcache.mach", "devicetree": "DeviceTree.bin", "restore_ramdisk": opt(ramdisk),
-                "mbr": ["sha256": try Preparer.digest(mbr, SHA256())], "stash": NSNull(),
+                "mbr": ["sha256": try Preparer.digest(mbr, SHA256())], "stash": NSNull()
             ],
             "identity": ["die_id": dieID],
             "outputs": outputs,
             "gl_test": systemOptions.glTest,
             "skip_setup": systemOptions.skipSetup,
-            "machine": machineOptions,
+            "machine": machineOptions
         ]
     }
 }

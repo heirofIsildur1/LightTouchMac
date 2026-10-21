@@ -249,7 +249,7 @@ public struct PreparedDeviceBoot {
                 userInfo: [
                     NSFilePathErrorKey: overlay.path,
                     NSLocalizedDescriptionKey:
-                        "This device’s data was written in an older format over a newer system image.",
+                        "This device’s data was written in an older format over a newer system image."
                 ]
             )
         }
@@ -266,7 +266,7 @@ public struct PreparedDeviceBoot {
                     .fileWriteUnknown,
                     userInfo: [
                         NSFilePathErrorKey: source.path,
-                        NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO),
+                        NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
                     ]
                 )
             }
@@ -424,6 +424,43 @@ public struct PreparedDeviceBoot {
         }
         config.argv += board.refreshGlobals(refreshHz)
         config.webProxy = webProxy
+        config.files = files(bootrom: bootrom, guestPackage: guestPackage, serial: serial, audio: audio)
         return config
+    }
+
+    /// What this boot opens, by role (BootConfig.files). Written: the overlay (the NAND pages or the live NAND clone,
+    /// the SIM, a staged kboot) and the writable NOR, the serial FIFOs, a recording. Read: the base (NAND, NOR,
+    /// iBoot/kboot, gid blobs), the SecureROM's folder, the guest package offer.
+    func files(bootrom: String, guestPackage: String?, serial: String, audio: [String]) -> BootFiles {
+        var files = BootFiles()
+        let fm = FileManager.default
+        files.readWrite.append(overlay.path)
+        if let writableNOR { files.readWrite.append(writableNOR.path) }
+        if serial.hasPrefix("pipe:") {
+            let path = String(serial.dropFirst("pipe:".count))
+            files.readWrite += [path + ".in", path + ".out"]
+        } else if serial.hasPrefix("file:") {
+            files.readWrite.append(
+                URL(fileURLWithPath: String(serial.dropFirst("file:".count))).deletingLastPathComponent().path
+            )
+        }
+        for option in audio.flatMap({ $0.split(separator: ",") }) where option.hasPrefix("path=") {
+            files.readWrite.append(
+                URL(fileURLWithPath: String(option.dropFirst("path=".count))).deletingLastPathComponent().path
+            )
+        }
+        files.readOnly += [baseNOR.deletingLastPathComponent().path, boot.deletingLastPathComponent().path]
+        if nandOverlay != nil { files.readOnly.append(nand.deletingLastPathComponent().path) }
+        if !bootrom.isEmpty { files.readOnly.append(URL(fileURLWithPath: bootrom).deletingLastPathComponent().path) }
+        if let gidBlobs { files.readOnly.append(URL(fileURLWithPath: gidBlobs).deletingLastPathComponent().path) }
+        if let guestPackage {
+            var directory: ObjCBool = false
+            let offer = URL(fileURLWithPath: guestPackage)
+            files.readOnly.append(
+                fm.fileExists(atPath: guestPackage, isDirectory: &directory) && directory.boolValue
+                    ? offer.path : offer.deletingLastPathComponent().path
+            )
+        }
+        return files
     }
 }

@@ -8,7 +8,7 @@ struct BootTests {
     @Test func radioBoardsGetModemIMEIAndCellNetdev() throws {
         let identity: [String: Any] = [
             "serial-number": "ABCDEFGHJKL", "wifi-mac": "02:11:22:33:44:66",
-            "bt-mac": "02:11:22:33:44:67", "seed": "iphone4-test",
+            "bt-mac": "02:11:22:33:44:67", "seed": "iphone4-test"
         ]
         let imei = IPhoneIdentity.imei(seed: "iphone4-test")
         #expect(
@@ -51,7 +51,7 @@ struct BootTests {
     /// in -global's long form (the type names have dots), the helper reads it back, and 60 adds nothing.
     @Test func refreshReachesEachBoardsPanel() throws {
         let panels: [Board: String] = [
-            .m68: "ipodtouch.lcd", .n72: "ipodtouch.lcd", .n88: "s5l8930.display", .k48: "s5l8930.display",
+            .m68: "ipodtouch.lcd", .n72: "ipodtouch.lcd", .n88: "s5l8930.display", .k48: "s5l8930.display"
         ]
         for (board, panel) in panels {
             let f = try Fixture(board: board, strategy: board == .m68 ? "iboot" : board == .n72 ? "bootrom" : "kboot")
@@ -151,7 +151,7 @@ struct BootTests {
     @Test func everyMachineOptionIsDeclared() throws {
         let lock = [
             "aes-uid": "hardware", "wifi-mac": "02:11:22:33:44:66", "bt-mac": "02:11:22:33:44:67", "ecid": "0x234",
-            "imei": "013977000272744", "rtc-epoch": "1300000000",
+            "imei": "013977000272744", "rtc-epoch": "1300000000"
         ]
         for board in Board.allCases {
             let declared = board.machineOptions
@@ -213,7 +213,7 @@ private final class Fixture {
         try JSONSerialization.data(withJSONObject: lock).write(to: base.appendingPathComponent("device.lock.json"))
         try JSONSerialization.data(
             withJSONObject: identity ?? [
-                "die-id": ["0x123", "0x456"], "unique-chip-id": "0x234", "wifi-mac": "02:11:22:33:44:66",
+                "die-id": ["0x123", "0x456"], "unique-chip-id": "0x234", "wifi-mac": "02:11:22:33:44:66"
             ]
         )
         .write(to: base.appendingPathComponent("identity.json"))
@@ -329,7 +329,9 @@ extension BootTests {
         if board.hardware!.hasCellular {
             expected.argv += ["-global", "ios-baseband.sim-file=\(f.overlay.appendingPathComponent("sim").path)"]
         }
-        #expect(config == expected)
+        var assembled = config
+        assembled.files = nil  // everyBoardsBootFilesCoverItsArgvAndWriteOnlyTheDevicesOwn
+        #expect(assembled == expected)
     }
 
     /// device.plist `panel` (issue #21) reaches the machine as panel=WxH; unset, the machine line has no panel.
@@ -532,7 +534,7 @@ extension BootTests {
         [
             "{", "[]", "true", "42", "null", "\"iboot\"",
             "{\"boot_strategy\":null}", "{\"boot_strategy\":true}",
-            "{\"boot_strategy\":17}", "{\"boot_strategy\":[]}", "{\"boot_strategy\":{}}",
+            "{\"boot_strategy\":17}", "{\"boot_strategy\":[]}", "{\"boot_strategy\":{}}"
         ]
     )
     func invalidPresentLockRejectedBeforeStorage(board: Board, json: String) throws {
@@ -763,5 +765,64 @@ extension BootTests {
         try image(0).write(to: a4.base.appendingPathComponent("kboot.bin"))
         #expect(try boots(a4, .n90, a4.base.appendingPathComponent("kboot.bin")))
         #expect(!FileManager.default.fileExists(atPath: a4.overlay.appendingPathComponent("kboot.bin").path))
+    }
+}
+
+extension BootTests {
+    /// A sandboxed helper is granted exactly what each board's boot opens (BootConfig.files, SandboxExtension): every
+    /// path argv names is covered, and only the overlay, the writable NOR and the serial FIFOs are writable, never the
+    /// base or the app bundle the SecureROM comes from.
+    @Test func everyBoardsBootFilesCoverItsArgvAndWriteOnlyTheDevicesOwn() throws {
+        for board in Board.allCases {
+            for strategy in Self.strategies(board) {
+                let f = try Fixture(board: board, strategy: strategy)
+                let rom = f.root.appendingPathComponent("Light Touch.app/Contents/Resources/Device/rom.bin").path
+                let offer = f.root.appendingPathComponent("device/work/guest-offer")
+                try FileManager.default.createDirectory(at: offer, withIntermediateDirectories: true)
+                let serial = f.root.appendingPathComponent("logs/serial").path
+                let config = try PreparedDeviceBoot.prepare(
+                    board: board,
+                    base: f.base,
+                    overlay: f.overlay,
+                    writableNOR: f.nor,
+                    storageKey: "base-A",
+                    bootrom: rom
+                ).configuration(
+                    bootArgs: "args",
+                    usbAddress: "/group/1/mux-1-g.sock",
+                    wifi: true,
+                    guestPackage: offer.path,
+                    serial: "pipe:\(serial)",
+                    audio: ["-audio", "driver=coreaudio"],
+                    netdev: "user,id=wifi0"
+                )
+                let files = try #require(config.files, "\(board) \(strategy)")
+                #expect(
+                    Set(files.readWrite) == [f.overlay.path, f.nor.path, serial + ".in", serial + ".out"],
+                    "\(board) \(strategy): \(files.readWrite)"
+                )
+                let granted = files.readWrite + files.readOnly
+                for path in Self.argvPaths(config.argv) where !path.hasPrefix("/group/") {
+                    // -serial pipe:PATH opens PATH.in and PATH.out
+                    #expect(
+                        granted.contains { path == $0 || path.hasPrefix($0 + "/") || path + ".in" == $0 },
+                        "\(board) \(strategy): \(path) is not granted"
+                    )
+                }
+            }
+        }
+    }
+
+    /// Every absolute path in a QEMU argv (a value after `=` or `:`, between commas; ",," an escaped comma).
+    static func argvPaths(_ argv: [String]) -> [String] {
+        argv.flatMap { value in
+            value.replacingOccurrences(of: ",,", with: "\u{1}").split(separator: ",").compactMap { field -> String? in
+                let text = field.replacingOccurrences(of: "\u{1}", with: ",")
+                guard let slash = text.firstIndex(of: "/"),
+                    slash == text.startIndex || [":", "="].contains(text[text.index(before: slash)])
+                else { return nil }
+                return String(text[slash...])
+            }
+        }
     }
 }

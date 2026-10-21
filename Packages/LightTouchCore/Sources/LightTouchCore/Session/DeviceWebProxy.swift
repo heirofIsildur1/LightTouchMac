@@ -42,8 +42,11 @@ import Observation
         status = .waiting
     }
 
-    /// A new boot builds its own endpoint (forward()).
-    public func forgetEndpoint() { endpoint = nil }
+    /// A new boot builds its own endpoint (forward()); a stop leaves none. The old socket's path goes.
+    public func forgetEndpoint() {
+        if let endpoint { unlink(endpoint.socket) }
+        endpoint = nil
+    }
 
     /// Writes this device's routing and returns the guestfwd that reaches the helper's proxy; nil when the routing
     /// can't be written (the proxy then reads failed).

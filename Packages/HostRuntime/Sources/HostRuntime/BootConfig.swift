@@ -11,6 +11,8 @@ public nonisolated struct BootConfig: Codable, Sendable, Equatable {
     public var webProxy: WebProxyEndpoint?
     /// Managed boot: helper rechecks this storage generation under its lease.
     public var storageProof: StorageBootProof?
+    /// What argv opens, by role: a sandboxed helper is granted these (DeviceLink; HostRuntime SandboxExtension).
+    public var files: BootFiles?
 
     public init(argv: [String], environment: [String: String] = [:], machine: String) {
         self.argv = argv
@@ -25,6 +27,7 @@ public nonisolated struct BootConfig: Codable, Sendable, Equatable {
         machine = try c.decode(String.self, forKey: .machine)
         webProxy = try c.decodeIfPresent(WebProxyEndpoint.self, forKey: .webProxy)
         storageProof = try c.decodeIfPresent(StorageBootProof.self, forKey: .storageProof)
+        files = try c.decodeIfPresent(BootFiles.self, forKey: .files)
     }
 
     /// The panel's refresh, Hz: 60 as on the devices, or what argv's `refresh-hz` global asks for

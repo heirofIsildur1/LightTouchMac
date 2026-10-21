@@ -18,6 +18,9 @@
 #    GitHub release as before.
 # --dry-run skips 3, 4 and 8's signing, notarizing and uploading (and the export-only checks);
 # LTM_RELEASE_SKIP_PREPARE=1 with --dry-run also skips 7's prepare matrix.
+# LTM_HELPER_SANDBOX=YES: the archive was built with the helper under the App Sandbox (the build setting of that name);
+# 6 holds the helper and the app to those entitlements, and 7's boots run sandboxed (sessions fails a boot whose helper
+# isn't sandboxed exactly when its signature says).
 #
 # Notarization uses an App Store Connect API key when one is configured, else the ltm-notary keychain profile
 # (scripts/release-common.sh). LTM_SIGN_IDENTITY overrides the DMG's signing identity (default: the exported app's Authority).
@@ -110,6 +113,7 @@ EXPORTED=1; (( DRY )) && EXPORTED=0
 release_tests() {
     TEST_RUNNER_LTM_RELEASE_APP="$APP" TEST_RUNNER_LTM_RELEASE_EXPORTED=$EXPORTED \
         TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE="$SKIP_PREPARE" \
+        TEST_RUNNER_LTM_RELEASE_HELPER_SANDBOX="${LTM_HELPER_SANDBOX:-NO}" \
         xcodebuild -quiet -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
         -only-testing:"ReleaseChecksTests/$2" -derivedDataPath "$WORK/dd" \
         -resultBundlePath "$WORK/$1.xcresult" test > "$WORK/$1.log" 2>&1 \

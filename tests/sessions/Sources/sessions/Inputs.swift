@@ -46,6 +46,36 @@ func vendorDirectory() -> URL? {
     return path.isEmpty ? nil : URL(fileURLWithPath: path)
 }
 
+/// A copy of `helper` re-signed ad hoc with its own entitlements and `options` (the impostor the rendezvous refuses, the
+/// socket-observed helper): in a folder laid out as the bundle's, Contents/MacOS beside a link to its Frameworks, so a
+/// release helper finds its emulator, and under its own signing identifier, so a sandboxed copy has its own container.
+func helperCopy(_ helper: URL, named name: String, in work: URL, options: [String]) -> URL {
+    let fm = FileManager.default
+    let contents = work.appendingPathComponent("helper-\(name)/Contents")
+    let copy = contents.appendingPathComponent("MacOS/LightTouchDevice")
+    try? fm.removeItem(at: contents.deletingLastPathComponent())
+    try? fm.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? fm.copyItem(at: helper, to: copy)
+    let frameworks = helper.deletingLastPathComponent().appendingPathComponent("../Frameworks").standardizedFileURL
+    if fm.fileExists(atPath: frameworks.path) {
+        try? fm.createSymbolicLink(at: contents.appendingPathComponent("Frameworks"), withDestinationURL: frameworks)
+    }
+    let entitlements = work.appendingPathComponent("helper-\(name).entitlements")
+    try? output("/usr/bin/codesign", ["-d", "--entitlements", "-", "--xml", helper.path]).write(
+        to: entitlements,
+        atomically: true,
+        encoding: .utf8
+    )
+    let identifier = "gold.samhenri.LightTouchMac.LightTouchDevice-\(name)"
+    guard
+        run(
+            "/usr/bin/codesign",
+            ["-f", "-s", "-", "-i", identifier] + options + ["--entitlements", entitlements.path, copy.path]
+        ) == 0
+    else { die("could not sign the helper copy \(copy.path)") }
+    return copy
+}
+
 /// The executables and resources a run boots with: a built app's (`--app`), or a Debug build of the helper, the
 /// services worker and firmwarekit with scripts/vendor's dylib, usbmuxd, SecureROMs and guest package.
 struct Tools {
@@ -95,7 +125,7 @@ struct Tools {
         if let usbmuxd = args.usbmuxd { t.usbmuxd = usbmuxd }
         for (what, url) in [
             ("helper", t.helper), ("services worker", t.services), ("firmwarekit", t.firmwarekit),
-            ("usbmuxd", t.usbmuxd),
+            ("usbmuxd", t.usbmuxd)
         ] where !fm.isExecutableFile(atPath: url.path) {
             die("no \(what) at \(url.path)")
         }
@@ -103,8 +133,8 @@ struct Tools {
         return t
     }
 
-    /// LightTouchDevice, LightTouchServices and firmwarekit, Debug, signed by the project's team; the build is cached
-    /// under .build/sessions-xcode.
+    /// LightTouchDevice, LightTouchServices and firmwarekit, Debug, signed by the project's team (the helper sandboxed
+    /// with LTM_HELPER_SANDBOX=YES); the build is cached under .build/sessions-xcode.
     static func build(work: URL) -> URL {
         let symroot = repository.appendingPathComponent(".build/sessions-xcode")
         let log = work.appendingPathComponent("xcodebuild.log")
@@ -115,7 +145,9 @@ struct Tools {
                 "-project", repository.appendingPathComponent("LightTouchMac.xcodeproj").path,
                 "-target", "LightTouchDevice", "-target", "LightTouchServices", "-target", "firmwarekit",
                 "-configuration", "Debug", "SYMROOT=\(symroot.path)", "OBJROOT=\(symroot.path)/obj",
-                "COMPILER_INDEX_STORE_ENABLE=NO", "build",
+                // the helper under the App Sandbox when the environment asks (Configuration/Shared.xcconfig)
+                "LTM_HELPER_SANDBOX=\(ProcessInfo.processInfo.environment["LTM_HELPER_SANDBOX"] ?? "NO")",
+                "COMPILER_INDEX_STORE_ENABLE=NO", "build"
             ],
             log: log
         )
@@ -182,13 +214,13 @@ struct Base {
         [
             "n72ap": "ipod", "k48ap": "ipad", "n45ap": "ipod1g", "m68ap": "iphone2g", "n81ap": "ipod4g",
             "n90ap": "iphone4",
-            "n18ap": "ipod3g", "n88ap": "iphone3gs",
+            "n18ap": "ipod3g", "n88ap": "iphone3gs"
         ][board] ?? board
     }
     var productType: String {
         [
             "n72ap": "iPod2,1", "k48ap": "iPad1,1", "n45ap": "iPod1,1", "m68ap": "iPhone1,1", "n81ap": "iPod4,1",
-            "n90ap": "iPhone3,1", "n18ap": "iPod3,1", "n88ap": "iPhone2,1",
+            "n90ap": "iPhone3,1", "n18ap": "iPod3,1", "n88ap": "iPhone2,1"
         ][board] ?? ""
     }
     /// The kboot boards boot as the iPad does (an armv7 offer); the rest take the armv6 package.

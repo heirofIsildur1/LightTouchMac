@@ -5,15 +5,16 @@ import Foundation
 
 public nonisolated enum DebugPort {
     /// QEMU's argv for a gdbstub on the Unix socket `path`. The stub has no authentication, so it is never on TCP:
-    /// the socket is in the per-user temporary directory (0700, as usbmuxd's and the web proxy's are), and a socket
-    /// takes a connection only from who may write it (its owner).
+    /// the socket is in the per-user temporary directory, or a sandboxed helper's folder of the app group's container
+    /// (HelperSandbox; 0700, as usbmuxd's and the web proxy's are), and a socket takes a connection only from who may
+    /// write it (its owner).
     public static func arguments(socket path: String) -> [String] {
         ["-gdb", "unix:\(path.replacingOccurrences(of: ",", with: ",,")),server=on,wait=off"]
     }
 
     /// A fresh socket path for one gdbstub (a Unix socket path stays under 104 bytes).
-    public static func socketPath(_ prefix: String = "ltm-gdb") -> String {
-        NSTemporaryDirectory() + prefix + "-" + UUID().uuidString.prefix(8) + ".sock"
+    public static func socketPath(_ prefix: String = "gdb") -> String {
+        HelperSandbox.socketPath(prefix + "-" + UUID().uuidString.prefix(8) + ".sock")
     }
 
     /// lldb attached to the stub at `socket`.
