@@ -66,10 +66,20 @@ public struct CapturePreferences {
         openInApplicationURL.map(Self.applicationName) ?? "Preview"
     }
 
+    /// Preview's place, asked of Launch Services once (it is a system app and doesn't move).
     public static var previewApplicationURL: URL? {
-        (LSCopyApplicationURLsForBundleIdentifier("com.apple.Preview" as CFString, nil)?.takeRetainedValue() as? [URL])?
-            .first
+        if let previewURL { return previewURL }
+        previewURL =
+            (LSCopyApplicationURLsForBundleIdentifier("com.apple.Preview" as CFString, nil)?.takeRetainedValue()
+            as? [URL])?.first
+        return previewURL
     }
+    private static var previewURL: URL?
+    /// Each app's display name by path. The toolbar's Open Screenshot tooltip names the app, and toolbar validation
+    /// runs after every event: looking the name up there cost ~110 µs a time (issue 107).
+    private static var names: [String: String] = [:]
+    /// Display names looked up rather than remembered.
+    static private(set) var nameLookups = 0
 
     public static func isApplication(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
@@ -82,8 +92,12 @@ public struct CapturePreferences {
     }
 
     public static func applicationName(_ url: URL) -> String {
-        let name = FileManager.default.displayName(atPath: url.path)
-        return name.hasSuffix(".app") ? String(name.dropLast(4)) : name
+        if let name = names[url.path] { return name }
+        nameLookups += 1
+        var name = FileManager.default.displayName(atPath: url.path)
+        if name.hasSuffix(".app") { name.removeLast(4) }
+        names[url.path] = name
+        return name
     }
 
     public var copyOnCapture: Bool {

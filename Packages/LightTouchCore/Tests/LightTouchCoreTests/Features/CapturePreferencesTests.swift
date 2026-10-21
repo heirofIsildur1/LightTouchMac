@@ -88,6 +88,10 @@ struct CapturePreferencesTests {
                 preferences.openInApplicationURL = app
                 #expect(preferences.openInApplicationURL?.path == app.path)
                 #expect(preferences.openInApplicationName == "Image Editor")
+                // The toolbar asks after every event (issue 107): the name is looked up once per app.
+                let lookups = CapturePreferences.nameLookups
+                for _ in 0..<100 { _ = preferences.openInApplicationName }
+                #expect(CapturePreferences.nameLookups == lookups, "the name was looked up again")
                 preferences.openInApplicationURL = base
                 #expect(
                     preferences.openInApplicationURL?.path == app.path,
