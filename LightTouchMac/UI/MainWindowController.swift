@@ -39,7 +39,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSWindo
     let noInspector = PaneLabelViewController()
     private let sidebarItem: NSSplitViewItem
     let inspectorItem: NSSplitViewItem
-    let zoomControl = NSSegmentedControl()
     var deadOverlay: NSView?
     var filesWindow: DeviceFilesWindowController?
     weak var proxySettingsEditor: ProxySettingsView?
@@ -154,8 +153,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSWindo
         migrateCaptureToolbar(toolbar)
         migrateSidebarToolbar(toolbar)
         migrateAddDeviceToolbar(toolbar)
-        configureZoomControl()
-        syncZoomControls()
 
         window.delegate = self
         NotificationCenter.default.addObserver(

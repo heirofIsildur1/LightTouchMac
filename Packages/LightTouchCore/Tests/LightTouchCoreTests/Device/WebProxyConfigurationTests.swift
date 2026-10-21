@@ -80,11 +80,11 @@ struct WebProxyConfigurationTests {
         )
     }
 
-    @Test func guestForwardQuotesTheSocket() {
-        #expect(
-            WebProxyConfiguration.guestForward(socket: "/t/a,b's")
-                == ",guestfwd=tcp:10.0.2.100:3128-cmd:/usr/bin/nc -U '/t/a,,b'\"'\"'s'"
-        )
+    /// QEMU connects to the socket itself (no `cmd:`, which runs a program per guest connection); a comma is escaped.
+    @Test func guestForwardConnectsToTheSocketWithoutAProgram() {
+        let forward = WebProxyConfiguration.guestForward(socket: "/t/a,b's")
+        #expect(forward == ",guestfwd=tcp:10.0.2.100:3128-unix-connect:/t/a,,b's")
+        #expect(!forward.contains("cmd:"))
     }
 
     @Test func statusLines() {
