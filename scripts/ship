@@ -8,8 +8,8 @@
 #    ExportOptions team's Developer ID Application identity is in the keychain; amore and gh are logged in; at
 #    least LTM_SHIP_MIN_DISK_GB (default 80) free in the release directory; scripts/host-ready says READY (asked
 #    every minute for up to LTM_SHIP_HOST_WAIT seconds, default 3600).
-# 2. vendor: every IPSW the vendor step and ReleaseBootTests need into the app's IPSW cache (the catalog's sha1),
-#    cloned from a local copy with that SHA-1 (LTM_BUILT_IN_IPSW for the built-in iPod, then any .ipsw of the
+# 2. vendor: every IPSW the vendor step and ReleaseBootTests need (Packages/ReleaseChecks/boots.json) into the app's
+#    IPSW cache (the catalog's sha1), cloned from a local copy with that SHA-1 (LTM_BUILT_IN_IPSW for the built-in iPod, then any .ipsw of the
 #    catalog's size under LTM_IPSW_DIRS, colon-separated, default ~/Developer/ipod2g-re/OldSDK,
 #    ~/Developer/qemu-ios-files and ~/Downloads), else downloaded from the catalog's URL or its mirrors and checked;
 #    then scripts/vendor.
@@ -140,10 +140,10 @@ main() {
     echo "$ready"
 
     step "IPSWs"
-    BUILT_IN="$(sed -n 's/.*static let builtIn = "\([^"]*\)".*/\1/p' "$ROOT/Packages/ReleaseChecks/Tests/ReleaseChecksTests/ReleaseBootTests.swift")"
-    local routes line
-    routes="$(sed -n 's/.*static let routes = \[\(.*\)\].*/\1/p' "$ROOT/Packages/ReleaseChecks/Tests/ReleaseChecksTests/ReleaseBootTests.swift" | tr -d '",')"
-    [[ -n "$BUILT_IN" && -n "$routes" ]] || fail IPSWs "can't read ReleaseBootTests' builtIn and routes"
+    local boots="$ROOT/Packages/ReleaseChecks/boots.json" routes line
+    BUILT_IN="$(plutil -extract builtIn raw -o - "$boots")" || fail IPSWs "no builtIn in $boots"
+    routes="$(plutil -extract routes json -o - "$boots" | tr -d '[]"' | tr ',' ' ')" || fail IPSWs "no routes in $boots"
+    [[ -n "$BUILT_IN" && -n "${routes// /}" ]] || fail IPSWs "$boots names no built-in iPod or no routes"
     local cache="$HOME/Library/Caches/gold.samhenri.LightTouchMac/IPSW"
     swift "$ROOT/scripts/release-helper.swift" catalog "$ROOT/LightTouchMac/Resources/firmware-catalog.json" \
         $(printf '%s\n' "$BUILT_IN" $routes | sort -u) > "$WORK/ipsws.txt" || fail IPSWs "the catalog has no source for one of them"

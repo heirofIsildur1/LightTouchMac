@@ -16,7 +16,7 @@ docs/matrix-results.json.lock
 docs/
 *.profraw
 
-# scripts/vendor output and local overrides
+# Local overrides; Vendor.xcconfig is what an older scripts/vendor wrote (nothing reads it), still in old checkouts
 Configuration/Vendor.xcconfig
 Configuration/Local.xcconfig
 

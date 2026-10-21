@@ -1,5 +1,5 @@
 #!/bin/bash
-# An archive to the release download, the command-line route (Organizer's is Distribute, then scripts/check-export):
+# An archive to the release download:
 #
 #     scripts/release path/to/X.xcarchive [--dry-run] [--amore --notes path/to/notes.md [--publish]]
 #

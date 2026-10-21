@@ -7,8 +7,8 @@
 #                                                      (its session ended: no idle wait; the agent hooks)
 #
 # Vendor directories (LTM_VENDOR_ROOT, default ~/Developer/ltm-vendor.noindex): keeps the pin key of every remaining
-#   checkout of this repository (the release worktree's among them), any a Vendor.xcconfig or build/vendor in one
-#   names, and the newest; removes the rest (and prunes their qemu-ios worktrees).
+#   checkout of this repository (the release worktree's among them), any a build/vendor in one names, and the
+#   newest; removes the rest (and prunes their qemu-ios worktrees).
 # Worktrees of this repository and the pinned qemu-ios's: only managed ones (under a repository's .claude/worktrees
 #   or LTM_WORKTREE_ROOT, default ~/Developer/ltm-worktrees.noindex), and only when unlocked, with no uncommitted or
 #   untracked file, every commit on a remote, untouched for LTM_CLEAN_IDLE_HOURS (default 24) and open in no
@@ -156,10 +156,8 @@ if [[ -z "$ONLY" ]]; then
     keep=() why=()
     for checkout in "${live[@]+"${live[@]}"}"; do
         keep+=("$("$HERE/vendor-check" --key "$checkout" 2>/dev/null)"); why+=("the pins of $checkout")
-        for ref in "$(readlink "$checkout/build/vendor" 2>/dev/null)" \
-            "$(sed -n 's/^VENDOR_DIR *= *//p' "$checkout/Configuration/Vendor.xcconfig" 2>/dev/null)"; do
-            [[ -n "$ref" ]] && { keep+=("$(basename "$ref")"); why+=("named in $checkout"); }
-        done
+        ref="$(readlink "$checkout/build/vendor" 2>/dev/null)"
+        [[ -n "$ref" ]] && { keep+=("$(basename "$ref")"); why+=("named in $checkout"); }
     done
     newest="$(ls -t "$VENDOR_ROOT"/*/vendor.json 2>/dev/null | head -1)"
     [[ -n "$newest" ]] && { keep+=("$(basename "$(dirname "$newest")")"); why+=("the newest"); }

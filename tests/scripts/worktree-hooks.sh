@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/hooks/worktree on a made-up repository with an origin: create makes a managed worktree and its scratch;
+# .claude/hooks/worktree on a made-up repository with an origin: create makes a managed worktree and its scratch;
 # remove and session-end take only what is safe. Prints ok/FAIL per check; exits 1 on any FAIL.
 set -uo pipefail
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -14,13 +14,13 @@ json() { perl -MJSON::PP -e 'my %h = @ARGV; print encode_json(\%h)' "$@"; }
 git init -q --bare "$T/origin.git"
 g clone -q "$T/origin.git" "$T/LightTouchMac" 2>/dev/null
 R="$T/LightTouchMac"
-mkdir -p "$R/scripts/hooks" "$R/build-support"
+mkdir -p "$R/scripts" "$R/.claude/hooks" "$R/build-support"
 cp "$SRC/scripts/clean" "$SRC/scripts/vendor-check" "$R/scripts/"
-cp "$SRC/scripts/hooks/worktree" "$R/scripts/hooks/"
+cp "$SRC/.claude/hooks/worktree" "$R/.claude/hooks/"
 echo '{}' > "$R/build-support/sources.json"
 g -C "$R" add -A && g -C "$R" commit -q -m one && g -C "$R" push -q origin HEAD:main
 export LTM_WORKTREE_ROOT="$T/managed" LTM_SCRATCH_ROOT="$T/scratch" LTM_DERIVED_DATA="$T/dd" LTM_VENDOR_ROOT="$T/vendor"
-HOOK="$R/scripts/hooks/worktree"
+HOOK="$R/.claude/hooks/worktree"
 create() { json name "$1" cwd "$R" hook_event_name WorktreeCreate | "$HOOK" create 2>/dev/null | tail -1; }
 gone() { for _ in $(seq 50); do [[ -e "$1" ]] || return 0; sleep 0.2; done; return 1; }
 stays() { sleep 2; [[ -d "$1" ]]; }

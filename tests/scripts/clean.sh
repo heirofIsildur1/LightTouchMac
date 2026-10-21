@@ -26,7 +26,7 @@ R="$T/LightTouchMac"
 mkdir -p "$R/scripts" "$R/build-support" "$R/LightTouchMac.xcodeproj" && touch "$R/LightTouchMac.xcodeproj/project.pbxproj"
 cp "$SRC/scripts/clean" "$SRC/scripts/vendor-check" "$R/scripts/"
 printf '{"qemu-ios": {"path": "%s"}}\n' "$T/qemu" > "$R/build-support/sources.json"
-printf '.claude/\nbuild/\nConfiguration/Vendor.xcconfig\n' > "$R/.gitignore"
+printf '.claude/\nbuild/\n' > "$R/.gitignore"
 g -C "$R" add -A && g -C "$R" commit -q -m pins && g -C "$R" push -q origin HEAD:main
 W="$R/.claude/worktrees"
 for name in landed dirty unpushed fresh locked; do g -C "$R" worktree add -q -b "$name" "$W/$name"; done
@@ -37,7 +37,7 @@ g -C "$R" worktree lock "$W/locked"
 for name in landed dirty unpushed locked; do old "$(git -C "$W/$name" rev-parse --absolute-git-dir)"; done
 old "$(git -C "$T/elsewhere" rev-parse --absolute-git-dir)" "$(git -C "$T/qemu/.claude/worktrees/q-landed" rev-parse --absolute-git-dir)"
 
-# vendor directories: the pins', one an override in a kept worktree names, the newest, one held open, one stale
+# vendor directories: the pins', one a kept worktree's build/vendor names, the newest, one held open, one stale
 V="$T/vendor"
 key="$("$R/scripts/vendor-check" --key "$R")"
 for name in "$key" aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc dddddddddddd; do
@@ -45,7 +45,7 @@ for name in "$key" aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc dddddddddddd; do
 done
 old "$V"
 touch "$V/bbbbbbbbbbbb/vendor.json"
-mkdir -p "$W/dirty/Configuration" && echo "VENDOR_DIR = $V/aaaaaaaaaaaa" > "$W/dirty/Configuration/Vendor.xcconfig"
+mkdir -p "$W/dirty/build" && ln -s "$V/aaaaaaaaaaaa" "$W/dirty/build/vendor"
 (cd "$V/cccccccccccc" && exec sleep 60) &
 HOLDER=$!; disown "$HOLDER"
 
