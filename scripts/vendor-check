@@ -20,7 +20,8 @@ pin_key() (
     shopt -s dotglob nullglob
     local names=(
         build-support/sources.json build-support/dependencies.json scripts/build-package-native.sh
-        scripts/build-static-deps.sh scripts/build-iboot32patcher.sh build-support/developer-disk-images.json
+        scripts/build-static-deps.sh scripts/build-iboot32patcher.sh scripts/build-angle.sh
+        build-support/developer-disk-images.json
         Packages/BuildTools/Package.swift Packages/BuildTools/Sources Packages/ReleaseChecks/Sources
         build-support/patches/*
     )

@@ -59,6 +59,7 @@ func single(_ args: SingleCheck) -> Never {
     if args.skipSetup { single["skipSetup"] = true }
     if args.jailbreak { single["jailbreak"] = true }
     if let panel = args.panel { single["panel"] = panel }
+    if args.angle { single["angle"] = true }
     if args.killPersist { single["killPersist"] = true }
     if let upgrade = args.upgradeIPA { single["upgradeIPA"] = upgrade.path }
     // Every run records the guest's sound (never to the Mac's speakers): the lock sound is judged at every run.

@@ -142,7 +142,7 @@ struct BugReportInfoDeviceFactsTests {
         d.iosVersion = "5.1.1"
         d.readSettings(DeviceSettings(), proxy: WebProxyConfiguration(), accessibilityOn: nil)
         let plain = BugReportInfo.text(system: system, devices: [d], recentErrors: [], identity: identity)
-        for absent in ["Notice", "Web proxy", "Tweaks", "Accessibility", "120 Hz", "Clipboard", "Free space", "Storage"] {
+        for absent in ["Notice", "Web proxy", "Tweaks", "Accessibility", "120 Hz", "ANGLE", "Clipboard", "Free space", "Storage"] {
             #expect(!plain.contains(absent), "\(absent)")
         }
         #expect(!plain.contains("Skipped"))
@@ -155,6 +155,7 @@ struct BugReportInfoDeviceFactsTests {
             system: system,
             freeSpace: 5_000_000_000,
             refresh120: true,
+            angle: true,
             shareClipboard: false,
             skippedAfterCrash: ["3D device", "starting a device at launch"],
             devices: [d],
@@ -167,6 +168,7 @@ struct BugReportInfoDeviceFactsTests {
                 arm64 on Mac16,10, Apple M4
                 Free space: \(Int64(5_000_000_000).formatted(.byteCount(style: .file))) on the library's volume
                 120 Hz refresh: on
+                ANGLE renderer: on
                 Clipboard sharing: off
                 Skipped after a crash: 3D device, starting a device at launch
                 """

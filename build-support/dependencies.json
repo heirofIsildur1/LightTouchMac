@@ -214,6 +214,21 @@
       "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-09-28. LukeZGD's fork (the one Legacy-iOS-Kit ships), master of 2026-09-14. firmwarekit runs it as a separate process (K48IBoot.patchIBoot) for the k48 iboot recipe. Built with build-support/patches/iBoot32Patcher-ltm.patch (word-aligned xref matches only, smoke #48); K48IBootTests checks its output byte-for-byte against the Legacy-iOS-Kit v25.09.01 binary on every k48 build that binary patches."
     },
     {
+      "name": "ANGLE",
+      "version": "3d5feae4378fee3404431223d908446041348761",
+      "groups": [
+        "angle"
+      ],
+      "archive": "angle-3d5feae4378fee3404431223d908446041348761.tar.gz",
+      "directory": "angle-3d5feae4378fee3404431223d908446041348761",
+      "url": "https://github.com/google/angle/archive/3d5feae4378fee3404431223d908446041348761.tar.gz",
+      "sha256": "f0bcaa78193e0ecb3bbe37eb212badd14d046c8098014fe45cfb4c8b7a6dc2bc",
+      "repository": "https://chromium.googlesource.com/angle/angle",
+      "depot_tools": "9cb87e7cca51147a3b8f39033e561736f8460652",
+      "license": "BSD-3-Clause",
+      "checksum_source": "SHA-256 calculated from this GitHub archive of ANGLE's main on 2026-10-21, which records the source; scripts/build-angle.sh builds from gclient's checkout of the same commit (repository, with depot_tools at depot_tools and the rest from ANGLE's DEPS), Metal only and static, linking in Abseil (Apache-2.0), zlib (Zlib) and zstd (BSD-3-Clause). The emulator opens its libEGL and libGLESv2 for the experimental ANGLE renderer (Settings ▸ General); the CGL renderer runs without them."
+    },
+    {
       "name": "ZIPFoundation",
       "version": "0.9.20",
       "groups": [

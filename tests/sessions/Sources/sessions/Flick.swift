@@ -37,8 +37,9 @@ func flickCheck(_ args: FlickCheck) -> Never {
                 "dump page", "button 0", "wait 3", "dump left", "button 0", "wait 3",
             ] + args.kinds.split(separator: ",").map { "flicks \($0) \(args.runs) \(at)" } + ["quit", "expectExit 60"]
     )
-    if args.refreshHz != 60, var prepared = scenario["prepared"] as? [String: Any] {
-        prepared["refreshHz"] = args.refreshHz
+    if args.refreshHz != 60 || args.angle, var prepared = scenario["prepared"] as? [String: Any] {
+        if args.refreshHz != 60 { prepared["refreshHz"] = args.refreshHz }
+        if args.angle { prepared["angle"] = true }
         scenario["prepared"] = prepared
     }
     let d = HelperDriver("flick", tools: tools, work: work, scenario: scenario)

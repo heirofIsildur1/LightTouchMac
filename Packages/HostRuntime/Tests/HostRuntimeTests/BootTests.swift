@@ -78,6 +78,33 @@ struct BootTests {
         }
     }
 
+    /// Settings ▸ General's experimental ANGLE renderer: every board's machine gets gl-renderer=angle; a boot without it,
+    /// or one resuming a snapshot, names no renderer (the emulator's default, CGL).
+    @Test func angleReachesEachBoardsMachine() throws {
+        for board in [Board.m68, .n72, .n88, .k48, .n81, .n90] {
+            let f = try Fixture(board: board, strategy: board == .m68 ? "iboot" : board == .n72 ? "bootrom" : "kboot")
+            defer { try? FileManager.default.removeItem(at: f.root) }
+            func machine(_ angle: Bool, restore: [String] = []) throws -> String {
+                let config = try f.prepare(board).configuration(
+                    bootArgs: "",
+                    usbAddress: nil,
+                    wifi: true,
+                    guestPackage: nil,
+                    serial: "null",
+                    audio: [],
+                    netdev: "user,id=wifi0",
+                    restore: restore,
+                    angle: angle
+                )
+                return config.argv[config.argv.firstIndex(of: "-M")! + 1]
+            }
+            #expect(try machine(true).contains(",gl-renderer=angle"), "\(board)")
+            #expect(try !machine(false).contains("gl-renderer"), "\(board)")
+            // a snapshot resumes on CGL, whose GL state it holds
+            #expect(try !machine(true, restore: ["-incoming", "file:/s"]).contains("gl-renderer"), "\(board)")
+        }
+    }
+
     @Test func carrierSettingsReachRadioBoards() throws {
         var carrier = CarrierSettings()
         carrier.carrier = "Panel"

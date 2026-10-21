@@ -49,6 +49,9 @@ public enum AboutCredits {
             "nettle"
         ),
         Project("PowerVR SDK", "https://github.com/powervr-graphics/Native_SDK", "MIT", "powervr"),
+        Project("ANGLE", "https://chromium.googlesource.com/angle/angle", "BSD-3-Clause", "angle"),
+        Project("Abseil", "https://abseil.io", "Apache-2.0", "angle"),
+        Project("zlib", "https://zlib.net", "Zlib", "angle"),
         Project("iBoot32Patcher", "https://github.com/LukeZGD/iBoot32Patcher", "GPL-3.0", "iBoot32Patcher"),
         Project("Unrar.swift", "https://github.com/mtgto/Unrar.swift", "MIT", "swift/Unrar.swift"),
         Project("UnRAR", "https://www.rarlab.com/rar_add.htm", "UnRAR license", "swift/Unrar.swift"),

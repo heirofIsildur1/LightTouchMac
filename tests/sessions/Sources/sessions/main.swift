@@ -139,6 +139,7 @@ struct SingleCheck: ParsableCommand {
     @Flag(help: "With --afc-race: dirty boots.") var dirty = false
     @Flag(help: "CoreAnimation composites through the emulator's GL bridge, and the bridge refuses nothing.")
     var gl = false
+    @Flag(help: "Boot with Settings ▸ General's experimental ANGLE renderer on.") var angle = false
     @Flag var noInstall = false
     @Flag var noOffer = false
     @Option(transform: path) var ipa: URL?
@@ -239,10 +240,13 @@ struct HelperCheck: ParsableCommand {
 struct HelperBootCheck: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "helper-boot",
-        abstract: "The helper alone on an n72 base: input, rotation, parent death, a meddled overlay, power."
+        abstract: """
+            The helper alone on an n72 base: input, rotation, parent death, a meddled overlay, power; with angle, a \
+            snapshot refused on the experimental ANGLE renderer.
+            """
     )
     @Argument var base: String
-    @Option(help: "The cases, comma-separated.") var only = "ipod,meddle,power"
+    @Option(help: "The cases, comma-separated (ipod, meddle, power, angle).") var only = "ipod,meddle,power"
     @OptionGroup var inputs: Inputs
 
     func run() { helperBoot(self) }
@@ -329,6 +333,7 @@ struct FlickCheck: ParsableCommand {
     @Option(help: "The kinds, comma-separated (helper-driver's trackpadGesture).") var kinds = "flick,slow"
     @Option(help: "The least median frames/s of motion each kind's gestures may reach the app at.") var minFps = 45.0
     @Option(help: "The panel's refresh, Hz, as Settings ▸ General's experimental 120 Hz boots it.") var refreshHz = 60
+    @Flag(help: "Boot with Settings ▸ General's experimental ANGLE renderer on.") var angle = false
     @OptionGroup var inputs: Inputs
 
     func run() { flickCheck(self) }

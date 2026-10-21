@@ -166,6 +166,8 @@ extension String {
     var restricted = false
     /// The device record's free-form `panel` ("WxH" as it scans), as EmulatorController boots with it.
     var panel: String?
+    /// Settings ▸ General's experimental ANGLE renderer (PreparedDeviceBoot's angle).
+    var angle = false
     init(name: String, profile: Board, base: URL) {
         self.name = name
         self.profile = profile
@@ -238,7 +240,8 @@ extension String {
                 serial: serial!.argument,
                 audio: ["-audio", config.single?.audioWAV.map { "driver=wav,path=\($0)" } ?? "driver=none"],
                 netdev: netdev,
-                webProxy: webProxy
+                webProxy: webProxy,
+                angle: angle
             )
             boot.storageProof = proof
             return boot

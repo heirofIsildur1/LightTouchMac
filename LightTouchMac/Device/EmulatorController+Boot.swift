@@ -189,7 +189,8 @@ extension EmulatorController {
                 audio: ["-audio", "driver=coreaudio,out.buffer-count=16"],
                 netdev: netdev,
                 carrier: profile.hasCellular ? carrierSettings : nil,
-                refreshHz: DisplayRefresh.hz
+                refreshHz: DisplayRefresh.hz,
+                angle: ANGLERenderer.isOn
             )
         } catch {
             failBoot(error)

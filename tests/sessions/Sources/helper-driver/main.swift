@@ -49,6 +49,8 @@ struct Scenario: Decodable {
         var itpack: String?
         /// The panel's refresh, as Settings ▸ General's experimental 120 Hz boots it; default 60.
         var refreshHz: Int?
+        /// Settings ▸ General's experimental ANGLE renderer; default off.
+        var angle: Bool?
     }
     var dylib: String?
     var board: String?
@@ -95,7 +97,8 @@ func preparedBoot(_ p: Scenario.Prepared, hardware: DeviceInfo?) throws -> BootC
         audio: ["-audio", "driver=none"],
         netdev: "user,id=wifi0",
         carrier: p.carrier,
-        refreshHz: p.refreshHz ?? 60
+        refreshHz: p.refreshHz ?? 60,
+        angle: p.angle ?? false
     )
 }
 
@@ -683,7 +686,7 @@ Thread.detachNewThread {
             usleep(UInt32(v[0] * 1e6))
             link.send(.audioStop(generation: g))
             usleep(1_500_000)
-        case "snapshot":
+        case "snapshot", "snapshot-refused":  // snapshot-refused: the save must end in an error (status 3)
             let start = Date()
             link.send(.snapshotSave(path: p[1]))
             var code = 1
@@ -704,7 +707,7 @@ Thread.detachNewThread {
                     "glesContexts": link.status?.glesContexts ?? -1,
                 ]
             )
-            if code != 2 { fail("snapshot failed") }
+            if code != (p[0] == "snapshot" ? 2 : 3) { fail("snapshot ended with status \(code)") }
         case "resume":
             link.send(.snapshotResume)
         case "pause", "unpause":  // the app's Pause and Resume (MachineOp.pause, .resume)

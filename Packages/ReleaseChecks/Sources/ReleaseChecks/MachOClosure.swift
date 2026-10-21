@@ -121,8 +121,10 @@ public enum MachOClosure {
         guard seen.insert(path.path).inserted else { return }
         if noWeakImports {
             let imports = try Shell.run(["nm", "-arch", arch, "-m", path.path]).output
+            // but @available's runtime check, which libSystem has had since macOS 10.15 (ANGLE's Metal backend uses it)
             let weak = imports.split(separator: "\n").filter {
                 $0.contains("(undefined)") && $0.contains("weak external")
+                    && !$0.contains("weak external __availability_version_check ")
             }
             .compactMap { $0.split(separator: " ").last.map(String.init) }
             if !weak.isEmpty {

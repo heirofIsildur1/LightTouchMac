@@ -15,7 +15,8 @@ public struct Vendor {
         Nothing here deletes a vendor directory. One run at a time: a second run waits for the first (a flock on
         <vendor root>/.lock).
 
-        <vendor>/Frameworks/   libqemu-arm.dylib and its closure, libimobiledevice-1.0 and libplist-2.0: universal,
+        <vendor>/Frameworks/   libqemu-arm.dylib and its closure, ANGLE's libEGL and libGLESv2 (the emulator opens them
+                               for its experimental ANGLE renderer), libimobiledevice-1.0 and libplist-2.0: universal,
                                @rpath install names, stripped, ad-hoc signed with the hardened runtime (Xcode re-signs)
         <vendor>/MacOS/        usbmuxd, iBoot32Patcher, inetcat, ipod-helper (the same)
         <vendor>/Resources/    Guest/guest.aar (the guest binaries and Developer Disk Images, packed: no nested code),
@@ -65,7 +66,8 @@ public struct Vendor {
     static let keyed =
         [
             "build-support/sources.json", "build-support/dependencies.json", "scripts/build-package-native.sh",
-            "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh", developerImages,
+            "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh", "scripts/build-angle.sh",
+            developerImages,
         ] + tools
     static let staticKeyed = [
         "scripts/build-static-deps.sh", "build-support/dependencies.json",
@@ -164,9 +166,33 @@ public struct Vendor {
         return tree
     }
 
+    /// ANGLE's universal libEGL and libGLESv2, headers and licenses (scripts/build-angle.sh), from gclient's checkout of
+    /// the pinned commit, cached under <vendor root>/angle-src/<commit>.
+    func angle(_ work: URL) throws -> URL {
+        let out = work.appendingPathComponent("angle")
+        if files.fileExists(atPath: out.appendingPathComponent("licenses/SOURCE.txt").path) { return out }
+        let packages = (try readJSON(root.appendingPathComponent("build-support/dependencies.json"))["packages"]
+            as? [[String: Any]]) ?? []
+        guard let commit = packages.first(where: { $0["name"] as? String == "ANGLE" })?["version"] as? String else {
+            throw ToolError("vendor: no ANGLE package in build-support/dependencies.json")
+        }
+        let log = work.appendingPathComponent("logs/angle.log")
+        say("ANGLE \(commit.prefix(10)); log \(log.path)")
+        try files.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try run(
+            [
+                "/bin/bash", scripts.appendingPathComponent("build-angle.sh").path,
+                vendorRoot.appendingPathComponent("angle-src/\(commit)").path, out.path,
+            ],
+            log: log,
+            environment: env(["LTM_ARCH": Self.archs.joined(separator: " ")])
+        )
+        return out
+    }
+
     /// One build-package-native.sh root per slice (usbmuxd at its pin, the QEMU dylib, iBoot32Patcher), with the
     /// static prefix cached per recipe, then merged into one universal root.
-    func native(_ work: URL, qemu: URL) throws -> URL {
+    func native(_ work: URL, qemu: URL, angle: URL) throws -> URL {
         let universal = work.appendingPathComponent("universal")
         if files.fileExists(atPath: universal.appendingPathComponent("native-build.json").path),
             files.fileExists(atPath: universal.appendingPathComponent("build/iBoot32Patcher/iBoot32Patcher").path)
@@ -184,7 +210,7 @@ public struct Vendor {
             try files.createDirectory(at: slice.deletingLastPathComponent(), withIntermediateDirectories: true)
             let e = env([
                 "LTM_ARCH": arch, "QEMU_IOS_DIR": qemu.path,
-                "LTM_STATIC_DEPS": staticRoot.appendingPathComponent("prefix").path,
+                "LTM_STATIC_DEPS": staticRoot.appendingPathComponent("prefix").path, "LTM_ANGLE": angle.path,
             ])
             if !Self.staticComplete(staticRoot) {
                 remove(staticRoot)
@@ -407,7 +433,7 @@ public struct Vendor {
     }
 
     /// Frameworks/ and MacOS/: every non-system dependency embedded once under @rpath, build rpaths dropped.
-    func binaries(_ vendor: URL, universal: URL, qemu: URL, work: URL) throws {
+    func binaries(_ vendor: URL, universal: URL, qemu: URL, angle: URL, work: URL) throws {
         let frameworks = vendor.appendingPathComponent("Frameworks")
         let tools = vendor.appendingPathComponent("MacOS")
         let toolsLog = work.appendingPathComponent("logs/tools.log")
@@ -454,6 +480,7 @@ public struct Vendor {
         _ = try embed(prefix.appendingPathComponent("lib/libimobiledevice-1.0.dylib"), as: "libimobiledevice-1.0.dylib")
         _ = try embed(prefix.appendingPathComponent("lib/libplist-2.0.dylib"), as: "libplist-2.0.dylib")
         _ = try embed(universal.appendingPathComponent("qemu-build/libqemu-arm.dylib"), as: "libqemu-arm.dylib")
+        for name in ["libEGL.dylib", "libGLESv2.dylib"] { _ = try embed(angle.appendingPathComponent(name), as: name) }
         let helper = work.appendingPathComponent("ipod-helper")
         try run(
             ["/usr/bin/cc", "-O2", "-Wall"] + Self.archs.flatMap { ["-arch", $0] } + [
@@ -519,6 +546,7 @@ public struct Vendor {
         work: URL,
         universal: URL,
         qemu: URL,
+        angle: URL,
         guestRoot: URL,
         manifest: [String: Any],
         developer: URL,
@@ -593,6 +621,7 @@ public struct Vendor {
         for name in ["LICENSE", "COPYING", "COPYING.LIB"] {
             try copy(qemu.appendingPathComponent(name), licenses.appendingPathComponent("qemu/\(name)"))
         }
+        try copy(angle.appendingPathComponent("licenses"), licenses.appendingPathComponent("angle"))
         let qemuPin = pin("qemu-ios")
         let usbPin = pin("usbmuxd")
         let version = try String(contentsOf: qemu.appendingPathComponent("VERSION"), encoding: .utf8)
@@ -684,19 +713,21 @@ public struct Vendor {
         }
         try files.createDirectory(at: work, withIntermediateDirectories: true)
         let qemu = try qemuTree(work)
-        let universal = try native(work, qemu: qemu)
+        let angle = try angle(work)
+        let universal = try native(work, qemu: qemu, angle: angle)
         let (guestRoot, manifest) = try guest(work, qemu: qemu)
         let developer = try developerTools(work, qemu: qemu)
         let (tool, helper, checkouts) = try firmwarekit(work)
         if previous["recipe"] != stamp["recipe"]
             || !files.fileExists(atPath: vendor.appendingPathComponent("Frameworks/libqemu-arm.dylib").path)
         {
-            try binaries(vendor, universal: universal, qemu: qemu, work: work)
+            try binaries(vendor, universal: universal, qemu: qemu, angle: angle, work: work)
             try resources(
                 vendor,
                 work: work,
                 universal: universal,
                 qemu: qemu,
+                angle: angle,
                 guestRoot: guestRoot,
                 manifest: manifest,
                 developer: developer,

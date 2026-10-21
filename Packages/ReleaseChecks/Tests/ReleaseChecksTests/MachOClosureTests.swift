@@ -121,6 +121,29 @@ struct MachOClosureTests {
                 failure { try MachOClosure.check(weakLib, minimum: "14.0", arch: "arm64", noWeakImports: true) }?
                     .contains("unexpected weak imports") == true
             )
+            // @available's runtime check, weak in every binary that uses it (ANGLE's Metal backend), is the one allowed
+            let available = root.appendingPathComponent("available.c")
+            try "int newer(void) { if (__builtin_available(macOS 26, *)) return 1; return 0; }\n"
+                .write(to: available, atomically: true, encoding: .utf8)
+            let availableLib = root.appendingPathComponent("available.dylib")
+            try cc(
+                "-arch",
+                "arm64",
+                "-mmacosx-version-min=14.0",
+                "-dynamiclib",
+                available.path,
+                "-o",
+                availableLib.path
+            )
+            #expect(
+                try Shell.run(["nm", "-m", availableLib.path]).output.contains(
+                    "weak external __availability_version_check"
+                )
+            )
+            #expect(
+                failure { try MachOClosure.check(availableLib, minimum: "14.0", arch: "arm64", noWeakImports: true) }
+                    == nil
+            )
 
             let lib = root.appendingPathComponent("lib.c")
             let main = root.appendingPathComponent("main.c")
