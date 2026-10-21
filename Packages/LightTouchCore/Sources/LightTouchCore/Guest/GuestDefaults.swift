@@ -54,7 +54,7 @@ extension GuestServices {
         for domain in domains {
             let path = "\(Self.preferences)/\(domain).plist"
             let old: NSDictionary
-            if let data = try await agent.get(path), !data.isEmpty {
+            if let data = try await agent.get(path, limit: 8 << 20), !data.isEmpty {
                 guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? NSDictionary
                 else { throw DeviceToolsError.failed("The device’s \(domain) preferences aren’t readable.") }
                 old = plist

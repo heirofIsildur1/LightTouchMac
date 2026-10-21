@@ -415,7 +415,7 @@ public nonisolated struct HiddenApp: Equatable, Sendable, Identifiable {
     public static func present(on guest: GuestServices) async throws -> [HiddenApp] {
         var found: [HiddenApp] = []
         for app in candidates {
-            guard let data = try await guest.agent.get("/Applications/\(app.bundle).app/Info.plist"),
+            guard let data = try await guest.agent.get("/Applications/\(app.bundle).app/Info.plist", limit: 1 << 20),
                 let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                 info["CFBundleIdentifier"] as? String == app.bundleID
             else { continue }

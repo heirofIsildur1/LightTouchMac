@@ -522,7 +522,10 @@ nonisolated enum WiFiProbe {
         // The language, region and keyboards the base was prepared with (FirmwareKit seedLanguage), as the guest has
         // them.
         if asks, generation == 1,
-            let data = try? await guestAgent.get("/var/mobile/Library/Preferences/.GlobalPreferences.plist"),
+            let data = try? await guestAgent.get(
+                "/var/mobile/Library/Preferences/.GlobalPreferences.plist",
+                limit: 16 << 20
+            ),
             let global = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         {
             emit(
@@ -540,7 +543,12 @@ nonisolated enum WiFiProbe {
                 "firstFront": (setupFront ?? phoneFront).map { "\($0.bundleID) \($0.name)" } ?? "",
             ]
             func plist(_ name: String) async -> [String: Any] {
-                guard asks, let data = try? await guestAgent.get("/var/mobile/Library/Preferences/\(name).plist") else {
+                guard asks,
+                    let data = try? await guestAgent.get(
+                        "/var/mobile/Library/Preferences/\(name).plist",
+                        limit: 16 << 20
+                    )
+                else {
                     return [:]
                 }
                 return (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any] ?? [:]
@@ -557,14 +565,14 @@ nonisolated enum WiFiProbe {
         }
         if let image = s.developerImage, generation == 1 {
             let bundle = "/Developer/Library/PreferenceBundles/Developer Settings.bundle/Info.plist"
-            let before = asks ? (try? await guestAgent.get(bundle)) != nil : false
+            let before = asks ? (try? await guestAgent.get(bundle, limit: 16 << 20)) != nil : false
             var mounted: String
             do {
                 mounted =
                     try await d.services.mountDeveloperImage(URL(fileURLWithPath: image), tool: s.lockdownTZ)
                     ? "mounted" : "already"
             } catch { mounted = "\(error)" }
-            let after = asks ? (try? await guestAgent.get(bundle)) != nil : false
+            let after = asks ? (try? await guestAgent.get(bundle, limit: 16 << 20)) != nil : false
             if asks { try? await guestAgent.launch("com.apple.Preferences") }
             try? await Task.sleep(for: .seconds(6))
             d.screenshot("developer-settings")
@@ -596,7 +604,7 @@ nonisolated enum WiFiProbe {
             emit("spawned", ["device": d.name, "argv": argv, "output": String(output.prefix(200))])
         }
         if let path = s.readFile {
-            let data = asks ? try? await guestAgent.get(path) : nil
+            let data = asks ? try? await guestAgent.get(path, limit: 16 << 20) : nil
             emit(
                 "fileRead",
                 [
@@ -783,7 +791,7 @@ nonisolated enum WiFiProbe {
         var found: (path: String, data: Data)?
         if let agent {
             for path in paths where found == nil {
-                if let data = try? await agent.get("/" + path) { found = (path, data) }
+                if let data = try? await agent.get("/" + path, limit: 64 << 20) { found = (path, data) }
             }
         } else {
             found = baseSystemFile(base: b, paths: paths, work: d.dir.appendingPathComponent("system-volume"))
@@ -1494,11 +1502,11 @@ enum DockBand {
     func names(_ path: String) async throws -> [String] { try await services.files(in: path).map(\.name) }
     func read(_ path: String) async -> Data? {
         guard let home else { return nil }
-        return try? await guest.get("\(home)/\(path)")
+        return try? await guest.get("\(home)/\(path)", limit: 64 << 20)
     }
     func absent(_ path: String) async -> Bool {
         guard let home else { return false }
-        do { return try await guest.get("\(home)/\(path)") == nil } catch { return false }
+        do { return try await guest.get("\(home)/\(path)", limit: 64 << 20) == nil } catch { return false }
     }
     do {
         let top = try await names("")
@@ -1686,7 +1694,8 @@ nonisolated enum CydiaSources {
     let agent = GuestAgent(link: d.process.link, cache: GuestAgentCache())
     let dir = "/Library/MobileSubstrate/DynamicLibraries"
     let probe = [dir + "/LTMProbe.plist", dir + "/LTMProbe.dylib"]
-    let installed = (try? await agent.get("/Library/Frameworks/CydiaSubstrate.framework/Info.plist")) ?? nil
+    let installed =
+        (try? await agent.get("/Library/Frameworks/CydiaSubstrate.framework/Info.plist", limit: 1 << 20)) ?? nil
     event["installed"] = installed != nil
     guard installed != nil else { return emit("substrate", event) }
     let file = d.dir.appendingPathComponent("substrate-syslog.txt")
@@ -1749,7 +1758,11 @@ nonisolated enum CydiaSources {
 
 /// installd's own record of where each app lives (iOS 2-5): the container an upgrade must keep.
 @MainActor func container(_ agent: GuestAgent, _ id: String) async -> String? {
-    guard let data = try? await agent.get("/var/mobile/Library/Caches/com.apple.mobile.installation.plist"),
+    guard
+        let data = try? await agent.get(
+            "/var/mobile/Library/Caches/com.apple.mobile.installation.plist",
+            limit: 16 << 20
+        ),
         let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
         let app = (plist["User"] as? [String: Any])?[id] as? [String: Any]
     else { return nil }
@@ -1784,7 +1797,7 @@ nonisolated enum CydiaSources {
     event["before"] = before ?? ""
     event["after"] = after ?? ""
     if let after, let file {
-        event["kept"] = (try? await agent.get("\(after)/\(file)")) == marker
+        event["kept"] = (try? await agent.get("\(after)/\(file)", limit: 64 << 20)) == marker
     } else {
         event["kept"] = false
     }

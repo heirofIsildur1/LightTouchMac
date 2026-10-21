@@ -200,19 +200,33 @@ public nonisolated struct GuestAgent: Sendable {
         }
     }
 
-    /// A regular file of any size (past 1 MiB by `getrange`); nil when absent.
-    public func get(_ path: String) async throws -> Data? {
+    /// A regular file of at most `limit` bytes (past 1 MiB by `getrange`); nil when absent. The guest decides what's
+    /// at `path` and how big it is, so every read names the most its purpose needs; a larger file throws, having read
+    /// no more than `limit` + 1 bytes of it.
+    public func get(_ path: String, limit: Int) async throws -> Data? {
+        let piece = 1024 * 1024
+        func overLimit() -> GuestAgentError {
+            GuestAgentError(
+                operation: "get",
+                status: GuestAgentError.tooBig,
+                output: Data("\(path) is over \(limit) bytes".utf8)
+            )
+        }
         let (status, output) = try await raw("get", path)
         if status == GuestAgentError.notFound { return nil }
         if status == GuestAgentError.tooBig {
             var data = Data()
-            while true {
-                let piece = try await perform("getrange", "\(data.count) \(1024 * 1024) \(path)")
-                data.append(piece)
-                if piece.count < 1024 * 1024 { return data }
+            while data.count <= limit {
+                let wanted = min(piece, limit + 1 - data.count)
+                let next = try await perform("getrange", "\(data.count) \(wanted) \(path)")
+                data.append(next.prefix(wanted))
+                if next.count < wanted { break }
             }
+            guard data.count <= limit else { throw overLimit() }
+            return data
         }
         guard status == 0 else { throw GuestAgentError(operation: "get", status: status, output: output) }
+        guard output.count <= limit else { throw overLimit() }
         return output
     }
 

@@ -65,7 +65,8 @@ public nonisolated enum AccessibilityFeature: Int, CaseIterable, Sendable {
 extension GuestServices {
     /// The features that are on: mobile's com.apple.Accessibility preferences, as libAccessibility keeps them.
     public func accessibility() async throws -> Set<AccessibilityFeature> {
-        guard let data = try await agent.get("\(Self.preferences)/com.apple.Accessibility.plist"), !data.isEmpty
+        guard let data = try await agent.get("\(Self.preferences)/com.apple.Accessibility.plist", limit: 1 << 20),
+            !data.isEmpty
         else { return [] }
         guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         else { throw DeviceToolsError.failed("The device’s accessibility preferences aren’t readable.") }

@@ -17,6 +17,8 @@ nonisolated final class FakeGuestLink: GuestAgentLink, @unchecked Sendable {
     /// A v5 agent's statusbarget: what SpringBoard holds (the last post; nil after a respring, read as zeros).
     var v5 = false, held: Data?
     var failPut: String?
+    /// Bytes `getrange` handed out: a get over 1 MiB comes in ranges, as it_agent's EFBIG makes it.
+    var rangeBytes = 0
     var waiting: [String: CheckedContinuation<LinkReply, Error>] = [:]
 
     init(version: Int = 2) { self.version = version }
@@ -74,7 +76,15 @@ nonisolated final class FakeGuestLink: GuestAgentLink, @unchecked Sendable {
             modes[path] = String(words.last!)
             owners[path] = "0:0"
             return (0, Data())
-        case "get": return files[args].map { (0, $0) } ?? (-2, Data())
+        case "get":
+            guard let file = files[args] else { return (-2, Data()) }
+            return file.count > 1024 * 1024 ? (-27, Data()) : (0, file)
+        case "getrange":
+            let w = args.split(separator: " ", maxSplits: 2).map(String.init)
+            guard let file = files[w[2]], let offset = Int(w[0]), let length = Int(w[1]) else { return (-2, Data()) }
+            let piece = file.dropFirst(offset).prefix(length)
+            rangeBytes += piece.count
+            return (0, Data(piece))
         case "chown":
             let w = args.split(separator: " ", maxSplits: 2).map(String.init)
             owners[w[2]] = w[0] + ":" + w[1]

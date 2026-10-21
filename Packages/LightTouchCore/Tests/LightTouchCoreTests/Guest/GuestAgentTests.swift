@@ -22,7 +22,7 @@ struct GuestAgentTests {
             link.files["/tmp/a b"] == Data("x".utf8) && link.modes["/tmp/a b"] == "644",
             "mode is octal, the last word"
         )
-        #expect(try await agent.get("/nope") == nil, "ENOENT is absent")
+        #expect(try await agent.get("/nope", limit: 1 << 20) == nil, "ENOENT is absent")
         try await agent.unlink("/nope")
         try await agent.chown(501, 501, "/tmp/a b")
         #expect(link.owners["/tmp/a b"] == "501:501")
@@ -32,6 +32,23 @@ struct GuestAgentTests {
         #expect(try await agent.orientation() == 90)
         link.angle = "17"
         await #expect(throws: (any Error).self, "invalid angle accepted") { try await agent.orientation() }
+    }
+
+    /// A read names the most it takes: a file over that throws having fetched no more than one byte past it, in 1 MiB
+    /// ranges past 1 MiB, and one under it comes whole (smaller ones in one get).
+    @Test func getStopsAtItsLimit() async throws {
+        let link = FakeGuestLink()
+        let agent = GuestAgent(link: link, cache: GuestAgentCache())
+        let big = Data((0..<(3 << 20) + 5).map { UInt8(truncatingIfNeeded: $0) })
+        link.files["/big"] = big
+        link.files["/small"] = Data(count: 1000)
+        #expect(try await agent.get("/big", limit: 4 << 20) == big)
+        link.rangeBytes = 0
+        await #expect(throws: GuestAgentError.self) { try await agent.get("/big", limit: 2 << 20) }
+        #expect(link.rangeBytes == (2 << 20) + 1, "fetched \(link.rangeBytes)")
+        #expect(try await agent.get("/small", limit: 1000)?.count == 1000)
+        await #expect(throws: GuestAgentError.self) { try await agent.get("/small", limit: 999) }
+        #expect(try await agent.get("/absent", limit: 1) == nil)
     }
 
     @Test func v1AgentGetsShellQuotedExecAndNoV2Ops() async throws {

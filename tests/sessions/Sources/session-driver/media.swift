@@ -71,11 +71,11 @@ import HostServiceClient
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     /// The database and its WAL copied out; its path, or nil when the guest has none.
     func pull(_ remote: String, as name: String) async -> URL? {
-        guard let data = try? await agent.get(remote) else { return nil }
+        guard let data = try? await agent.get(remote, limit: 256 << 20) else { return nil }
         let local = dir.appendingPathComponent(name)
         try? data.write(to: local)
         for suffix in ["-wal", "-journal"] {
-            if let side = try? await agent.get(remote + suffix) {
+            if let side = try? await agent.get(remote + suffix, limit: 256 << 20) {
                 try? side.write(to: URL(fileURLWithPath: local.path + suffix))
             }
         }

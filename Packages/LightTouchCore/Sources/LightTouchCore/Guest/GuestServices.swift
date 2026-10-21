@@ -103,7 +103,7 @@ public nonisolated struct GuestServices: Sendable {
     /// the Wi-Fi service's HTTP and HTTPS proxies at the guestfwd through configd (idempotent; it keeps
     /// a backup of the keys it owns). The host's "off" mode passes those connections straight through.
     public func routeThroughProxy(localTool: (String) throws -> Data) async throws {
-        for pac in [Self.proxyPAC, Self.legacyProxyPAC] where try await agent.get(pac) != nil { return }
+        for pac in [Self.proxyPAC, Self.legacyProxyPAC] where try await agent.get(pac, limit: 1 << 20) != nil { return }
         let output = try await runTool("itproxy", ["on"], localTool: localTool)
         guard output.contains("Proxy enabled") else {
             throw DeviceToolsError.failed("The device didn’t accept the proxy setting: \(output)")
@@ -151,7 +151,7 @@ public nonisolated struct GuestServices: Sendable {
         let cache = "/var/root/Library/Caches/locationd/cache.plist"
         let job = "/System/Library/LaunchDaemons/com.apple.locationd.plist"
         func withoutRecord() async throws -> Data? {
-            guard let data = try await agent.get(cache),
+            guard let data = try await agent.get(cache, limit: 16 << 20),
                 var plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                 plist.removeValue(forKey: "PreviousTimeZone") != nil
             else { return nil }
@@ -176,7 +176,9 @@ public nonisolated struct GuestServices: Sendable {
     /// (and its apps). launchd's KeepAlive brings them straight back. Which one is the guest's own answer: the
     /// firmware has a backboardd job or not.
     public func respring() async throws {
-        let job = try await agent.get(Self.backboarddJob) != nil ? "com.apple.backboardd" : "com.apple.SpringBoard"
+        let job =
+            try await agent.get(Self.backboarddJob, limit: 1 << 20) != nil
+            ? "com.apple.backboardd" : "com.apple.SpringBoard"
         try await agent.spawn([Self.launchctl, "stop", job])
     }
 

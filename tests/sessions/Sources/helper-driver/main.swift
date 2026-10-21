@@ -587,7 +587,7 @@ Thread.detachNewThread {
             emit("defaults", ["changed": "\(changed)"])
         case "agentget":  // agentget NAME REMOTE…: the guest's file into the dump directory as NAME
             let remote = p.dropFirst(2).joined(separator: " ")
-            let data = blocking { try await guest.agent.get(remote) }
+            let data = blocking { try await guest.agent.get(remote, limit: 256 << 20) }
             if case .success(let d?) = data { try? d.write(to: URL(fileURLWithPath: "\(dumpDir)/\(p[1])")) }
             emit("agentget", ["path": remote, "result": "\(data.map { $0?.count ?? -1 })"])
         case "statusbar":  // statusbar clean|clear: the Marketing Status Bar's default, for the base's version
