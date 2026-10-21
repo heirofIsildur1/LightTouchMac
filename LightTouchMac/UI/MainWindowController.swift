@@ -64,12 +64,17 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSWindo
     /// 1100×760 for the iPad (device plus inspector), plus the console bar.
     /// Wide enough that the toolbar's sidebar section holds its toggle and + beside the window buttons.
     private static let sidebarWidth: CGFloat = 260
+    /// The narrowest the panes' own content goes; fitPanesToToolbar raises each to what its toolbar section needs.
+    static let sidebarFloor: CGFloat = 180
+    static let inspectorFloor: CGFloat = 280
     static func contentSize(for profile: Board) -> NSSize {
         let device = profile == .k48 ? NSSize(width: 1100, height: 760) : NSSize(width: 720, height: 640)
         return NSSize(width: device.width + sidebarWidth, height: device.height + ConsoleBar.height)
     }
     /// Cleared once the user resizes; until then switching devices resizes to fit.
     var sizedToDevice = true
+    /// A fit of the panes to the toolbar is queued (fitPanesToToolbarLater).
+    var paneFitPending = false
 
     init(host: DeviceSessionHost, profile: Board) {
         self.host = host
@@ -78,7 +83,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSWindo
 
         let split = NSSplitViewController()
         sidebarItem = NSSplitViewItem(sidebarWithViewController: library)
-        sidebarItem.minimumThickness = 180
+        sidebarItem.minimumThickness = Self.sidebarFloor
         sidebarItem.maximumThickness = 320
         // The split opens the sidebar at its view's width.
         library.view.setFrameSize(NSSize(width: Self.sidebarWidth, height: library.view.frame.height))
@@ -92,7 +97,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSWindo
         inspectorItem = NSSplitViewItem(inspectorWithViewController: inspectorContainer)
         // The widths the sidebar guidelines ask for: enough for an app name at a
         // readable size, not so much that it competes with the device.
-        inspectorItem.minimumThickness = 280
+        inspectorItem.minimumThickness = Self.inspectorFloor
         inspectorItem.maximumThickness = 400
 
         split.addSplitViewItem(inspectorItem)
@@ -153,6 +158,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSWindo
         migrateCaptureToolbar(toolbar)
         migrateSidebarToolbar(toolbar)
         migrateAddDeviceToolbar(toolbar)
+        fitPanesToToolbar()
 
         window.delegate = self
         NotificationCenter.default.addObserver(
@@ -245,7 +251,7 @@ final class ContainerViewController: NSViewController {
             child.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             child.view.topAnchor.constraint(equalTo: view.topAnchor),
-            child.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            child.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 }
@@ -267,7 +273,7 @@ final class PaneLabelViewController: NSViewController {
         view.addSubview(label)
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
 }

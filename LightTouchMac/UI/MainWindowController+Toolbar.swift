@@ -163,34 +163,36 @@ extension MainWindowController {
         _ action: Selector,
         _ help: String
     ) -> NSToolbarItem {
-        let item = NSToolbarItem(itemIdentifier: id)
-        item.label = label
-        item.paletteLabel = label
-        item.toolTip = help
-        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
-        item.target = self
-        item.action = action
-        item.isBordered = true
-        if id == .liveText || id == .fingerDots {
-            let control = NSButton(image: item.image ?? NSImage(), target: self, action: action)
-            control.setButtonType(.pushOnPushOff)
-            control.bezelStyle = .texturedRounded
-            control.toolTip = help
-            control.setAccessibilityLabel(label)
-            item.view = control
-        }
-        return item
+        .button(id, label, symbol, action, help, target: self)
     }
 
-    /// Frequent capture actions live beside the device controls.
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [
-            .toggleSidebar, .flexibleSpace, .addDevice, .sidebarTrackingSeparator, .home, .lock, .rotate, .zoom,
-            .flexibleSpace,
-            .openScreenshot, .screenshot, .copyScreen, .recording,
-            .inspectorTrackingSeparator, .flexibleSpace, .searchCatalog, .toggleInspector,
-        ]
+        NSToolbarItem.Identifier.mainDefaults
     }
+
+    /// The sidebar and inspector stay wide enough for the toolbar items above them (ToolbarSectionFit), also after
+    /// the toolbar is customized.
+    func fitPanesToToolbar() {
+        paneFitPending = false
+        guard let window, let toolbar = window.toolbar else { return }
+        ToolbarSectionFit.fitPanes(of: window, sidebarFloor: Self.sidebarFloor, inspectorFloor: Self.inspectorFloor) {
+            self.toolbar(toolbar, itemForItemIdentifier: $0, willBeInsertedIntoToolbar: false)
+        }
+    }
+
+    /// Once for a run of changes (the toolbar adds its items one by one), after them: an added item isn't among the
+    /// toolbar's items yet when it is announced.
+    func fitPanesToToolbarLater() {
+        guard !paneFitPending else { return }
+        paneFitPending = true
+        DispatchQueue.main.async { [weak self] in
+            if self?.paneFitPending == true { self?.fitPanesToToolbar() }
+        }
+    }
+
+    func toolbarWillAddItem(_ notification: Notification) { fitPanesToToolbarLater() }
+
+    func toolbarDidRemoveItem(_ notification: Notification) { fitPanesToToolbarLater() }
 
     /// Add the actions displaced from the removed floating bar once. Preserve
     /// existing customization and subsequent choices to remove toolbar items.
@@ -210,7 +212,7 @@ extension MainWindowController {
             .addDevice, .files, .home, .lock, .rotate, .motion, .zoom, .screenshot, .recording, .saveScreenshotAs,
             .openScreenshot, .captureOptions, .liveText, .copyScreen, .fingerDots, .installApp, .searchCatalog,
             .space, .flexibleSpace, .toggleSidebar, .sidebarTrackingSeparator, .inspectorTrackingSeparator,
-            .toggleInspector,
+            .toggleInspector
         ]
     }
 
@@ -235,26 +237,6 @@ extension MainWindowController {
             toolbar.insertItem(withItemIdentifier: .toggleSidebar, at: 0)
         }
     }
-}
-
-extension NSToolbarItem.Identifier {
-    static let files = NSToolbarItem.Identifier("files")
-    fileprivate static let motion = NSToolbarItem.Identifier("motion")
-    fileprivate static let screenshot = NSToolbarItem.Identifier("screenshot")
-    static let recording = NSToolbarItem.Identifier("recording")
-    static let saveScreenshotAs = NSToolbarItem.Identifier("saveScreenshotAs")
-    static let openScreenshot = NSToolbarItem.Identifier("openScreenshot")
-    fileprivate static let captureOptions = NSToolbarItem.Identifier("captureOptions")
-    fileprivate static let liveText = NSToolbarItem.Identifier("liveText")
-    static let copyScreen = NSToolbarItem.Identifier("copyScreen")
-    fileprivate static let fingerDots = NSToolbarItem.Identifier("fingerDots")
-    fileprivate static let home = NSToolbarItem.Identifier("home")
-    static let lock = NSToolbarItem.Identifier("lock")
-    static let rotate = NSToolbarItem.Identifier("rotate")
-    static let zoom = NSToolbarItem.zoomIdentifier
-    static let installApp = NSToolbarItem.Identifier("installApp")
-    static let searchCatalog = NSToolbarItem.Identifier("searchCatalog")
-    static let addDevice = NSToolbarItem.Identifier("addDevice")
 }
 
 // MARK: - Toolbar item validation (same command model as the menus)
