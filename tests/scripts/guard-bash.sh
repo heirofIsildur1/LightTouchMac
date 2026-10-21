@@ -1,7 +1,7 @@
 #!/bin/bash
-# scripts/hooks/guard-bash: commands in, allow or deny out. Prints ok/FAIL per case; exits 1 on any FAIL.
+# .claude/hooks/guard-bash: commands in, allow or deny out. Prints ok/FAIL per case; exits 1 on any FAIL.
 set -uo pipefail
-HOOK="$(cd "$(dirname "$0")/../.." && pwd)/scripts/hooks/guard-bash"
+HOOK="$(cd "$(dirname "$0")/../.." && pwd)/.claude/hooks/guard-bash"
 AGENT=/Users/x/Developer/LightTouchMac/.claude/worktrees/agent-1
 MAIN=/Users/x/Developer/LightTouchMac
 failed=0
