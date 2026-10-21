@@ -72,7 +72,6 @@ extension UnsafeRawBufferPointer {
     func u16le(_ o: Int) throws -> UInt16 { UInt16(littleEndian: try field(o)) }
     func u32le(_ o: Int) throws -> UInt32 { UInt32(littleEndian: try field(o)) }
     func u64le(_ o: Int) throws -> UInt64 { UInt64(littleEndian: try field(o)) }
-    func u32be(_ o: Int) throws -> UInt32 { UInt32(bigEndian: try field(o)) }
 }
 
 extension Data {
@@ -91,17 +90,9 @@ extension ParserSpan {
         var s = try seeking(toRelativeOffset: o)
         return try UInt32(parsingBigEndian: &s)
     }
-    func be64(at o: Int) throws(ParsingError) -> UInt64 {
-        var s = try seeking(toRelativeOffset: o)
-        return try UInt64(parsingBigEndian: &s)
-    }
     func le32(at o: Int) throws(ParsingError) -> UInt32 {
         var s = try seeking(toRelativeOffset: o)
         return try UInt32(parsingLittleEndian: &s)
-    }
-    func le64(at o: Int) throws(ParsingError) -> UInt64 {
-        var s = try seeking(toRelativeOffset: o)
-        return try UInt64(parsingLittleEndian: &s)
     }
     func byte(at o: Int) throws(ParsingError) -> UInt8 {
         var s = try seeking(toRelativeOffset: o)
