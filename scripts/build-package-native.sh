@@ -91,7 +91,7 @@ source_note() {   # MANIFEST-NAME LICENSE-NAME [PATCH...]
 }
 fetch_group native
 cd "$ROOT/build"
-for archive in glib-2.88.3.tar.xz pcre2-10.48.tar.bz2 pixman-0.46.4.tar.gz libslirp-v4.9.4.tar.gz libusb-1.0.30.tar.bz2 libplist-2.7.0.tar.bz2 libimobiledevice-1.4.0.tar.bz2 ffmpeg-9.0.1.tar.xz; do
+for archive in glib-2.88.3.tar.xz pcre2-10.48.tar.bz2 pixman-0.46.4.tar.gz libslirp-v4.9.4.tar.gz libusb-1.0.30.tar.bz2 libplist-2.8.0.tar.bz2 libimobiledevice-1.4.0.tar.bz2 ffmpeg-9.0.1.tar.xz; do
     tar -xf "$ROOT/src/$archive"
 done
 tar -xf "$ROOT/src/proxy-libintl-0.5.tar.gz" -C glib-2.88.3/subprojects
@@ -154,9 +154,30 @@ ninja -C slirp-out -j"$JOBS" && ninja -C slirp-out install
 # Shared exports are required by IMobileDevice.swift's dlopen/dlsym API; the
 # corresponding static archives intentionally hide these public symbols.
 export PKG_CONFIG_LIBDIR="$P/lib/pkgconfig:$STATIC/lib/pkgconfig"
-(cd libplist-2.7.0 && ./configure --prefix="$P" ${HOST[@]+"${HOST[@]}"} --enable-shared --disable-static --without-cython && make -j"$JOBS" && make install)
-license libplist libplist-2.7.0 COPYING COPYING.LESSER
-source_note libplist libplist
+# A binary plist's object can be referenced from anywhere and libplist copies it per reference, so a device's
+# 127-byte reply can stand for gigabytes; libplist-bin-limits.patch refuses a parse past 2^20 nodes or 32 MiB.
+(cd libplist-2.8.0 && patch -p1 < "$SRC/build-support/patches/libplist-bin-limits.patch")
+(cd libplist-2.8.0 && ./configure --prefix="$P" ${HOST[@]+"${HOST[@]}"} --enable-shared --disable-static --without-cython && make -j"$JOBS" && make install)
+license libplist libplist-2.8.0 COPYING COPYING.LESSER "$SRC/build-support/patches/libplist-bin-limits.patch"
+source_note libplist libplist libplist-bin-limits.patch
+doubling() {   # LEVELS: a binary plist of LEVELS arrays, each two references to the next, down to one integer
+    local levels="$1" i
+    hex() { printf "\\x$(printf %02x "$1")"; }
+    printf 'bplist00'
+    for ((i = 0; i < levels; i++)); do printf '\xa2'; hex $((i + 1)); hex $((i + 1)); done
+    printf '\x10\x00'
+    for ((i = 0; i <= levels; i++)); do hex $((8 + 3 * i)); done
+    printf '\0\0\0\0\0\0\x01\x01\0\0\0\0\0\0\0'; hex $((levels + 1))
+    printf '\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0'; hex $((8 + 3 * levels + 2))
+}
+if [ "$ARCH" = arm64 ]; then   # the built library itself: 19 levels (2^20 - 1 nodes) parse, 20 are refused
+    doubling 19 > "$ROOT/doubling-19.bplist" && doubling 20 > "$ROOT/doubling-20.bplist"
+    "$P/bin/plistutil" -i "$ROOT/doubling-19.bplist" -o /dev/null -f xml
+    if "$P/bin/plistutil" -i "$ROOT/doubling-20.bplist" -o /dev/null -f xml 2>/dev/null; then
+        echo 'libplist parsed a binary plist of 2^21 - 1 nodes: libplist-bin-limits.patch is not in effect' >&2
+        exit 1
+    fi
+fi
 # iPhone OS 1.x lockdownd speaks SSLv3 only: offer exactly SSLv3 below ProductVersion 2.0 (smoke.md #51); no ECDHE
 # suites below 10.0 (5.0 beta 1 lockdownd aborts a ClientHello that offers one; smoke.md "9A5220p USB lockdown").
 (cd libimobiledevice-1.4.0 && patch -p1 < "$SRC/build-support/patches/libimobiledevice-sslv3-ios1.patch")

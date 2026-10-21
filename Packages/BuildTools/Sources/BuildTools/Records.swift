@@ -69,6 +69,7 @@ public enum Records {
         "scripts/build-package-native.sh", "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh",
         "build-support/dependencies.json", "build-support/patches/glib-pipe2-availability.patch",
         "build-support/patches/iBoot32Patcher-ltm.patch", "build-support/patches/libimobiledevice-sslv3-ios1.patch",
+        "build-support/patches/libplist-bin-limits.patch",
         "Packages/BuildTools/Sources/BuildTools/DependencySources.swift",
         "Packages/ReleaseChecks/Sources/ReleaseChecks/MachOClosure.swift",
     ]
