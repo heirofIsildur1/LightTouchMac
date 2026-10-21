@@ -266,10 +266,9 @@ struct ReleaseAppStaticTests {
     }
 
     @Test func hygieneLicensesAndNoLocalPaths() throws {
+        // The workspace's: scripts/ship archives the workspace, so these are the versions the app was built with.
         let resolved = [
-            repository.appendingPathComponent(
-                "LightTouchMac.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
-            ),
+            repository.appendingPathComponent("LightTouchMac.xcworkspace/xcshareddata/swiftpm/Package.resolved"),
             repository.appendingPathComponent("Packages/FirmwareKit/Package.resolved"),
         ]
         let found = try BundleHygiene.problems(app: app, packages: try BundleHygiene.swiftPackages(resolved: resolved))
