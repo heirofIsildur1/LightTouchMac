@@ -1,11 +1,11 @@
 #!/bin/bash
-# The vendor directory for the current pins, found without Configuration/Vendor.xcconfig:
+# The vendor directory for the current pins:
 #
 #     scripts/vendor-check --key [CHECKOUT]   the pin key of this checkout or another (scripts/vendor's directory name)
 #     scripts/vendor-check --print   the current pins' vendor directory, or one line saying to run scripts/vendor
 #     scripts/vendor-check           Xcode's first phase (LightTouchServices): with VENDOR_DIR at its default,
 #                                    $(SRCROOT)/build/vendor, point that link at the current pins' directory; with
-#                                    VENDOR_DIR set in Vendor.xcconfig or Local.xcconfig, check that it is the current
+#                                    VENDOR_DIR set in Local.xcconfig, check that it is the current
 #                                    pins' directory. Either way a missing or stale one fails the build.
 #
 # The key is the first 12 hex digits of a SHA-256 over every keyed file's relative path and content (directories
@@ -66,7 +66,7 @@ if [[ "$VENDOR_DIR" == "$link" ]]; then
     [[ -f "$dir/vendor.json" ]] || stale "$dir"
     [[ "$(readlink "$link" 2>/dev/null)" == "$dir" ]] || { mkdir -p "$(dirname "$link")"; ln -sfn "$dir" "$link"; }
 else
-    # An override (Vendor.xcconfig from an older scripts/vendor, or Local.xcconfig) must still be these pins' build.
+    # An override (Local.xcconfig) must still be these pins' build.
     real="$(cd "$VENDOR_DIR" 2>/dev/null && pwd -P)" || stale "VENDOR_DIR $VENDOR_DIR is missing"
     [[ "$(basename "$real")" == "$key" && -f "$real/vendor.json" ]] \
         || stale "VENDOR_DIR $VENDOR_DIR is not $key; drop the override or point it there"

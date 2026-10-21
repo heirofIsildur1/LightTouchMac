@@ -5,8 +5,7 @@ import ReleaseChecks
 /// app (see `usage`).
 public struct Vendor {
     public static let usage = """
-            scripts/vendor               build (or reuse) ~/Developer/ltm-vendor.noindex/<pin-hash>/ and point
-                                         Configuration/Vendor.xcconfig at it
+            scripts/vendor               build (or reuse) ~/Developer/ltm-vendor.noindex/<pin-hash>/
             scripts/vendor --print       print the vendor directory for the current pins
 
         The pin hash covers build-support/sources.json (qemu-ios and usbmuxd commits), dependencies.json,
@@ -140,15 +139,6 @@ public struct Vendor {
     /// The environment children run with: this tool for the recipes' `scripts/ltm-build` calls.
     func env(_ extra: [String: String] = [:]) -> [String: String] {
         environment.merging(["LTM_BUILD_TOOL": Bundle.main.executablePath ?? ""]) { $1 }.merging(extra) { $1 }
-    }
-
-    func writeXCConfig(_ vendor: URL) throws {
-        let text =
-            "// Written by scripts/vendor (gitignored): the vendor directory for the current pins.\nVENDOR_DIR = \(vendor.path)\n"
-        let path = root.appendingPathComponent("Configuration/Vendor.xcconfig")
-        if (try? String(contentsOf: path, encoding: .utf8)) != text {
-            try text.write(to: path, atomically: true, encoding: .utf8)
-        }
     }
 
     /// The pinned qemu-ios commit, as a detached worktree of the checkout sources.json names.
@@ -679,7 +669,6 @@ public struct Vendor {
         let stamp = ["recipe": try treeHash(Self.tools), "device": try treeHash(Self.deviceSources)]
         let done = vendor.appendingPathComponent("vendor.json")
         let previous = ((try? readJSON(done)) ?? [:]).compactMapValues { $0 as? String }
-        try writeXCConfig(vendor)
         if previous == stamp { return vendor }
         for name in Self.bootROMs where !files.fileExists(atPath: assets.appendingPathComponent(name).path) {
             throw ToolError("vendor: no SecureROM \(assets.appendingPathComponent(name).path) (LTM_ASSETS)")

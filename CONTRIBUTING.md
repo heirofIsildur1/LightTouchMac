@@ -91,8 +91,7 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    itself: the services helper's first phase (`scripts/vendor-check`) keys the pins as `scripts/vendor` does, points
    the gitignored `build/vendor` (the default `VENDOR_DIR`) at that directory, and fails the build with "run
    scripts/vendor" when there is none, rather than build with another pin's. `LTM_VENDOR_ROOT` counts for Debug builds
-   only. A `VENDOR_DIR` in `Configuration/Vendor.xcconfig` (which scripts/vendor still writes) or `Local.xcconfig`
-   is held to the current pins the same way.
+   only. A `VENDOR_DIR` in `Configuration/Local.xcconfig` is held to the current pins the same way.
 2. **Xcode ▸ Product ▸ Archive** (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID). The archive's
    Copy Files phases bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity
    and the hardened runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`: allow-jit, library validation on; a Debug build uses `LightTouchDevice-Debug.entitlements`, which also disables library validation for a development dylib).
@@ -295,7 +294,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `scripts/` | `bootstrap`, `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
-| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
+| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
 | `Models/` | The 3D device models and their lighting (`Resources/Models/` in the app) |
 | `LightTouchServices/` | The services helper: `Engine/` (libimobiledevice: installation_proxy, AFC, springboardservices, notification_proxy and lockdown on one `run` kernel, the serial gate and deadlines), and the lockdown writes (`Lockdown/`) it runs as child processes |
 | `tools/activation/` | Sam's activation tool (its `build/` output is ignored) |
