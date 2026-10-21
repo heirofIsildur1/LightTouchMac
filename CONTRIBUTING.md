@@ -225,7 +225,9 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
   outside the three repositories; the app downloads or imports them on the user's Mac.
 - **Branches.** Both repositories work on `main`. Make a short branch per change and open a pull request;
   `main` doesn't accept force-pushes. A qemu-ios change the app needs lands there first, then the app's
-  pin (`build-support/sources.json`) moves to it in the same pull request as the app change.
+  pin (`build-support/sources.json`) moves to it in the same pull request as the app change, with
+  `scripts/machine-options BUILD/qemu-system-arm` run against a build at the new pin (each board's -machine options,
+  which a boot keeps to).
 
 ## Layout
 

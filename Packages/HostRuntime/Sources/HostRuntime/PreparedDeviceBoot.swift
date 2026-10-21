@@ -309,6 +309,20 @@ public struct PreparedDeviceBoot {
         return writableNOR.path
     }
 
+    /// The base's machine options and the access point's country, each only where the board's machine declares it
+    /// (Board.machineOptions): QEMU stops at an option its machine lacks, before the guest runs.
+    func machineOptions() -> [String: String] {
+        let declared = board.machineOptions
+        var options = machine.filter { declared.contains($0.key) }
+        for key in machine.keys.sorted() where options[key] == nil {
+            FileHandle.standardError.write(Data("boot: \(board.rawValue)'s machine has no \(key); left out\n".utf8))
+        }
+        if declared.contains("wifi-country"), options["wifi-country"] == nil, let country = Self.wifiCountry() {
+            options["wifi-country"] = country
+        }
+        return options
+    }
+
     /// `hardware`: the emulator's facts about the board (its hello's DeviceInfo; else Machines'): the -M machine,
     /// the modem, the USB host.
     public func configuration(
@@ -332,6 +346,7 @@ public struct PreparedDeviceBoot {
                 userInfo: [NSLocalizedDescriptionKey: "The emulator library has no machine for \(board.rawValue)."]
             )
         }
+        let machine = machineOptions()
         var config: BootConfig
         switch board.soc {
         case .s5l8900:
@@ -389,7 +404,7 @@ public struct PreparedDeviceBoot {
                 usbAddress: usbAddress,
                 wifi: wifi,
                 guestPackage: guestPackage,
-                machineOptions: machine.merging(Self.wifiCountry().map { ["wifi-country": $0] } ?? [:]) { a, _ in a }
+                machineOptions: machine
             )
             ipad.cellular = cellular
             config = BootRecipe.iPad(

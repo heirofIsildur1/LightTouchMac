@@ -300,7 +300,8 @@ public nonisolated enum BootRecipe {
     /// Wi-Fi is the machine's default (a BCM4329 on its own slirp wifi0); an
     /// explicit `netdev` replaces it. No -m: the machine's default is the board's (256 MiB on K48 and N81).
     /// `hardware`: the emulator's facts about the board (DeviceInfo): the -M machine (ipad1, iPod-Touch-4G, iPhone-4,
-    /// n88, n18: the same options), its modem (baseband=on and the cell0 netdev) and USB host (the keyboard).
+    /// n88, n18; Board.machineOptions lists what each takes), its modem (baseband=on and the cell0 netdev) and USB
+    /// host (the keyboard).
     public static func iPad(
         _ d: IPad,
         hardware: DeviceInfo,

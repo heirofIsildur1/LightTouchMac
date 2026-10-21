@@ -116,8 +116,8 @@ struct BootTests {
     /// 6.x Setup guesses the country, and so its Welcome page, from it); the iPods' machines have no such option.
     @Test func theAccessPointsCountryIsTheMacsRegion() throws {
         let region = try #require(Locale.current.region?.identifier)
-        for board in [Board.k48, .n88, .n72] {
-            let f = try Fixture(board: board, strategy: board == .n72 ? "bootrom" : "kboot")
+        for board in Board.allCases {
+            let f = try Fixture(board: board, strategy: Self.strategies(board)[0])
             defer { try? FileManager.default.removeItem(at: f.root) }
             let config = try f.prepare(board).configuration(
                 bootArgs: "",
@@ -129,7 +129,63 @@ struct BootTests {
                 netdev: "user,id=wifi0"
             )
             let machine = try #require(config.argv.firstIndex(of: "-M").map { config.argv[$0 + 1] })
-            #expect(machine.contains(",wifi-country=\(region)") == (board != .n72 && region.count == 2), "\(machine)")
+            let declared = board.machineOptions.contains("wifi-country")
+            #expect(machine.contains(",wifi-country=\(region)") == (declared && region.count == 2), "\(machine)")
+        }
+        // The S5L8920 and A4 machines take it (n18's and n88's had none at first, and stopped QEMU at it).
+        #expect(Board.allCases.filter { $0.machineOptions.contains("wifi-country") } == [.n18, .n88, .k48, .n81, .n90])
+    }
+
+    /// The boot strategies a board's base can have (Board.requiredFiles).
+    static func strategies(_ board: Board) -> [String] {
+        switch board.soc {
+        case .s5l8900: ["iboot"]
+        case .s5l8720: ["bootrom", "iboot"]
+        case .s5l8920, .s5l8930: board == .k48 ? ["kboot", "iboot", "bootrom"] : ["kboot"]
+        }
+    }
+
+    /// Every option of every board's -machine line is one its machine declares (Board.machineOptions, listed from
+    /// qemu-ios by scripts/machine-options): QEMU stops at one it lacks before the guest runs, and the device never
+    /// lights. Each strategy a base can have, with every option a lock, the device record and the caller can add.
+    @Test func everyMachineOptionIsDeclared() throws {
+        let lock = [
+            "aes-uid": "hardware", "wifi-mac": "02:11:22:33:44:66", "bt-mac": "02:11:22:33:44:67", "ecid": "0x234",
+            "imei": "013977000272744", "rtc-epoch": "1300000000",
+        ]
+        for board in Board.allCases {
+            let declared = board.machineOptions
+            #expect(declared.contains("panel"), "\(board): no machine options listed")
+            for strategy in Self.strategies(board) {
+                let f = try Fixture(board: board, strategy: strategy, machine: lock)
+                for wifi in [true, false] {
+                    let config = try PreparedDeviceBoot.prepare(
+                        board: board,
+                        base: f.base,
+                        overlay: f.overlay,
+                        writableNOR: f.nor,
+                        storageKey: "base-A",
+                        bootrom: "rom",
+                        dieID: "0x1:0x2",
+                        panel: "320x480",
+                        clock: Date(timeIntervalSince1970: 1_300_000_000)
+                    ).configuration(
+                        bootArgs: "args",
+                        usbAddress: "127.0.0.1:1234",
+                        wifi: wifi,
+                        guestPackage: "offer",
+                        serial: "null",
+                        audio: [],
+                        netdev: "user,id=wifi0"
+                    )
+                    let line = try #require(config.argv.firstIndex(of: "-M").map { config.argv[$0 + 1] })
+                    // QEMU escapes a comma in a value by doubling it.
+                    let keys = line.replacingOccurrences(of: ",,", with: "").split(separator: ",").dropFirst()
+                        .map { String($0.prefix { $0 != "=" }) }
+                    let undeclared = keys.filter { !declared.contains($0) }
+                    #expect(undeclared.isEmpty, "\(board) \(strategy): \(undeclared) in \(line)")
+                }
+            }
         }
     }
 }
@@ -139,7 +195,12 @@ private final class Fixture {
     var base: URL { root.appendingPathComponent("base, with spaces") }
     var overlay: URL { root.appendingPathComponent("overlay") }
     var nor: URL { root.appendingPathComponent("private-nor") }
-    init(board: Board, strategy: String?, identity: [String: Any]? = nil) throws {
+    init(
+        board: Board,
+        strategy: String?,
+        identity: [String: Any]? = nil,
+        machine: [String: String] = ["aes-uid": "engine"]
+    ) throws {
         MachineFixtures.install()
         let fm = FileManager.default
         try fm.createDirectory(at: base.appendingPathComponent("nand"), withIntermediateDirectories: true)
@@ -147,7 +208,7 @@ private final class Fixture {
             try Data(name.utf8).write(to: base.appendingPathComponent(name))
         }
         try Data(repeating: 0x55, count: 1_048_576).write(to: base.appendingPathComponent("nor.bin"))
-        var lock: [String: Any] = ["board": board.rawValue, "machine": ["aes-uid": "engine"]]
+        var lock: [String: Any] = ["board": board.rawValue, "machine": machine]
         if let strategy { lock["boot_strategy"] = strategy }
         try JSONSerialization.data(withJSONObject: lock).write(to: base.appendingPathComponent("device.lock.json"))
         try JSONSerialization.data(
@@ -188,7 +249,8 @@ extension BootTests {
         let machine = config.argv[2]
         #expect(machine.contains(BootRecipe.escape(f.overlay.path)))
         #expect(config.argv.joined(separator: " ").contains(BootRecipe.escape(f.nor.path)))
-        #expect(machine.contains("aes-uid=engine"))
+        // The lock's aes-uid reaches only the machine that has one (n72's iPod-Touch).
+        #expect(machine.contains("aes-uid=engine") == (board == .n72))
         #expect(machine.contains("usb-tcp-addr=127.0.0.1:1234"))
         #expect(config.argv.contains("driver=none"))
         if board == .n72 { #expect(machine.contains("ecid=0x234")) }
@@ -208,8 +270,7 @@ extension BootTests {
                     writableNOR: f.nor.path,
                     overlay: f.overlay.path,
                     usbAddress: "127.0.0.1:1234",
-                    guestPackage: "offer",
-                    machineOptions: ["aes-uid": "engine"]
+                    guestPackage: "offer"
                 ),
                 hardware: board.hardware!,
                 serial: "null",
@@ -252,7 +313,7 @@ extension BootTests {
                     usbAddress: "127.0.0.1:1234",
                     wifi: true,
                     guestPackage: "offer",
-                    machineOptions: ["aes-uid": "engine", "wifi-mac": "02:11:22:33:44:66"].merging(
+                    machineOptions: ["wifi-mac": "02:11:22:33:44:66"].merging(
                         Locale.current.region.map { ["wifi-country": $0.identifier] } ?? [:]
                     ) { a, _ in a }
                 ),
@@ -288,7 +349,7 @@ extension BootTests {
         }
         #expect(!(try machine(nil)).contains("panel="))
         #expect(try machine("320x504").contains(",panel=320x504"))
-        #expect(try machine("1280x768").contains("aes-uid=engine"))
+        #expect(try machine("1280x768").contains("aes-uid=engine") == (board == .n72))
     }
 
     @Test func privateNORKeepsGuestWritesAndBaseImmutable() throws {
