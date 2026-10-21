@@ -25,13 +25,13 @@ struct GuestPackageOfferTests {
         var entries: [Entry] = []
         for (name, mode) in [
             ("bin/it_agent", 0o755), ("bin/itmedia", 0o755), ("jobs/com.qemu.it-agent.plist", 0o644),
-            ("hooks/MBXGLEngine", 0o755), ("hooks/libappsync.dylib", 0o755),
+            ("hooks/MBXGLEngine", 0o755), ("hooks/libappsync.dylib", 0o755)
         ] {
             let data = Data(String(repeating: family + name, count: 50).utf8)
             entries.append((family + "/" + name, data))
             files.append([
                 "name": name, "mode": String(mode, radix: 8), "size": data.count,
-                "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
+                "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
             ])
         }
         let manifest: [String: Any] = [
@@ -40,8 +40,8 @@ struct GuestPackageOfferTests {
             "provides": ["it_agent", "itmedia"], "files": files, "jobs": ["jobs/com.qemu.it-agent.plist"],
             "hooks": [
                 ["file": "hooks/MBXGLEngine", "target": mbx, "respring": true],
-                ["file": "hooks/libappsync.dylib", "target": "/usr/lib/libappsync.dylib", "respring": false],
-            ],
+                ["file": "hooks/libappsync.dylib", "target": "/usr/lib/libappsync.dylib", "respring": false]
+            ]
         ]
         return [(family + "/manifest.json", try! JSONSerialization.data(withJSONObject: manifest))] + entries
     }
@@ -49,7 +49,7 @@ struct GuestPackageOfferTests {
     /// "ITPACK01", a little-endian u32 index length, the JSON index, a zlib stream (header, raw deflate).
     static func itpack(_ url: URL, _ entries: [Entry]) throws {
         let index = try JSONSerialization.data(withJSONObject: [
-            "format": 1, "entries": entries.map { ["name": $0.name, "size": $0.data.count] },
+            "format": 1, "entries": entries.map { ["name": $0.name, "size": $0.data.count] }
         ])
         let stream = try (entries.reduce(Data()) { $0 + $1.data } as NSData).compressed(using: .zlib) as Data
         var length = UInt32(index.count).littleEndian
@@ -108,7 +108,7 @@ struct GuestPackageOfferTests {
                 )
                 + [
                     ("loader/it_boot", Data([0xce, 0xfa, 0xed, 0xfe])),
-                    ("loader/com.qemu.it-boot.plist", Data("<plist/>".utf8)),
+                    ("loader/com.qemu.it-boot.plist", Data("<plist/>".utf8))
                 ]
             let pack = t.appendingPathComponent("armv6.itpack")
             try Self.itpack(pack, entries)
@@ -234,7 +234,7 @@ struct GuestPackageOfferTests {
             // An index size past the stream is refused, not an overflow trap.
             let huge = t.appendingPathComponent("huge.itpack")
             let index = try JSONSerialization.data(withJSONObject: [
-                "format": 1, "entries": [["name": "a", "size": 1], ["name": "b", "size": Int.max]],
+                "format": 1, "entries": [["name": "a", "size": 1], ["name": "b", "size": Int.max]]
             ])
             var length = UInt32(index.count).littleEndian
             let stream = try (Data([0]) as NSData).compressed(using: .zlib) as Data

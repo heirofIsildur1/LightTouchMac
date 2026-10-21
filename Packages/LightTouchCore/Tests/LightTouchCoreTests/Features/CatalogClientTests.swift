@@ -13,7 +13,7 @@ extension SharedState {
         /// Copies whose download_url is neither the store's own origin nor the Internet Archive over https.
         nonisolated static let refusedDownloads = [
             "881": "https://elsewhere.test/ipa/881", "882": "http://ia800.us.archive.org/ipa/882",
-            "883": "file:///ipa/883",
+            "883": "file:///ipa/883"
         ]
 
         /// tests/fixtures/catalog-server.py: one fixture app per ipa_id, its copy record, two versions and the archive.
@@ -25,7 +25,7 @@ extension SharedState {
                     "min_os": "3.0",
                     "size": body.count, "ipa_id": Int(id)!,
                     "download_url": refusedDownloads[id] ?? "http://catalog.test/ipa/" + id,
-                    "app_url": "http://catalog.test/app/test.fixture",
+                    "app_url": "http://catalog.test/app/test.fixture"
                 ]
             }
             let path = request.path
@@ -43,8 +43,8 @@ extension SharedState {
                     "version": id == "123" ? "1.0" : "0.9", "bundle_id": "test.fixture",
                     "binary": [
                         "install_status": "installable", "architectures": ["armv6"], "macho_min_os": "3.0",
-                        "device_family_macho": ["1"],
-                    ],
+                        "device_family_macho": ["1"]
+                    ]
                 ])
             }
             if path.hasSuffix("/versions") {
@@ -55,9 +55,9 @@ extension SharedState {
                             "copies": [
                                 [
                                     "ipa_id": id, "size": body.count, "install_status": "installable",
-                                    "architectures": ["armv6"], "macho_min_os": "3.0",
+                                    "architectures": ["armv6"], "macho_min_os": "3.0"
                                 ]
-                            ],
+                            ]
                         ]
                     }
                 ])
@@ -119,7 +119,7 @@ extension SharedState {
         // MARK: API 2.1 compatibility, against recorded responses of both shapes
 
         nonisolated static let compatFiles = [
-            "iPod2,1": "new-ipod2-3.1.3-enigmo", "iPad1,1": "new-ipad1-3.2-enigmo", "iPod1,1": "new-ipod1-1.1.5-enigmo",
+            "iPod2,1": "new-ipod2-3.1.3-enigmo", "iPad1,1": "new-ipad1-3.2-enigmo", "iPod1,1": "new-ipod1-1.1.5-enigmo"
         ]
 
         /// The live (2.0) server ignores device/os; the 2.1 one judges and 404s incompatible copies.
@@ -171,7 +171,7 @@ extension SharedState {
             try JSONSerialization.data(withJSONObject: [
                 "feed": [
                     "bundleID": "com.pangea.Enigmo", "size": blob.count,
-                    "md5": "1ce61d09f89df054e99b72eabffbd640",
+                    "md5": "1ce61d09f89df054e99b72eabffbd640"
                 ]
             ])
             .write(to: IPALibrary.directory.appendingPathComponent("index.json"))
@@ -257,7 +257,7 @@ extension SharedState {
                     let ipod2 = try await CatalogClient.search("enigmo", device: "iPod2,1", os: "3.1.3")
                     #expect(
                         names(ipod2) == [
-                            "Enigmo": "Needs a newer processor", "Enigmo 2": nil, "Enigmo!": nil, "Enigmous": nil,
+                            "Enigmo": "Needs a newer processor", "Enigmo 2": nil, "Enigmo!": nil, "Enigmous": nil
                         ]
                     )
                     #expect(
@@ -296,14 +296,14 @@ extension SharedState {
                     #expect(
                         names(ipod1) == [
                             "Enigmo": "Needs a newer processor", "Enigmo 2": "Requires iOS 3.0",
-                            "Enigmo!": "Requires iOS 3.0", "Enigmous": "Requires iOS 2.0",
+                            "Enigmo!": "Requires iOS 3.0", "Enigmous": "Requires iOS 2.0"
                         ]
                     )
 
                     let requests = LegacyStoreStub.requests
                     #expect(
                         Self.checkSearches(requests).map { $0["device"] } == [
-                            "iPhone9,9", "iPod2,1", "iPod2,1", "iPad1,1", "iPod1,1", "iPod1,1",
+                            "iPhone9,9", "iPod2,1", "iPod2,1", "iPad1,1", "iPod1,1", "iPod1,1"
                         ]
                     )
                     for lookup in requests.filter({ $0.path == "/api/emulator/apps" && $0.items["ipa_id"] != nil }).map(

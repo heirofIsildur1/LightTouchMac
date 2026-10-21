@@ -23,7 +23,7 @@ struct KBootIBootTests {
             "7B500", "arm-io", "clock-frequencies", { $0.replaceSubrange(176..<180, with: Data(count: 4)) },
             "3.x's iBoot-817 sets slot 44 to 24 MHz, 4.x's iBoots leave it 0 (931 here, the iPhone 4's 1072), and KBoot "
                 + "boots 4.x and later"
-        ),
+        )
     ]
 
     /// Where KBoot differs from iBoot on purpose: (node, property or "*" for the whole node, why).
@@ -56,7 +56,7 @@ struct KBootIBootTests {
             "arm-io/flash-controller0/disk", "logical-page-size",
             "KBoot writes the page size the 5.x DTs need (iBoot-1219's); iBoot-931 leaves 4.2.1's 0. Not yet read "
                 + "from a 5.x iBoot"
-        ),
+        )
     ]
 
     enum Value: Equatable {
@@ -210,7 +210,7 @@ struct KBootIBootTests {
         var hit = Set<Int>()
         var corrected = Set<String>()
         for (build, iboot, base) in [
-            ("7B500", "iBoot-817.29", UInt32(0xC000_0000)), ("8C148", "iBoot-931.71.16", UInt32(0x8000_0000)),
+            ("7B500", "iBoot-817.29", UInt32(0xC000_0000)), ("8C148", "iBoot-931.71.16", UInt32(0x8000_0000))
         ] {
             let (found, fixed) = try Self.differences(build, iboot: iboot, base: base)
             corrected.formUnion(fixed)

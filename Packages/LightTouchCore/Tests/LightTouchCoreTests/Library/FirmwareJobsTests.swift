@@ -115,7 +115,7 @@ import os
     nonisolated static func ipsw(_ url: String, mirrors: [(String, String)], sha1: String) -> [String: any Sendable] {
         [
             "kind": "ipsw", "url": url, "sha1": sha1, "bytes": size,
-            "mirrors": mirrors.map { ["url": $0.0, "sha1": $0.1, "bytes": size] },
+            "mirrors": mirrors.map { ["url": $0.0, "sha1": $0.1, "bytes": size] }
         ]
     }
     /// Unrar.swift's own test fixture (MIT): a 107-byte RAR 5 archive holding README.md, 40 bytes.
@@ -128,7 +128,7 @@ import os
         [
             "kind": "rar", "url": base + "/media_ipsw.rar", "archive_sha1": archiveSHA1, "archive_bytes": rar.count,
             "member": "README.md",
-            "sha1": IPSWStoreTests.sha1Hex(member), "bytes": member.count,
+            "sha1": IPSWStoreTests.sha1Hex(member), "bytes": member.count
         ]
     }
     nonisolated static let sources: [Source] = [
@@ -175,7 +175,7 @@ import os
             source: { b, _ in rarSource(b, archiveSHA1: String(repeating: "0", count: 40)) },
             outcome: .failure,
             paths: ["/media_ipsw.rar"]
-        ),
+        )
     ]
 
     @Test(arguments: sources)
@@ -243,7 +243,7 @@ import os
             try data.write(to: url)
             let source: [String: Any] = [
                 "kind": "ipsw", "url": i == 1 ? baseURL ?? url.absoluteString : url.absoluteString,
-                "sha1": IPSWStoreTests.sha1Hex(data), "bytes": size,
+                "sha1": IPSWStoreTests.sha1Hex(data), "bytes": size
             ]
             if i == 0 {
                 point["source"] = source
@@ -283,7 +283,7 @@ import os
                 let url = tmp.appendingPathComponent("\(id).ipsw")
                 try data.write(to: url)
                 e["source"] = [
-                    "kind": "ipsw", "url": url.absoluteString, "sha1": IPSWStoreTests.sha1Hex(data), "bytes": 1 << 20,
+                    "kind": "ipsw", "url": url.absoluteString, "sha1": IPSWStoreTests.sha1Hex(data), "bytes": 1 << 20
                 ]
                 e["estimates"] = Self.smallEstimates
                 e.removeValue(forKey: "bundled")
@@ -293,7 +293,7 @@ import os
             var seen: [String: [String]] = [:]
             for (id, chosen) in [
                 ("k48ap-9B206", true), ("k48ap-8C148", true), ("k48ap-9B206", false), ("k48ap-8C148", false),
-                ("k48ap-7B500", false),
+                ("k48ap-7B500", false)
             ] {
                 let argvURL = tmp.appendingPathComponent("argv-\(UUID().uuidString).json")
                 let h = try Harness(
@@ -324,7 +324,7 @@ import os
     @Test func jailbreakIsOfferedFromIPhoneOS2() throws {
         let catalog = try FirmwareCatalog.load(from: LibraryFixtures.shippedCatalog)
         for (id, offered) in [
-            ("m68ap-1A543a", false), ("n45ap-4B1", false), ("n72ap-5F138", true), ("n90ap-8C148", true),
+            ("m68ap-1A543a", false), ("n45ap-4B1", false), ("n72ap-5F138", true), ("n90ap-8C148", true)
         ] {
             #expect(FirmwareJobs.offersJailbreak(try #require(catalog.entry(id: id))) == offered, "\(id)")
         }
@@ -441,26 +441,26 @@ import os
             try handle.close()
         }
         for (name, data) in [
-            ("iBoot.bin", Data("ibot".utf8)), ("gid-blobs.bin", Data(count: 64)), ("nor.bin", Data(count: 0x100000)),
+            ("iBoot.bin", Data("ibot".utf8)), ("gid-blobs.bin", Data(count: 64)), ("nor.bin", Data(count: 0x100000))
         ] {
             try data.write(to: template.appendingPathComponent(name))
         }
         try JSONSerialization.data(withJSONObject: [
             "seed": "lighttouch-built-in", "model-number": "MB528", "region-info": "LL/A",
-            "serial-number": "X", "udid": "u",
+            "serial-number": "X", "udid": "u"
         ]).write(to: template.appendingPathComponent("identity.json"))
         try JSONSerialization.data(withJSONObject: [
             "board": "n72ap", "boot_strategy": "iboot", "entry": ["id": "n72ap-7E18"],
             "identity": ["seed": "lighttouch-built-in", "udid": "u", "sha256": "x"], "machine": ["aes-uid": "engine"],
             "outputs": ["nor": ["path": "nor.bin", "sha256": "x"]],
             "inputs": ["ipsw": ["path": NSHomeDirectory() + "/Library/Caches/x.ipsw"], "guest_tools": template.path],
-            "tool": ["helper": template.appendingPathComponent("LightTouchDevice").path],
+            "tool": ["helper": template.appendingPathComponent("LightTouchDevice").path]
         ]).write(to: template.appendingPathComponent("device.lock.json"))
         try LibraryFixtures.run(
             "/bin/chmod",
             [
                 "-R", "a-w", template.appendingPathComponent("nand").path,
-                template.appendingPathComponent("nor.bin").path,
+                template.appendingPathComponent("nor.bin").path
             ]
         )
         let resources = tmp.appendingPathComponent("Resources")
@@ -469,7 +469,7 @@ import os
             fk.path,
             [
                 "pack-base", "--base", template.path, "--out",
-                resources.appendingPathComponent("Device/n72ap-7E18.itbase").path,
+                resources.appendingPathComponent("Device/n72ap-7E18.itbase").path
             ]
         )
         let catalog = try FirmwareCatalog.load(from: LibraryFixtures.shippedCatalog)
@@ -522,7 +522,7 @@ import os
             "udid": identity["udid"]!, "serial": identity["serial-number"]!, "wifi": identity["wifi-mac"]!,
             "bt": identity["bt-mac"]!,
             "ecid": identity["unique-chip-id"]!, "seed": identity["seed"]!,
-            "syscfg": nor[0x4000..<0x4068].map { String(format: "%02x", $0) }.joined(),
+            "syscfg": nor[0x4000..<0x4068].map { String(format: "%02x", $0) }.joined()
         ]
     }
 

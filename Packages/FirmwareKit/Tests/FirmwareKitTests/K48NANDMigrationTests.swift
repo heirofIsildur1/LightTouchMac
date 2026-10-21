@@ -91,8 +91,8 @@ struct K48NANDMigrationTests {
             "format": 1, "id": d.id.uuidString, "board": board, "firmware": "\(board)-test",
             "base": ["kind": "prepared", "path": d.base.path],
             "storage": [
-                "key": "key", "overlay": d.overlay.path, "snapshot": d.device.appendingPathComponent("snapshot").path,
-            ],
+                "key": "key", "overlay": d.overlay.path, "snapshot": d.device.appendingPathComponent("snapshot").path
+            ]
         ]
         try DeviceRecord.data(record).write(to: d.record)
         try Preparer.readOnly(d.nand)

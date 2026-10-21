@@ -15,7 +15,7 @@ struct IdentityTests {
         (
             "caf\u{e9} \u{2713} \"q\"\\\n\t\u{7f}\u{1F600}",
             "bd4f2ab2194d18d4c25738444a4ba831213ffa0b362bbac56e1bffaedab49dc7"
-        ),
+        )
     ]
 
     @Test(arguments: recorded) func jsonMatchesRecordedDigests(seed: String, sha: String) throws {

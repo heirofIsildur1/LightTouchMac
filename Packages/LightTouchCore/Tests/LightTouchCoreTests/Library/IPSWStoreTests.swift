@@ -219,7 +219,7 @@ struct IPSWStoreTests {
             let swept = store(tmp, "3")
             for url in [
                 swept.partial("a"), swept.download("b"), swept.resumeData("b"),
-                swept.imports.appendingPathComponent(".c.importing"), swept.imported("d"),
+                swept.imports.appendingPathComponent(".c.importing"), swept.imported("d")
             ] {
                 try StorageLocations.privateDirectory(url.deletingLastPathComponent())
                 try Data("x".utf8).write(to: url)

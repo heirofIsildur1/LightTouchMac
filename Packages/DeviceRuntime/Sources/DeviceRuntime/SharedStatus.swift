@@ -203,7 +203,7 @@ nonisolated public func makeSurface(width: Int, height: Int, bytesPerElement: In
         let surface = IOSurface(properties: [
             .width: width, .height: height, .bytesPerElement: bytesPerElement,
             // pixelFormat is 'BGRA'.
-            .pixelFormat: 0x4247_5241,
+            .pixelFormat: 0x4247_5241
         ])
     else { preconditionFailure("IOSurface refused a \(width)x\(height) BGRA surface") }
     if let srgb = CGColorSpace(name: CGColorSpace.sRGB)?.copyICCData() {

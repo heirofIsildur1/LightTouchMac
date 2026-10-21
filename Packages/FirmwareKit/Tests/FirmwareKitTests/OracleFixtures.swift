@@ -74,7 +74,7 @@ enum Oracle {
                 "iBoot.bin": "77451ef5efb8ba35f210b5d57fb68660156678c9d57194428dfb43c293d7f04c",
                 "iBSS.bin": "058cf81fe887245a9443df47eb9da4db1265d43b626642de1687b269f315bac7",
                 "kernelcache.mach": "bb3e9f016de957509ea19550d7812c37a7951f2699afad88de253501a54bf317",
-                "LLB.bin": "8356b7f064504b8beca865d8a109541d1b3ebbc741461db5f128d9cd16701ece",
+                "LLB.bin": "8356b7f064504b8beca865d8a109541d1b3ebbc741461db5f128d9cd16701ece"
             ],
             rootfsDMG: "72b73e6e01d700be9c7444c3f706c5f55a6fadbbc88bc6ab2c1bbc9717a92537",
             rawVolume: "21e9fd48be0aca57a26fc794d1df8d86a06b32f538f6aa938481a1c38ce3645c"
@@ -92,7 +92,7 @@ enum Oracle {
                 "iBoot.bin": "e705c34b9ebcb1245cdd431b9245fbe0317c66a6994bf579ffc29cfc2483a2f8",
                 "iBSS.bin": "be4fef1685d6345f7dfc59e2fdbec4a78f62144d133313c2aed6b6414b243e66",
                 "kernelcache.mach": "fd951a7787020ecbb90b1ce216da3e68564468aa2e2822ba84749b3871e354b6",
-                "LLB.bin": "b39ef1ed9b2c4316e8ebeb2b2602cacb729ed7c10ce0d1a598fd1eca1ac6654b",
+                "LLB.bin": "b39ef1ed9b2c4316e8ebeb2b2602cacb729ed7c10ce0d1a598fd1eca1ac6654b"
             ],
             rootfsDMG: "4755c36c859956e438658e2021b1e1df16d3756a055d153f9c4bb957f6dc91c6",
             rawVolume: "12acac9e9845f442bfe77a8f7f7916b65948a0bd2b2ae03c51f314b549817198"
@@ -110,7 +110,7 @@ enum Oracle {
                 "iBoot.bin": "727a74a9777de646aa043dc9b1c6929543213f10c8a5e957ffb88ad644a47e56",
                 "iBSS.bin": "f326f29088ce83eef0fe716322c948312abd7b552d15978e1b5f8702cd3ae171",
                 "kernelcache.mach": "de990d9ced571b5a75c07e6cc277fe04d7f87bb279a607f267591500391c9026",
-                "LLB.bin": "365b422c7ee4d990fea4f45f6238b7a1a063a3d9b369553b8e8c925254342a3b",
+                "LLB.bin": "365b422c7ee4d990fea4f45f6238b7a1a063a3d9b369553b8e8c925254342a3b"
             ],
             rootfsDMG: "bb7ab7cc2d545669021627d6779eb6d6448d8529d32a965f965dd67c1fdc4697",
             rawVolume: "c111624aaf85bc627ee55111dd3cac8dd7a05152cd47fb7e2ac2cdcdc58a1ab6"
@@ -128,7 +128,7 @@ enum Oracle {
                 "iBoot.bin": "a0da587db8c16dbe523b0d458cdd9a631ba99c3e93dba3a1480afa81f19e4e91",
                 "iBSS.bin": "1b73bfb59d818fcd1622735abeb5c154cc5355b756b9313c9b8229408838ec95",
                 "kernelcache.mach": "93ccc8e1da0ea65201859627693b5100f4e659554b37e63a3c6988602153d42f",
-                "LLB.bin": "1c0e6ffbfd29c793d928a21e962eaf8748061c73cc29949f084db50e330216a9",
+                "LLB.bin": "1c0e6ffbfd29c793d928a21e962eaf8748061c73cc29949f084db50e330216a9"
             ],
             rootfsDMG: "2ffb29128ad6c5a72fffca5b603fa5e393fb806928e51431b11ca7d84b01ff93",
             rawVolume: "7a34c1a30cb24188c258dc9f041db290af9a41332c57e322f3b16ef6f94b0969"
@@ -146,7 +146,7 @@ enum Oracle {
                 "iBoot.bin": "9337ac9381669f29dc7086244c6e63e1714c3c37457947602734d4446ff21f8b",
                 "iBSS.bin": "f65852f107c6f1a678f77144d75d750df1c2affaf7e62ed2194dda9e1e204004",
                 "kernelcache.mach": "8caf1738b15fe4df99ddebb1f976b8582364af27ef738b93dcac60be1b26c63e",
-                "LLB.bin": "132f2213afb9e817e080684e6453c00352a9541f7ff6aee1436481f01c5f7d38",
+                "LLB.bin": "132f2213afb9e817e080684e6453c00352a9541f7ff6aee1436481f01c5f7d38"
             ],
             rootfsDMG: "8ec6d1c00a4b360e1d62d99e393253d50e74a8603bd36284a929bf5863ec03c4",
             rawVolume: "7cfde0d4192c7b32490c16267bf0497b8ce82dbf277283a8da9aa3924ded2786"
@@ -166,11 +166,11 @@ enum Oracle {
                 "iBoot.bin": "4c2ec4ea8b8c9ef93548275bfc0f44b447315b8b9631bfeeb147721a2f834b3d",
                 "iBSS.bin": "ffa508c1e88dc353ab331d1af990174ac9ed0543074cc04f6dce302648acda27",
                 "kernelcache.mach": "20fa129653ad4094ce4fd885ddd1477e0ee175137c48898277c8ca7bfc3dd33f",
-                "LLB.bin": "8657a7601ddf867549632b3a2744caab8f154d5c569cc38626cc2fd944d19c61",
+                "LLB.bin": "8657a7601ddf867549632b3a2744caab8f154d5c569cc38626cc2fd944d19c61"
             ],
             rootfsDMG: "e5eea56355c191df9e539fd2957a026325590fca393361c99e551d3fabf5fbd1",
             rawVolume: "25876ecc24259028d67978b04ea4baf446d305f7f56790565f637671c3bbf796"
-        ),
+        )
     ]
 
     static func firmware(_ id: String) -> Firmware { firmwares.first { $0.entryID == id }! }

@@ -9,7 +9,7 @@ import Testing
 struct CatalogCopyTests {
     @Test(arguments: [
         ("2.2.1", true), ("3", true), ("3.1.3", true), ("3.1.4", false), ("3.2", false), ("10.0", false),
-        ("3.x", false), ("-1", false), ("3..1", false), ("", false),
+        ("3.x", false), ("-1", false), ("3..1", false), ("", false)
     ])
     func minimumOSAgainstTheDefaultDevice(_ os: String, _ allowed: Bool) {
         #expect((CatalogCopy.osIssue(os) == nil) == allowed)
@@ -18,7 +18,7 @@ struct CatalogCopyTests {
     /// The device's own version, not 3.1.3: a 4.2.1 iPod takes 4.0 apps, a 3.2.2 iPad refuses 4.0 and takes 3.2.
     @Test(arguments: [
         ("4.0", "4.2.1", true), ("4.2.1", "4.2.1", true), ("4.3", "4.2.1", false),
-        ("3.2", "3.2.2", true), ("4.0", "3.2.2", false), ("3.1.3", "3.2", true),
+        ("3.2", "3.2.2", true), ("4.0", "3.2.2", false), ("3.1.3", "3.2", true)
     ])
     func minimumOSAgainstTheDevice(_ os: String, _ device: String, _ allowed: Bool) {
         #expect((CatalogCopy.osIssue(os, deviceOS: device) == nil) == allowed)
@@ -30,7 +30,7 @@ struct CatalogCopyTests {
 
     static let good: [String: Any] = [
         "ipa_id": "123", "size": 3, "md5": "900150983cd24fb0d6963f7d28e17f72", "available": true,
-        "binary": ["install_status": "installable", "architectures": ["armv6"], "macho_min_os": "3.0"],
+        "binary": ["install_status": "installable", "architectures": ["armv6"], "macho_min_os": "3.0"]
     ]
     static func copy(_ changes: [String: Any] = [:]) throws -> CatalogCopy {
         try JSONDecoder().decode(
@@ -47,7 +47,7 @@ struct CatalogCopyTests {
         let armv7: [String: Any] = [
             "binary": [
                 "install_status": "installable", "architectures": ["armv7"], "macho_min_os": "3.2",
-                "device_family_macho": ["2"],
+                "device_family_macho": ["2"]
             ]
         ]
         #expect(try Self.copy(armv7).unavailableReason(minimumOS: "3.2", deviceOS: "3.2.2", arch: "armv7") == nil)
@@ -58,7 +58,7 @@ struct CatalogCopyTests {
             ["binary": ["install_status": "encrypted", "architectures": ["armv6"]]],
             ["binary": ["install_status": "installable", "architectures": ["armv7"]]],
             ["binary": ["install_status": "installable", "architectures": ["armv6"], "macho_min_os": "4.0"]],
-            ["binary": ["install_status": "installable", "architectures": ["armv6"], "device_family_macho": ["3"]]],
+            ["binary": ["install_status": "installable", "architectures": ["armv6"], "device_family_macho": ["3"]]]
         ] {
             #expect(try Self.copy(changes).unavailableReason(minimumOS: "2.0") != nil, "\(changes)")
         }
@@ -133,7 +133,7 @@ struct CatalogWordsTests {
         ("unsupported_device_family", "Not made for this device"),
         ("capability:telephony", "Needs hardware this device doesn’t have"),
         ("capability:!armv6", "Not made for this device"),
-        ("encrypted", "Encrypted — can’t open in Light Touch"), ("something_new", "Not compatible with this device"),
+        ("encrypted", "Encrypted — can’t open in Light Touch"), ("something_new", "Not compatible with this device")
     ])
     func incompatibilityReasons(_ code: String, _ words: String) {
         let app = CatalogApp(

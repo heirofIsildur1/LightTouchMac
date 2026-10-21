@@ -6,7 +6,7 @@ import Foundation
 nonisolated public enum DeveloperTools {
     public static let targets = [
         "usr/sbin/sshd", "usr/libexec/sftp-server", "bin/bash",
-        "usr/lib/libcrypto.0.9.8.dylib",
+        "usr/lib/libcrypto.0.9.8.dylib"
     ]
     public static let source = "Legacy-iOS-Kit/2f818780e5c808b09c3497f1745dde1bdce8e372+GNU/bash-4.0.40/minimal-v2"
     public static let packageRevision = 2
@@ -18,7 +18,7 @@ nonisolated public enum DeveloperTools {
         "bin/bash": "27c3bb64b03a68e1266d4a90b74c922d68e65967aa3690894a3aac9a29ec14df",
         "usr/lib/libcrypto.0.9.8.dylib": "bb7cff246d604171a4179cd2fb1a1d97f06ac2e534342b7039ad40aed8bb30de",
         "usr/libexec/sftp-server": "c6ea137ba834febc9b69848f02a68b529a3eaa88a11768f6682e159c05db0906",
-        "usr/sbin/sshd": "737a9b0decfe7008641b38f3be18c2bb9006f258f2fb81d3598f52f510b8357b",
+        "usr/sbin/sshd": "737a9b0decfe7008641b38f3be18c2bb9006f258f2fb81d3598f52f510b8357b"
     ]
     public struct BundleManifest: Codable, Sendable {
         public var source: String
@@ -146,7 +146,7 @@ nonisolated public enum DeveloperTools {
         let job: [String: Any] = [
             "Label": "com.lighttouch.developer.sshd", "RunAtLoad": true, "KeepAlive": true,
             "ProgramArguments": ["/usr/sbin/sshd", "-D", "-e", "-f", prefix + "sshd_config"],
-            "StandardErrorPath": "/private/var/log/lighttouch-sshd.log",
+            "StandardErrorPath": "/private/var/log/lighttouch-sshd.log"
         ]
         let jobData = try PropertyListSerialization.data(fromPropertyList: job, format: .xml, options: 0)
         // Prepare everything before changing the offer; loader verifies each hash.
@@ -164,7 +164,7 @@ nonisolated public enum DeveloperTools {
                 "/private/var/root/.ssh/lighttouch_authorized_keys"
             ),
             ("developer/sshd_config", Data(config.utf8), "0600", nil),
-            ("developer/sshd.plist", jobData, "0644", nil),
+            ("developer/sshd.plist", jobData, "0644", nil)
         ]
         try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: offer.path)
         for (path, data, mode, target) in extra {

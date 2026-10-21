@@ -42,7 +42,7 @@ import Testing
     @Test func hmacSHA1MatchesRFC2202() throws {
         let cases: [(key: Data, data: String, mac: String)] = [
             (Data(repeating: 0x0b, count: 20), "Hi There", "b617318655057264e28bc0b6fb378c8ef146be00"),
-            (Data("Jefe".utf8), "what do ya want for nothing?", "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79"),
+            (Data("Jefe".utf8), "what do ya want for nothing?", "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79")
         ]
         for c in cases {
             let mac = HMAC<Insecure.SHA1>.authenticationCode(for: Data(c.data.utf8), using: SymmetricKey(data: c.key))

@@ -11,7 +11,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "HostServiceWire", type: .static, targets: ["HostServiceWire"]),
-        .library(name: "HostServiceClient", type: .static, targets: ["HostServiceClient"]),
+        .library(name: "HostServiceClient", type: .static, targets: ["HostServiceClient"])
     ],
     dependencies: [.package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.2")],
     targets: [
@@ -20,10 +20,10 @@ let package = Package(
             name: "HostServiceClient",
             dependencies: [
                 "HostServiceWire",
-                .product(name: "Subprocess", package: "swift-subprocess"),
+                .product(name: "Subprocess", package: "swift-subprocess")
             ]
         ),
         .testTarget(name: "HostServiceWireTests", dependencies: ["HostServiceWire"]),
-        .testTarget(name: "HostServiceClientTests", dependencies: ["HostServiceClient"]),
+        .testTarget(name: "HostServiceClientTests", dependencies: ["HostServiceClient"])
     ]
 )

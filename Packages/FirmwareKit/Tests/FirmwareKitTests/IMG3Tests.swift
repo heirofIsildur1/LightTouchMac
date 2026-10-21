@@ -41,7 +41,7 @@ struct IMG3Tests {
             "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
             "f58c4c04d6e5f1ba779eabfb5f7bfbd69cfc4e967edb808d679f777bc6702c7d"
                 + "39f23369a9d9bacfa530e26304231461b2eb05e2c39be9fcda6c19078c6a9d1b"
-        ),
+        )
     ])
     func aesCBCMatchesNISTVectors(key: String, ciphertext: String) throws {
         let key = try #require(Data(hex: key))

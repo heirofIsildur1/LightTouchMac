@@ -27,7 +27,7 @@ import Testing
         Address(chip: 3, page: 2000 * 128 + 2): image.blankRecord,  // every bit set: erased, a hole
         Address(chip: 2, page: 2000 * 128 + 3): [UInt8](repeating: 0, count: stride),
         Address(chip: 1, page: erasedBlock * 128 + 1): record(0x44),  // under the mark
-        Address(chip: 1, page: erasedBlock * 128 + 2): record(0x45),
+        Address(chip: 1, page: erasedBlock * 128 + 2): record(0x45)
     ]
     /// The FTL's location of logical page 10 (the base's map): the guest rewrote it in place.
     static var superseded: Address {
@@ -39,7 +39,7 @@ import Testing
             superseded: [UInt8](repeating: 0xC3, count: N45NAND.page) + supersededSpare,
             Address(chip: 1, page: erasedBlock * 128 + 2): record(0x46),  // rewritten after the mark
             Address(chip: 2, page: 3000 * 128 + 5): [UInt8](repeating: 0x21, count: 100),  // short, overlay only
-            Address(chip: 3, page: 3001 * 128): record(0x47),  // the base has none
+            Address(chip: 3, page: 3001 * 128): record(0x47)  // the base has none
         ]
     }
 
@@ -74,8 +74,8 @@ import Testing
             "format": 1, "id": d.id.uuidString, "board": "m68ap", "firmware": "m68ap-test",
             "base": ["kind": "prepared", "path": d.base.path],
             "storage": [
-                "key": "key", "overlay": d.overlay.path, "snapshot": d.device.appendingPathComponent("snapshot").path,
-            ],
+                "key": "key", "overlay": d.overlay.path, "snapshot": d.device.appendingPathComponent("snapshot").path
+            ]
         ]
         try DeviceRecord.data(record).write(to: d.record)
         try Preparer.readOnly(d.nand)
@@ -139,7 +139,7 @@ import Testing
             (geometry as? NSDictionary)
                 == [
                     "storage_format": "nand-xor-blank-v2", "blank": "ff", "board": "s5l8900", "chip_selects": 4,
-                    "page_bytes": 2048, "spare_bytes": 64, "pages_per_block": 128, "blocks_per_ce": 4096,
+                    "page_bytes": 2048, "spare_bytes": 64, "pages_per_block": 128, "blocks_per_ce": 4096
                 ]
         )
     }

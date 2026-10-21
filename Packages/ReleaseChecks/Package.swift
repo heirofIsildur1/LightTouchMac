@@ -16,6 +16,6 @@ let package = Package(
         .testTarget(
             name: "ReleaseChecksTests",
             dependencies: ["ReleaseChecks", .product(name: "HostRuntime", package: "HostRuntime")]
-        ),
+        )
     ]
 )

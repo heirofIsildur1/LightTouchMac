@@ -74,8 +74,8 @@ import Testing
             "storage": [
                 "key": "old", "overlay": device.appendingPathComponent("overlay").path,
                 "snapshot": "old-snapshot", "writableNOR": device.appendingPathComponent("nor.bin").path,
-                "usbmuxConf": "conf",
-            ],
+                "usbmuxConf": "conf"
+            ]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         // A mounted/exported copy must not keep the stopped owner alive merely
@@ -213,8 +213,8 @@ import Testing
             "base": ["kind": "prepared", "path": base.path],
             "storage": [
                 "key": "old", "overlay": overlay.path, "snapshot": "old-snapshot",
-                "writableNOR": device.appendingPathComponent("nor.bin").path, "usbmuxConf": "conf",
-            ],
+                "writableNOR": device.appendingPathComponent("nor.bin").path, "usbmuxConf": "conf"
+            ]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
 

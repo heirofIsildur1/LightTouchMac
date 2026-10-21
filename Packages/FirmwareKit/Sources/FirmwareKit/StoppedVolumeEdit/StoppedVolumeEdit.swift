@@ -292,7 +292,7 @@ public enum StoppedVolumeEdit {
             var outputs = lock["outputs"] as? [String: Any] ?? [:]
             outputs["nand"] = [
                 "path": "nand", "pages": files.filter { $0.hasSuffix(".page") }.count,
-                "listing_sha256": listing.sha256, "built_listing_sha256": listing.sha256,
+                "listing_sha256": listing.sha256, "built_listing_sha256": listing.sha256
             ]
             // Immutable boot outputs were cloned, so update legacy absolute output
             // paths only when their named file actually exists in the new base.
@@ -309,7 +309,7 @@ public enum StoppedVolumeEdit {
             lock["outputs"] = outputs
             var maintenance: [String: Any] = [
                 "kind": "stopped-volume-edit", "volume_sha256": expected[0],
-                "generation": id.uuidString, "original_lock_sha256": StorageGeneration.hash(originalLockData),
+                "generation": id.uuidString, "original_lock_sha256": StorageGeneration.hash(originalLockData)
             ]
             let workingNOR = edit.root.appendingPathComponent("nor.bin")
             if fm.fileExists(atPath: workingNOR.path) {
@@ -319,7 +319,7 @@ public enum StoppedVolumeEdit {
             let lockData = try DeviceLock(json: lock).data()
             try StorageGeneration.write(lockData, to: lockURL)
             let provenance: [String: Any] = [
-                "lock": try edit.recordPath(lockURL), "sha256": StorageGeneration.hash(lockData),
+                "lock": try edit.recordPath(lockURL), "sha256": StorageGeneration.hash(lockData)
             ]
             try Preparer.readOnly(edit.base)
             // K48NAND.rebuild and N72NAND.write lay out image stores: a format 1 device leaves the edit in format 2
@@ -374,7 +374,7 @@ public enum StoppedVolumeEdit {
         let lockURL = edit.base.appendingPathComponent("device.lock.json")
         let provenance: [String: Any] = [
             "lock": try edit.recordPath(lockURL), "sha256": StorageGeneration.hash(try Data(contentsOf: lockURL)),
-            "kind": "stopped-volume-edit", "legacy_ftl_pages": changed,
+            "kind": "stopped-volume-edit", "legacy_ftl_pages": changed
         ]
         try Preparer.readOnly(edit.base)
         try await edit.publish(record: edit.candidateRecord(provenance: provenance))

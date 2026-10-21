@@ -84,7 +84,7 @@ public struct UnitIdentity: Equatable, Sendable {
             ("unique-chip-id", .string(String(format: "0x%010llx", ecid))),
             ("die-id", .list([String(format: "0x%08llx", word2), String(format: "0x%08llx", word3)])),
             ("wifi-mac", .string(mac(wifi))), ("bt-mac", .string(mac(bt))),
-            ("model-number", .string(model)), ("region-info", .string(iPadRegion)), ("seed", .string(seed)),
+            ("model-number", .string(model)), ("region-info", .string(iPadRegion)), ("seed", .string(seed))
         ])
         id.fields.append(
             (
@@ -114,12 +114,12 @@ public struct UnitIdentity: Equatable, Sendable {
         var id = UnitIdentity(
             fields: [
                 ("serial-number", .string(serial)),
-                ("wifi-mac", .string(base.synthesized("wifi-mac"))),
+                ("wifi-mac", .string(base.synthesized("wifi-mac")))
             ]
                 + (bluetooth ? [("bt-mac", .string(base.synthesized("bt-mac")))] : []) + [
                     ("battery-serial", .string(h[0..<12].map { String($0 % 10) }.joined())),
                     ("model-number", .string(modelNumber)), ("region-info", .string(regionInfo)),
-                    ("seed", .string(seed)),
+                    ("seed", .string(seed))
                 ]
         )
         if bluetooth { id.fields.append(("unique-chip-id", .string(base.synthesized("unique-chip-id")))) }

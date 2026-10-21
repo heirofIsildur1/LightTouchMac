@@ -52,7 +52,7 @@ enum HFSOracle {
         defer { try? FileManager.default.removeItem(atPath: mnt) }
         let attach = try await DiskImage.run([
             "/usr/bin/hdiutil", "attach", "-readonly", "-owners", owners, "-nobrowse", "-noverify", "-imagekey",
-            "diskimage-class=CRawDiskImage", "-mountpoint", mnt, img.path,
+            "diskimage-class=CRawDiskImage", "-mountpoint", mnt, img.path
         ])
         let dev = String(attach.split(whereSeparator: \.isWhitespace).first ?? "")
         do {
@@ -143,7 +143,7 @@ enum HFSOracle {
             }
             let specs = [
                 "private/var/mobile:0:0", "System/Library/LaunchDaemons/com.apple.SpringBoard.plist:501:20",
-                "usr/libexec/lockdownd:0:0:4755", "private/var/Keychains:64:0:700", "Applications:0:80",
+                "usr/libexec/lockdownd:0:0:4755", "private/var/Keychains:64:0:700", "Applications:0:80"
             ]
             let vol = try HFSPlusVolume(raw, writable: true)
             var changed = 0

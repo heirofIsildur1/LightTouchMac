@@ -48,13 +48,13 @@ struct N72NANDMigrationTests {
         Page(cs: 3, page: 5002): N72NANDImage.blankRecord,  // the blank page itself: a hole
         Page(cs: 2, page: 5003): [UInt8](repeating: 0, count: stride),
         Page(cs: 1, page: erasedBlock * 128 + 1): record([UInt8](repeating: 0x44, count: 4096)),  // under the mark
-        Page(cs: 1, page: erasedBlock * 128 + 2): record([UInt8](repeating: 0x45, count: 4096)),
+        Page(cs: 1, page: erasedBlock * 128 + 2): record([UInt8](repeating: 0x45, count: 4096))
     ]
     static let overlayPages: [Page: [UInt8]] = [
         N72NAND.predict(1): record(block(1, 0x80)),  // superseding
         N72NAND.predict(3): record(block(3, 0x80)),  // the base has none
         Page(cs: 1, page: erasedBlock * 128 + 2): record([UInt8](repeating: 0x46, count: 4096)),  // rewritten after
-        Page(cs: 2, page: 4_000_000 / 8): [UInt8](repeating: 0x21, count: 100),  // short, overlay only
+        Page(cs: 2, page: 4_000_000 / 8): [UInt8](repeating: 0x21, count: 100)  // short, overlay only
     ]
 
     func write(_ bytes: [UInt8], _ p: Page, in dir: URL) throws {
@@ -78,8 +78,8 @@ struct N72NANDMigrationTests {
             "format": 1, "id": d.id.uuidString, "board": "n72ap", "firmware": "n72ap-test",
             "base": ["kind": "prepared", "path": d.base.path],
             "storage": [
-                "key": "key", "overlay": d.overlay.path, "snapshot": d.device.appendingPathComponent("snapshot").path,
-            ],
+                "key": "key", "overlay": d.overlay.path, "snapshot": d.device.appendingPathComponent("snapshot").path
+            ]
         ]
         try DeviceRecord.data(record).write(to: d.record)
         try Preparer.readOnly(d.nand)

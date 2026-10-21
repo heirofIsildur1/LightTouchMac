@@ -36,21 +36,21 @@ struct PreparedBaseTests {
             "identity": ["seed": seed, "udid": id.udid!, "sha256": "x"],
             "machine": [
                 "aes-uid": "engine", "wifi-mac": id["wifi-mac"]!, "bt-mac": id["bt-mac"]!,
-                "ecid": id["unique-chip-id"]!,
+                "ecid": id["unique-chip-id"]!
             ],
             "outputs": [
-                "nor": ["path": "nor.bin", "sha256": Preparer.sha256(try nor(seed))], "nand": ["listing_sha256": "l"],
+                "nor": ["path": "nor.bin", "sha256": Preparer.sha256(try nor(seed))], "nand": ["listing_sha256": "l"]
             ],
             "inputs": [
                 "ipsw": ["path": "/Users/someone/Library/Caches/x/5f4f.ipsw", "sha1": "5f4f"],
                 "decrypted": "/tmp/cache/abc",
-                "guest_tools": "/Users/someone/out/ipad-guest-tools", "identity": "identity.json",
+                "guest_tools": "/Users/someone/out/ipad-guest-tools", "identity": "identity.json"
             ],
             "tool": ["name": "firmwarekit", "helper": "/Users/someone/app/LightTouchDevice"],
             "guest_package": [
                 "seed": 15, "itpack": ["path": "/Users/someone/out/ipad-guest-tools/armv6.itpack", "sha256": "s"],
-                "hooks": ["/usr/lib/libappsync.dylib"],
-            ],
+                "hooks": ["/usr/lib/libappsync.dylib"]
+            ]
         ]
         try Preparer.lockData(lock).write(to: dir.appendingPathComponent("device.lock.json"))
         for name in ["nand", "nor.bin", "iBoot.bin"] { try Preparer.readOnly(dir.appendingPathComponent(name)) }
@@ -92,7 +92,7 @@ struct PreparedBaseTests {
             try Self.base(want, seed: seed)
             for name in [
                 "identity.json", "nor.bin", "nand/cs0.pages", "nand/cs3.pages", "nand/geometry.json", "iBoot.bin",
-                "empty",
+                "empty"
             ] {
                 #expect(
                     try Data(contentsOf: out.appendingPathComponent(name))
@@ -177,7 +177,7 @@ struct PreparedBaseTests {
         }
         // a page in each of two chunks of cs0, and one on cs2
         let pages: [N72NAND.Page: UInt8] = [
-            .init(cs: 0, page: 1): 7, .init(cs: 0, page: 700): 9, .init(cs: 2, page: 3): 5,
+            .init(cs: 0, page: 1): 7, .init(cs: 0, page: 700): 9, .init(cs: 2, page: 3): 5
         ]
         try Self.base(tmp.appendingPathComponent("a"), seed: "lighttouch-built-in", pages: pages)
         Thread.sleep(forTimeInterval: 1.1)  // a lock created a second later
@@ -194,7 +194,7 @@ struct PreparedBaseTests {
         let a = try Self.tree(tmp.appendingPathComponent("a.itbase"))
         #expect(
             Set(a.keys.filter { $0.hasSuffix(".z") }) == [
-                "nand/cs0/000000.z", "nand/cs0/000002.z", "nand/cs2/000000.z",
+                "nand/cs0/000000.z", "nand/cs0/000002.z", "nand/cs2/000000.z"
             ]
         )
         #expect(try Self.tree(tmp.appendingPathComponent("b.itbase")) == a)
