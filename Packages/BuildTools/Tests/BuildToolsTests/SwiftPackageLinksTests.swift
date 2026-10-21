@@ -14,7 +14,7 @@ struct SwiftPackageLinksTests {
         [
             "targets": targets,
             "products": products.map { ["name": $0.0, "targets": $0.1] as [String: Any] },
-            "dependencies": deps.map { ["sourceControl": [["identity": $0]]] },
+            "dependencies": deps.map { ["sourceControl": [["identity": $0]]] }
         ]
     }
 
@@ -26,7 +26,7 @@ struct SwiftPackageLinksTests {
                         "Kit",
                         deps: [["product": ["Parsing", "swift-parsing", nil, nil]], ["byName": ["Small", nil]]]
                     ),
-                    Self.target("KitTests", "test", deps: [["byName": ["Testing", nil]]]),
+                    Self.target("KitTests", "test", deps: [["byName": ["Testing", nil]]])
                 ],
                 deps: ["swift-parsing", "small", "testing"]
             ),
@@ -34,7 +34,7 @@ struct SwiftPackageLinksTests {
                 [
                     Self.target("Parsing", deps: [["byName": ["ParsingMacros", nil]]]),
                     Self.target("ParsingMacros", "macro", deps: [["product": ["Syntax", "swift-syntax", nil, nil]]]),
-                    Self.target("Tool", "executable", deps: [["product": ["Args", "swift-args", nil, nil]]]),
+                    Self.target("Tool", "executable", deps: [["product": ["Args", "swift-args", nil, nil]]])
                 ],
                 products: [("Parsing", ["Parsing"]), ("tool", ["Tool"])],
                 deps: ["swift-syntax", "swift-args"]
@@ -43,7 +43,7 @@ struct SwiftPackageLinksTests {
             "testing": Self.manifest([Self.target("Testing")], products: [("Testing", ["Testing"])]),
             "swift-syntax": Self.manifest([Self.target("Syntax")], products: [("Syntax", ["Syntax"])]),
             "swift-args": Self.manifest([Self.target("Args")], products: [("Args", ["Args"])]),
-            "sparkle": Self.manifest([Self.target("Sparkle")], products: [("Sparkle", ["Sparkle"])]),
+            "sparkle": Self.manifest([Self.target("Sparkle")], products: [("Sparkle", ["Sparkle"])])
         ]
         #expect(
             SwiftPackageLinks.linked(roots: ["root"], direct: ["sparkle"], manifests: manifests)

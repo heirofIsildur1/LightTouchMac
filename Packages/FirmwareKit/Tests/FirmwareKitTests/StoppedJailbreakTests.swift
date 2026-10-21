@@ -12,7 +12,7 @@ import Testing
     static var springBoardJob: [String: Any] {
         [
             "Label": "com.apple.SpringBoard",
-            "EnvironmentVariables": ["DYLD_INSERT_LIBRARIES": "/usr/lib/it_typein.dylib:/usr/lib/other.dylib"],
+            "EnvironmentVariables": ["DYLD_INSERT_LIBRARIES": "/usr/lib/it_typein.dylib:/usr/lib/other.dylib"]
         ]
     }
 
@@ -143,15 +143,15 @@ import Testing
             out: base.appendingPathComponent("nand")
         )
         try JSONSerialization.data(withJSONObject: [
-            "board": "n72ap", "product_version": "3.1.3", "derived": ["nand_epoch": 1],
+            "board": "n72ap", "product_version": "3.1.3", "derived": ["nand_epoch": 1]
         ]).write(to: base.appendingPathComponent("device.lock.json"))
         try DeviceRecord.data([
             "id": UUID().uuidString, "board": "n72ap", "firmware": "test",
             "base": ["kind": "prepared", "path": base.path],
             "storage": [
                 "key": "k", "overlay": device.appendingPathComponent("overlay").path, "snapshot": "s",
-                "usbmuxConf": "conf",
-            ],
+                "usbmuxConf": "conf"
+            ]
         ]).write(to: device.appendingPathComponent(DeviceRecord.name))
 
         try await StoppedVolumeEdit.jailbreak(device: device, bootstrap: bootstrap)

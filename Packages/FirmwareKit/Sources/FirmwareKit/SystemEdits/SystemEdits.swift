@@ -80,7 +80,7 @@ public enum SystemEdits {
         /// guest tool -> (install path, mode); ipad1_rootfs.TOOLS (+ SEAL_TOOL, GLTEST_TOOL).
         public static let tools: [(name: String, path: String, mode: mode_t)] = [
             ("it_pbd", "usr/local/bin/it_pbd", 0o755), ("it_prefs", "usr/local/bin/it_prefs", 0o755),
-            msmQuiet,
+            msmQuiet
         ]
         public static let msmQuiet: (name: String, path: String, mode: mode_t) = (
             "it_msmquiet.dylib", "usr/local/lib/it_msmquiet.dylib", 0o755
@@ -133,7 +133,7 @@ public enum SystemEdits {
     static let noticeJobs = [
         (msmJob, "com.apple.mobile.storage_mounter"),
         (daemons + "/com.apple.mobile.usb_device_arbitrator.plist", "com.apple.mobile.usb_device_arbitrator"),
-        (daemons + "/com.apple.device-o-matic.plist", "com.apple.device-o-matic"),
+        (daemons + "/com.apple.device-o-matic.plist", "com.apple.device-o-matic")
     ]
     static let btJob = daemons + "/com.apple.BTServer.plist"
     static let installdJob = daemons + "/com.apple.mobile.installd.plist"
@@ -510,7 +510,7 @@ public enum SystemEdits {
                 oldStyle
                 ? [
                     "AllowUnactivatedService": true, "Label": "com.apple.afc2",
-                    "ProgramArguments": ["/usr/libexec/afcd", "--lockdown", "-d", "/"],
+                    "ProgramArguments": ["/usr/libexec/afcd", "--lockdown", "-d", "/"]
                 ]
                 : ["AllowUnactivatedService": true, "Label": "com.apple.afc2", "XPCServiceName": "com.apple.afc2"]
         }
@@ -714,7 +714,7 @@ public enum SystemEdits {
     static var pacProxies: NSDictionary {
         [
             "ExceptionsList": ["*.local", "169.254/16"], "FTPPassive": 1, "ProxyAutoConfigEnable": 1,
-            "ProxyAutoConfigURLString": "file:///" + pacPath,
+            "ProxyAutoConfigURLString": "file:///" + pacPath
         ]
     }
     /// What the /private/var skeleton gets before it becomes the data volume: the web proxy, the language, Setup finished, the data
@@ -765,10 +765,10 @@ public enum SystemEdits {
             wifiService,
             NSMutableDictionary(dictionary: [
                 "Interface": [
-                    "DeviceName": "en0", "Hardware": "AirPort", "Type": "Ethernet", "UserDefinedName": "AirPort",
+                    "DeviceName": "en0", "Hardware": "AirPort", "Type": "Ethernet", "UserDefinedName": "AirPort"
                 ],
                 "IPv4": ["ConfigMethod": "DHCP"], "IPv6": ["ConfigMethod": "Automatic"], "DNS": [String: Any](),
-                "UserDefinedName": "AirPort",
+                "UserDefinedName": "AirPort"
             ])
         )
         svc["Proxies"] = pacProxies

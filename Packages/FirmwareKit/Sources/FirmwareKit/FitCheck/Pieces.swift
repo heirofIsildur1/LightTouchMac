@@ -58,7 +58,7 @@ extension FitCheck {
     /// (IT_PREFS_TIP_ONLY), and the bake that stands in for it on 2.x/3.0, set only the first.
     public static let itPrefs = [
         ("SBDidShowReorderText", "System/Library/CoreServices/SpringBoard.app/SpringBoard"),
-        ("AppleLocationServer", "usr/libexec/locationd"), ("AppleLocationServerRequiresCert", "usr/libexec/locationd"),
+        ("AppleLocationServer", "usr/libexec/locationd"), ("AppleLocationServerRequiresCert", "usr/libexec/locationd")
     ]
 
     /// One Fit per setting: the reader names the key, by it_prefs' own rule (the key and its NUL anywhere in the
@@ -206,7 +206,7 @@ extension FitCheck {
     static let appSyncCalls = [
         ["_MISValidateSignatureAndCopyInfo", "_MISValidateSignature"], ["_SecCertificateCreateWithData"],
         ["_SecCertificateCopySubjectSummary"], ["_kMISValidationInfoSignerCertificate"],
-        ["_kMISValidationInfoValidatedByProfile"],
+        ["_kMISValidationInfoValidatedByProfile"]
     ]
 
     /// libappsync fits the installation service `host` when the host's process (it, and every image it links)
@@ -340,7 +340,7 @@ extension FitCheck {
     static let ioSurface = "System/Library/PrivateFrameworks/IOSurface.framework/IOSurface"
     static let coreSurfaces = [
         "System/Library/Frameworks/CoreSurface.framework/CoreSurface",
-        "System/Library/PrivateFrameworks/CoreSurface.framework/CoreSurface",
+        "System/Library/PrivateFrameworks/CoreSurface.framework/CoreSurface"
     ]
     static let ioMobileFramebuffer =
         "System/Library/PrivateFrameworks/IOMobileFramebuffer.framework/IOMobileFramebuffer"
@@ -348,7 +348,7 @@ extension FitCheck {
     /// The surface calls the front end (mbxshim.c iosurface_init) takes by name: IOSurface's, or CoreSurface's
     /// CoreSurfaceBuffer* equivalents (2.x; GetPixelFormatType there).
     static let surfaceCalls = [
-        "GetBaseAddress", "GetBytesPerRow", "GetWidth", "GetHeight", "GetPixelFormat", "Lock", "Unlock",
+        "GetBaseAddress", "GetBytesPerRow", "GetWidth", "GetHeight", "GetPixelFormat", "Lock", "Unlock"
     ]
 
     /// Does the image installed as `install` name the C string `s` (a selector it sends or implements, an @encode)?
@@ -451,7 +451,7 @@ extension FitCheck {
             (
                 "sendNotification:forTransaction:onLayer:",
                 ["_IOMobileFramebufferSwapSignal", "_IOMobileFramebufferGetMainDisplay", "_IOMobileFramebufferGetID"]
-            ),
+            )
         ]
         where names(fw, quartzCore, sel) {
             let missing = want.filter { !fb.contains($0) }

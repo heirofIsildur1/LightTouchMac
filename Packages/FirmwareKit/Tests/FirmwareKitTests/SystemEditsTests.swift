@@ -18,7 +18,7 @@ enum K48Oracle {
         for (j, d) in [
             ("com.qemu.it-pbd.plist", "it-pasteboard"), ("com.qemu.it-prefs.plist", "it-prefs"),
             ("com.qemu.it-seal.plist", "it-seal"),
-            ("com.qemu.it-gltest.plist", "it-gltest"),
+            ("com.qemu.it-gltest.plist", "it-gltest")
         ] {
             m[j] = contrib.appendingPathComponent("\(d)/\(j)")
         }
@@ -156,13 +156,13 @@ enum K48Oracle {
         }
         let common: Set = [
             "SetupDone", "SetupFinishedAllSteps", "RestoreChoice", "PBTCPresented", "PBDiagnosticsPresented",
-            "WiFiPresented", "Language", "Locale",
+            "WiFiPresented", "Language", "Locale"
         ]
         let buddy: [Int: Set<String>] = [
             5: common.union(["AppleIDPresented"]), 6: common.union(["AppleIDPB3Presented", "SetupVersion"]),
             7: common.union([
-                "AppleIDPB5Presented", "PasscodePresented", "SetupVersion", "SetupState", "AppleIDForceUpgrade",
-            ]),
+                "AppleIDPB5Presented", "PasscodePresented", "SetupVersion", "SetupState", "AppleIDForceUpgrade"
+            ])
         ]
         #expect(keys(mobile + "com.apple.purplebuddy.plist") == buddy[major])
         #expect(plist(mobile + "com.apple.purplebuddy.plist")["SetupVersion"] as? Int == [6: 3, 7: 5][major])
@@ -194,11 +194,11 @@ enum K48Oracle {
                 == (major == 7
                     ? [
                         "-ActivationStateAcknowledged", "com.apple.mobile.chaperone-NotSoFresh",
-                        "-FirstPurpleBuddyCompletion",
+                        "-FirstPurpleBuddyCompletion"
                     ]
                     : [
                         "com.apple.purplebuddy-SetupState", "com.apple.mobile.user_preferences-UserSetLanguage",
-                        "com.apple.mobile.user_preferences-UserSetLocale",
+                        "com.apple.mobile.user_preferences-UserSetLocale"
                     ])
         )
     }
@@ -209,7 +209,7 @@ enum K48Oracle {
         // AppleLanguages as each rootfs ships it in /private/var/mobile/Library/Preferences/.GlobalPreferences.plist.
         let v114 = [
             "en", "fr", "de", "ja", "nl", "it", "es", "pt-PT", "da", "fi", "nb", "sv", "ko", "zh-Hans", "zh-Hant", "ru",
-            "pl",
+            "pl"
         ]
         let v313 =
             v114.filter { $0 != "pt-PT" }
@@ -284,7 +284,7 @@ enum K48Oracle {
         #expect(SystemEdits.regionFormats(MountedVolume(root: root)) == nil, "no ICU data")
         try Self.icuData([
             "icudt42l/res_index.res", "icudt42l/en.res", "icudt42l/en_US.res", "icudt42l/uk.res",
-            "icudt42l/uk_UA.res", "icudt42l/sr_Latn_RS.res", "icudt42l/coll/hi_IN.res", "icudt42l/cnvalias.icu",
+            "icudt42l/uk_UA.res", "icudt42l/sr_Latn_RS.res", "icudt42l/coll/hi_IN.res", "icudt42l/cnvalias.icu"
         ]).write(to: icu.appendingPathComponent("icudt42l.dat"))
         let formats = try #require(SystemEdits.regionFormats(MountedVolume(root: root)))
         #expect(formats.isSuperset(of: ["en", "en_US", "uk", "uk_UA", "sr_Latn_RS"]))
@@ -369,7 +369,7 @@ enum K48Oracle {
                 try fm.createDirectory(at: b, withIntermediateDirectories: true)
                 let info: [String: Any] = [
                     "UIKeyboardSupportedInputModes": modes,
-                    "UIKeyboardDefaultLanguageInputModes": defaults.filter { $0.key.hasPrefix(bundle) },
+                    "UIKeyboardDefaultLanguageInputModes": defaults.filter { $0.key.hasPrefix(bundle) }
                 ]
                 try PropertyListSerialization.data(fromPropertyList: info, format: .binary, options: 0)
                     .write(to: b.appendingPathComponent("Info.plist"))
@@ -385,7 +385,7 @@ enum K48Oracle {
                 "fr": ["fr_CA": layout("QWERTY"), "fr_CH": layout("QWERTY"), "fr_FR": layout("AZERTY")],
                 "ja": ["ja_JP-Kana": layout("Japanese3x3"), "ja_JP-Romaji": layout("QWERTY_ja_JP")],
                 "zh": ["zh_Hans-HWR": layout("HWR"), "zh_Hans-Pinyin": layout("Pinyin"), "zh_Hant-HWR": layout("HWR")],
-                "emoji": ["emoji": layout("Emoji")],
+                "emoji": ["emoji": layout("Emoji")]
             ]
         )
         // 7.1.2's shape: hardware and software layouts, and the language defaults.
@@ -400,22 +400,22 @@ enum K48Oracle {
             [
                 "en": [
                     "en_US": hwsw(["QWERTY", "AZERTY"], ["US", "British", "French"], "US"),
-                    "en_GB": hwsw(["QWERTY"], ["British", "US"], "British"),
+                    "en_GB": hwsw(["QWERTY"], ["British", "US"], "British")
                 ],
                 "fr": [
                     "fr_FR": hwsw(["AZERTY-French", "AZERTY"], ["French", "French - numerical", "US"], "French"),
-                    "fr_CA": hwsw(["QWERTY-Accents"], ["Canadian - CSA", "French", "US"], "Canadian - CSA"),
+                    "fr_CA": hwsw(["QWERTY-Accents"], ["Canadian - CSA", "French", "US"], "Canadian - CSA")
                 ],
                 "ja": [
                     "ja_JP": hwsw(["Kana", "Kana-Flick"]), "ja_JP-Kana": hwsw(["Kana"], ["US", "KANA"]),
-                    "ja_JP-Romaji": hwsw(["QWERTY-Japanese"], ["US", "French"], "US"),
+                    "ja_JP-Romaji": hwsw(["QWERTY-Japanese"], ["US", "French"], "US")
                 ],
                 "zh": ["zh_Hans-HWR": hwsw(["HWR"]), "zh_Hans-Pinyin": hwsw(["Pinyin"], ["US"], "US")],
-                "emoji": ["emoji": hwsw(["Emoji"])],
+                "emoji": ["emoji": hwsw(["Emoji"])]
             ],
             defaults: [
                 "en": ["en_US"], "en_GB": ["en_GB"], "fr_FR": ["fr_FR"],
-                "ja": ["ja_JP-Kana", "ja_JP-Romaji", "emoji", "en_US"],
+                "ja": ["ja_JP-Kana", "ja_JP-Romaji", "emoji", "en_US"]
             ]
         )
         typealias K = SystemEdits.MacKeyboard
@@ -435,7 +435,7 @@ enum K48Oracle {
         )
         #expect(
             v313.keyboards(language: "ja", locale: "ja_JP", mac: [romaji, us]) == [
-                "ja_JP-Kana", "ja_JP-Romaji", "en_US",
+                "ja_JP-Kana", "ja_JP-Romaji", "en_US"
             ]
         )
         #expect(
@@ -482,7 +482,7 @@ enum K48Oracle {
     @Test func plistEdits() throws {
         let real = NSMutableDictionary(dictionary: [
             "CurrentSet": "/Sets/S", "NetworkServices": ["W": ["Interface": ["DeviceName": "en0"]]],
-            "Sets": ["S": ["Network": ["Global": ["IPv4": ["ServiceOrder": ["W"]]], "Service": ["W": [:]]]]],
+            "Sets": ["S": ["Network": ["Global": ["IPv4": ["ServiceOrder": ["W"]]], "Service": ["W": [:]]]]]
         ])
         let d =
             try PropertyListSerialization.propertyList(
@@ -746,7 +746,7 @@ enum K48Oracle {
         var vh = [UInt8](repeating: 0, count: 512)
         _ = try Data(contentsOf: a, options: .alwaysMapped).withUnsafeBytes { memcpy(&vh, $0.baseAddress! + 1024, 512) }
         var regions: [(String, Int, Int)] = [
-            ("volume header", 0, page), ("alternate volume header", v.totalBlocks * v.blockSize - 1024, 1024),
+            ("volume header", 0, page), ("alternate volume header", v.totalBlocks * v.blockSize - 1024, 1024)
         ]
         if da.count - 1024 != v.totalBlocks * v.blockSize - 1024 {
             regions.append(("alternate volume header (file end)", da.count - 1024, 1024))

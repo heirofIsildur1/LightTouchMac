@@ -95,7 +95,7 @@ struct Tools {
         if let usbmuxd = args.usbmuxd { t.usbmuxd = usbmuxd }
         for (what, url) in [
             ("helper", t.helper), ("services worker", t.services), ("firmwarekit", t.firmwarekit),
-            ("usbmuxd", t.usbmuxd),
+            ("usbmuxd", t.usbmuxd)
         ] where !fm.isExecutableFile(atPath: url.path) {
             die("no \(what) at \(url.path)")
         }
@@ -115,7 +115,7 @@ struct Tools {
                 "-skipMacroValidation", "-project", repository.appendingPathComponent("LightTouchMac.xcodeproj").path,
                 "-target", "LightTouchDevice", "-target", "LightTouchServices", "-target", "firmwarekit",
                 "-configuration", "Debug", "SYMROOT=\(symroot.path)", "OBJROOT=\(symroot.path)/obj",
-                "COMPILER_INDEX_STORE_ENABLE=NO", "build",
+                "COMPILER_INDEX_STORE_ENABLE=NO", "build"
             ],
             log: log
         )
@@ -182,13 +182,13 @@ struct Base {
         [
             "n72ap": "ipod", "k48ap": "ipad", "n45ap": "ipod1g", "m68ap": "iphone2g", "n81ap": "ipod4g",
             "n90ap": "iphone4",
-            "n18ap": "ipod3g", "n88ap": "iphone3gs",
+            "n18ap": "ipod3g", "n88ap": "iphone3gs"
         ][board] ?? board
     }
     var productType: String {
         [
             "n72ap": "iPod2,1", "k48ap": "iPad1,1", "n45ap": "iPod1,1", "m68ap": "iPhone1,1", "n81ap": "iPod4,1",
-            "n90ap": "iPhone3,1", "n18ap": "iPod3,1", "n88ap": "iPhone2,1",
+            "n90ap": "iPhone3,1", "n18ap": "iPod3,1", "n88ap": "iPhone2,1"
         ][board] ?? ""
     }
     /// The kboot boards boot as the iPad does (an armv7 offer); the rest take the armv6 package.

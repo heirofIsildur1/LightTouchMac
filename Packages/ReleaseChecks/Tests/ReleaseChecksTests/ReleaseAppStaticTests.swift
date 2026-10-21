@@ -125,7 +125,7 @@ struct ReleaseAppStaticTests {
         }
         #expect(
             Dictionary(uniqueKeysWithValues: types) == [
-                "com.apple.itunes.ipsw": "Alternate", "com.apple.itunes.ipa": "Alternate",
+                "com.apple.itunes.ipsw": "Alternate", "com.apple.itunes.ipa": "Alternate"
             ]
         )
         #expect(
@@ -231,7 +231,7 @@ struct ReleaseAppStaticTests {
         try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
         let extracted = try run([
             "aa", "extract", "-i", contents.appendingPathComponent("Resources/Guest/guest.aar").path, "-d",
-            unpacked.path, "-include-path", "developer-disk-images",
+            unpacked.path, "-include-path", "developer-disk-images"
         ])
         #expect(extracted.succeeded, "\(extracted.error)")
         let manifest =
@@ -276,7 +276,7 @@ struct ReleaseAppStaticTests {
             repository.appendingPathComponent(
                 "LightTouchMac.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
             ),
-            repository.appendingPathComponent("Packages/FirmwareKit/Package.resolved"),
+            repository.appendingPathComponent("Packages/FirmwareKit/Package.resolved")
         ]
         let inputs =
             try JSONSerialization.jsonObject(

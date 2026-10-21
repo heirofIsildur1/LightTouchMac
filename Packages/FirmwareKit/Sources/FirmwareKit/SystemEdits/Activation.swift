@@ -26,7 +26,7 @@ public enum Activation {
                 result["patch"] = [
                     "strategy": patch.strategy, "isa": patch.isa, "offset": patch.offset,
                     "original": patch.original.hexString,
-                    "replacement": patch.replacement.hexString,
+                    "replacement": patch.replacement.hexString
                 ]
             }
             return result

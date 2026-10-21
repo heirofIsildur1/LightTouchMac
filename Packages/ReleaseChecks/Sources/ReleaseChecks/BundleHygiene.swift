@@ -18,7 +18,7 @@ public enum BundleHygiene {
         "proxy-libintl": ("proxy-libintl", "proxy-libintl", true), "ffmpeg": ("ffmpeg", "FFmpeg", true),
         "iBoot32Patcher": ("iBoot32Patcher", "iBoot32Patcher", true), "libslirp": ("libslirp", "libslirp", true),
         "openssl": ("openssl", "OpenSSL", false), "nettle": ("nettle", "Nettle", true),
-        "pcre2": ("pcre2", "PCRE2", false), "pixman": ("pixman", "pixman", false),
+        "pcre2": ("pcre2", "PCRE2", false), "pixman": ("pixman", "pixman", false)
     ]
     /// Where each shipped Mach-O comes from (bundle-relative glob: the components linked into it). Light Touch's own
     /// binaries list only what they link in; their Swift packages are checked against the Package.resolved files.
@@ -46,7 +46,7 @@ public enum BundleHygiene {
         ("Contents/Frameworks/libswiftCompatibilitySpan.dylib", []),
         // the guest tools: qemu-ios contrib, built for the guest
         ("Contents/Resources/Guest/guest.aar/guest-tools/*", ["qemu"]),
-        ("Contents/Resources/Guest/guest.aar/tools/*", ["qemu"]),
+        ("Contents/Resources/Guest/guest.aar/tools/*", ["qemu"])
     ]
     public static let guest = "Contents/Resources/Guest/guest.aar"
     /// scripts/vendor's SEED: the identity a packed base carries until the app unpacks it with a seed of its own.
@@ -61,7 +61,7 @@ public enum BundleHygiene {
         }
         try? handle.close()
         return [
-            [0xcf, 0xfa, 0xed, 0xfe], [0xce, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca],
+            [0xcf, 0xfa, 0xed, 0xfe], [0xce, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca]
         ].contains(Array(head))
     }
 
@@ -102,7 +102,7 @@ public enum BundleHygiene {
         if FileManager.default.fileExists(atPath: app.appendingPathComponent(guest).path) {
             try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
             let extracted = try Shell.run([
-                "aa", "extract", "-i", app.appendingPathComponent(guest).path, "-d", unpacked.path,
+                "aa", "extract", "-i", app.appendingPathComponent(guest).path, "-d", unpacked.path
             ])
             guard extracted.succeeded else { return ["could not extract \(guest): \(extracted.error)"] }
             files += try walk(unpacked.resolvingSymlinksInPath(), prefix: guest + "/")
@@ -129,7 +129,7 @@ public enum BundleHygiene {
         if let developer = files.first(where: { $0.name == "\(guest)/developer-tools" }) {
             let audited = try Shell.run([
                 app.appendingPathComponent("Contents/MacOS/firmwarekit").path, "developer-audit", "--payload",
-                developer.url.path,
+                developer.url.path
             ])
             if !audited.succeeded {
                 found.append(

@@ -14,12 +14,12 @@ struct JailbreakTests {
             ["Label": "com.apple.afc", "ProgramArguments": ["/usr/libexec/afcd", "--lockdown"]],
             [
                 "AllowUnactivatedService": true, "Label": "com.apple.afc",
-                "ProgramArguments": ["/usr/libexec/afcd", "--lockdown", "-d", "/var/mobile/Media", "-u", "mobile"],
+                "ProgramArguments": ["/usr/libexec/afcd", "--lockdown", "-d", "/var/mobile/Media", "-u", "mobile"]
             ],
             [
                 "AllowUnactivatedService": true, "Label": "com.apple.afc", "UserName": "mobile",
-                "XPCServiceName": "com.apple.afcd",
-            ],
+                "XPCServiceName": "com.apple.afcd"
+            ]
         ]
     }
 
@@ -89,7 +89,7 @@ struct JailbreakTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let stockJob: [String: Any] = [
             "Label": "com.apple.afcd", "MachServices": ["com.apple.afcd": true], "EnableTransactions": true,
-            "ProgramArguments": ["/usr/libexec/afcd"], "UserName": "mobile",
+            "ProgramArguments": ["/usr/libexec/afcd"], "UserName": "mobile"
         ]
         try Self.put(
             try PropertyListSerialization.data(
@@ -198,7 +198,7 @@ struct CydiaInstallTests {
         for (rel, text) in [
             ("Applications/Cydia.app/Cydia", "cydia"), ("bin/bash", "bash"),
             ("private/var/lib/dpkg/status", Self.status), ("private/var/lib/dpkg/available", Self.status),
-            ("usr/libexec/afcd", "not the firmware's"), ("private/var/Keychains/TrustStore.sqlite3", "roots"),
+            ("usr/libexec/afcd", "not the firmware's"), ("private/var/Keychains/TrustStore.sqlite3", "roots")
         ] + SystemEdits.Cydia.patcyh.map({ ($0, "patcyh") }) {
             let u = src.appendingPathComponent(rel)
             try fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -206,7 +206,7 @@ struct CydiaInstallTests {
         }
         for (tar, rel) in [
             ("cydiasubstrate.tar", "private/var/root/Media/Cydia/AutoInstall/mobilesubstrate_fix.deb"),
-            ("cydiahttpatch.tar", "private/var/root/Media/Cydia/AutoInstall/cydiahttpatch-1.0.deb"),
+            ("cydiahttpatch.tar", "private/var/root/Media/Cydia/AutoInstall/cydiahttpatch-1.0.deb")
         ] {
             let pkg = dir.appendingPathComponent("pkg-" + tar)
             let u = pkg.appendingPathComponent(rel)
@@ -286,7 +286,7 @@ struct CydiaInstallTests {
         for rel in [
             ".cydia_no_stash", "Applications", "Applications/Cydia.app/Cydia", "bin/bash",
             "private/var/lib/dpkg/status",
-            "etc",
+            "etc"
         ] {
             #expect(r.root.contains(rel), "\(rel) is root's")
         }
@@ -296,7 +296,7 @@ struct CydiaInstallTests {
         #expect(
             Set(r.mobile) == [
                 "private/var/mobile/Library", "private/var/mobile/Library/Preferences",
-                SystemEdits.Cydia.springBoardPrefs,
+                SystemEdits.Cydia.springBoardPrefs
             ]
         )
     }
@@ -343,7 +343,7 @@ struct CydiaInstallTests {
         #expect(
             Set(sources.keys) == [
                 "deb:http://apt.thebigboss.org/repofiles/cydia/:stable", "deb:http://modmyi.saurik.com/:stable",
-                "deb:http://zodttd.saurik.com/repo/cydia/:stable",
+                "deb:http://zodttd.saurik.com/repo/cydia/:stable"
             ]
         )
         for (key, source) in sources {
@@ -377,7 +377,7 @@ struct CydiaInstallTests {
         let major = Int(version.prefix(1)) ?? 0
         let auto = "private/var/root/Media/Cydia/AutoInstall/"
         for (deb, wanted) in [
-            ("mobilesubstrate_fix.deb", (3...6).contains(major)), ("cydiahttpatch-1.0.deb", major == 3),
+            ("mobilesubstrate_fix.deb", (3...6).contains(major)), ("cydiahttpatch-1.0.deb", major == 3)
         ] {
             #expect(fm.fileExists(atPath: m.appendingPathComponent(auto + deb).path) == wanted, "\(version): \(deb)")
             #expect(r.root.contains(auto + deb) == wanted, "\(version): \(deb) is root's")

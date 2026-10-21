@@ -42,7 +42,7 @@ final class N45Board: Board {
     static let keptDaemons: Set = [
         "com.apple.AddressBook.plist", "com.apple.CommCenter.plist", "com.apple.configd.plist",
         "com.apple.mDNSResponder.plist", "com.apple.mobile.lockdown.plist", "com.apple.notifyd.plist",
-        "com.apple.SpringBoard.plist", "com.apple.usbptpd.plist", "coreaudiod.plist",
+        "com.apple.SpringBoard.plist", "com.apple.usbptpd.plist", "coreaudiod.plist"
     ]
     /// Kept where the firmware ships them, not required of every 1.x: 1.1.3+ lockdownd starts each service (AFC among
     /// them) through lockbot ("spawn_service_agent: Could not spawn service agent via lockbot" without it); 1.1-1.1.2
@@ -158,7 +158,7 @@ final class N45Board: Board {
     static var qemuNetwork: [String: Any] {
         [
             "SSID_STR": "qemu-ios", "SSID": Data("qemu-ios".utf8), "AP_MODE": 2, "CAPABILITIES": 1, "CHANNEL": 6,
-            "CHANNEL_FLAGS": 8, "BEACON_INT": 10, "HIDDEN_NETWORK": false,
+            "CHANNEL_FLAGS": 8, "BEACON_INT": 10, "HIDDEN_NETWORK": false
         ]
     }
 
@@ -258,7 +258,7 @@ final class N45Board: Board {
                 try Data(contentsOf: c.decFile("kernelcache.mach")),  // host file
                 /Darwin Kernel Version [^\x00]+/
             ) ?? NSNull(),
-            "iboot": N72Board.firstMatch(iboot, /iBoot-[0-9.]+/) ?? "?",
+            "iboot": N72Board.firstMatch(iboot, /iBoot-[0-9.]+/) ?? "?"
         ]
     }
 
@@ -468,11 +468,11 @@ final class N45Board: Board {
         let ident = try self.ident.filled("the identity")
         return [
             "inputs": [
-                "kernelcache": kcMember, "iboot": prefix + "iBoot.\(c.e.board).RELEASE.img2", "all_flash": prefix,
+                "kernelcache": kcMember, "iboot": prefix + "iBoot.\(c.e.board).RELEASE.img2", "all_flash": prefix
             ],
             "outputs": [
                 "nand": ["pages": c.nandHashes.count], "nor": try Recipe.fileRecord(c, "nor.bin"),
-                "iboot": try Recipe.fileRecord(c, "iBoot.bin"),
+                "iboot": try Recipe.fileRecord(c, "iBoot.bin")
             ],
             "derived": derived,
             // The 88W8686's EEPROM MAC (qemu-ios iPod-Touch-1G wifi-mac): the card the driver reads it from is
@@ -480,7 +480,7 @@ final class N45Board: Board {
             "machine": ["wifi-mac": ident["wifi-mac"] ?? ""].merging(iPhone ? ["imei": ident["imei"] ?? ""] : [:]) {
                 a,
                 _ in a
-            },
+            }
         ]
     }
 }

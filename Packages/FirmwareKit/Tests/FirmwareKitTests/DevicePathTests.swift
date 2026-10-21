@@ -100,7 +100,7 @@ struct DevicePathTests {
                 "rewritePlist", "System/Library/Lockdown/Services.plist",
                 { try SystemEdits.rewritePlist($0) { $0["x"] = 1 } }
             ),
-            ("data_ark", "root/Library/Lockdown/data_ark.plist", { try DevicePath.write(Self.plist, $0, mode: 0o600) }),
+            ("data_ark", "root/Library/Lockdown/data_ark.plist", { try DevicePath.write(Self.plist, $0, mode: 0o600) })
         ]
         for (name, rel, sink) in sinks where try v.plant(link, at: rel) {
             let completed = (try? sink(v.root.appendingPathComponent(rel))) != nil
@@ -169,7 +169,7 @@ struct DevicePathTests {
         try v.fm.moveItem(at: m, to: v.root)
         for rel in [
             SystemEdits.Cydia.noStash, SystemEdits.Cydia.springBoardPrefs, "private/var/lib/dpkg/status",
-            "private/var/lib/dpkg/available",
+            "private/var/lib/dpkg/available"
         ] {
             try v.plant(link, at: rel)
         }
@@ -234,7 +234,7 @@ struct DevicePathTests {
         let files = [
             "SystemEdits/SystemEdits.swift", "SystemEdits/Cydia.swift", "N45/N45Recipe.swift",
             "N45/N45Migration.swift", "N45/Preferences1x.swift", "N45/TrustStore1x.swift",
-            "StoppedVolumeEdit/StoppedVolumeEdit+Jailbreak.swift",
+            "StoppedVolumeEdit/StoppedVolumeEdit+Jailbreak.swift"
         ]
         let raw =
             /contentsOf:|fileExists\(|removeItem\(|createFile\(|createSymbolicLink\(|createDirectory\(|attributesOfItem\(|setAttributes\(|contentsOfDirectory\(|enumerator\(|destinationOfSymbolicLink\(|moveItem\(|copyItem\(|\.write\(to:|sqlite3_open|FileHandle\(|(^|[^\w.])(open|stat|lstat|chmod|mkdir|unlink|rename|truncate|listxattr|getxattr|setxattr|clonefile)\(/

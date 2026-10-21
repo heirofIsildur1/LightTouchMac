@@ -36,7 +36,7 @@ struct EarlyAppSyncTests {
             let job: [String: Any] = [
                 "Label": "com.apple.mobile.installation_proxy", "UserName": "mobile",
                 "ProgramArguments": ["/usr/libexec/mobile_installation_proxy", "argument"],
-                "EnvironmentVariables": ["EXISTING": "keep"],
+                "EnvironmentVariables": ["EXISTING": "keep"]
             ]
             let original: [String: Any] =
                 lockbot ? ["com.apple.mobile.installation_proxy": job, "unrelated": ["Label": "keep"]] : job
@@ -55,7 +55,7 @@ struct EarlyAppSyncTests {
             if lockbot {
                 #expect(
                     service["ProgramArguments"] as? [String] == [
-                        "/usr/libexec/appsync-launch", "/usr/libexec/mobile_installation_proxy", "argument",
+                        "/usr/libexec/appsync-launch", "/usr/libexec/mobile_installation_proxy", "argument"
                     ]
                 )
                 #expect((output["unrelated"] as? [String: String])?["Label"] == "keep")
