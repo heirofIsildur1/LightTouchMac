@@ -69,19 +69,39 @@ import Testing
         }
     }
 
-    /// Show File System's mount, read and write: quarantined, setuid and device nodes ignored, as the kernel reports it.
-    @Test func finderMountIsQuarantined() async throws {
+    /// Every mount for Finder, as the kernel reports it: Show File System's (hidden, read and write) and firmwarekit
+    /// mount's (hidden with --root, else where Finder shows it; read-only) are quarantined with setuid and device nodes
+    /// ignored, and a file copied out of one carries the quarantine.
+    @Test(arguments: [(visible: false, readOnly: false), (false, true), (true, true)])
+    func finderMountIsQuarantined(visible: Bool, readOnly: Bool) async throws {
         try await Oracle.withTemp { dir in
             let img = dir.appendingPathComponent("v.img")
-            try await VolumeMount.makeHFS(img, size: 16 << 20)
-            let mnt = dir.appendingPathComponent("mnt")
-            let attached = try await VolumeMount.attachHidden(img, at: mnt)
+            try await VolumeMount.makeHFS(
+                img,
+                size: 16 << 20,
+                name: "LTM-\(UUID().uuidString.prefix(8))",
+                journaled: false
+            )
+            try await VolumeMount.withMounted(img, at: dir.appendingPathComponent("w")) {
+                try Data("f".utf8).write(to: $0.appendingPathComponent("f"))
+            }
+            let attached =
+                visible
+                ? try await VolumeMount.attachVisible(img, readOnly: readOnly)
+                : try await VolumeMount.attachHidden(img, at: dir.appendingPathComponent("mnt"), readOnly: readOnly)
+            let mnt = URL(fileURLWithPath: attached.mountPoint ?? "/nonexistent")
             var fs = statfs()
             let mounted = statfs(mnt.path, &fs) == 0
+            let copy = dir.appendingPathComponent("copied")
+            let copied = (try? FileManager.default.copyItem(at: mnt.appendingPathComponent("f"), to: copy)) != nil
             try await VolumeMount.detach(attached.device)
-            #expect(mounted)
-            let want = UInt32(MNT_QUARANTINE | MNT_NOSUID | MNT_NODEV | MNT_DONTBROWSE)
-            #expect(fs.f_flags & want == want && fs.f_flags & UInt32(MNT_RDONLY) == 0, "flags \(fs.f_flags)")
+            #expect(mounted && copied)
+            let want =
+                UInt32(MNT_QUARANTINE | MNT_NOSUID | MNT_NODEV) | (visible ? 0 : UInt32(MNT_DONTBROWSE))
+                | (readOnly ? UInt32(MNT_RDONLY) : 0)
+            let seen = fs.f_flags & UInt32(MNT_QUARANTINE | MNT_NOSUID | MNT_NODEV | MNT_DONTBROWSE | MNT_RDONLY)
+            #expect(seen == want, "flags \(fs.f_flags)")
+            #expect(getxattr(copy.path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "no quarantine on a copy")
         }
     }
 
@@ -179,7 +199,9 @@ import Testing
     ) func grow(_ fw: Oracle.Firmware) async throws {
         try await Oracle.withTemp { dir in
             guard let raw = try await HFSOracle.rawSystem(fw, in: dir) else {
-                try FixtureRequirements.missing(#"VolumeMountTests.swift: let raw = try await HFSOracle.rawSystem(fw, in: dir)"#)
+                try FixtureRequirements.missing(
+                    #"VolumeMountTests.swift: let raw = try await HFSOracle.rawSystem(fw, in: dir)"#
+                )
             }
             let blocks = 1280 << 20 / 4096
             let before = try HFSPlusVolume(raw)
