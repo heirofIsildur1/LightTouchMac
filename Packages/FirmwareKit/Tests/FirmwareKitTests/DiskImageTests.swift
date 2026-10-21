@@ -16,24 +16,23 @@ import Testing
         let img = URL(fileURLWithPath: "/tmp/v.img")
         let raw = ["-imagekey", "diskimage-class=CRawDiskImage"]
         #expect(
-            DiskImage.attachCommand(img, readOnly: false, mount: false, backend: .hdiutil)
+            DiskImage.attachCommand(img, readOnly: false, backend: .hdiutil)
                 == ["/usr/bin/hdiutil", "attach", "-plist"] + raw + ["-nomount", "-nobrowse", "/tmp/v.img"]
         )
         #expect(
-            DiskImage.attachCommand(img, readOnly: true, mount: true, backend: .hdiutil)
+            DiskImage.attachCommand(img, readOnly: true, backend: .hdiutil)
                 == ["/usr/bin/hdiutil", "attach", "-plist"] + raw + [
-                    "-readonly", "-owners", "off", "-noverify", "-noautoopen", "/tmp/v.img",
+                    "-readonly", "-nomount", "-nobrowse", "/tmp/v.img",
                 ]
         )
         #expect(
-            DiskImage.attachCommand(img, readOnly: false, mount: false, backend: .diskutil)
+            DiskImage.attachCommand(img, readOnly: false, backend: .diskutil)
                 == ["/usr/sbin/diskutil", "image", "attach", "--plist", "--noMount", "--nobrowse", "/tmp/v.img"]
         )
         #expect(
-            DiskImage.attachCommand(img, readOnly: true, mount: true, backend: .diskutil)
+            DiskImage.attachCommand(img, readOnly: true, backend: .diskutil)
                 == [
-                    "/usr/sbin/diskutil", "image", "attach", "--plist", "--readOnly", "--mountOptions",
-                    "noowners,nosuid,nodev",
+                    "/usr/sbin/diskutil", "image", "attach", "--plist", "--readOnly", "--noMount", "--nobrowse",
                     "/tmp/v.img",
                 ]
         )

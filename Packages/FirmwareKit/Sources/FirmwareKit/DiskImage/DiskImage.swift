@@ -4,7 +4,7 @@
 // and fsck_hfs are not disk-image operations and stay with VolumeMount.
 //
 //   let dev = try await DiskImage.attach(image)                       // -nomount, nobrowse: "/dev/diskN"
-//   let a = try await DiskImage.attach(image, readOnly: true, mount: true)   // browsable, for Finder: a.mountPoint
+//                                                               // (VolumeMount mounts it, with its options)
 //   try await DiskImage.detach(dev, force: true)                // checked cleanup
 //   try await DiskImage.resize(image, toBytes: n)                     // grows the image and its volume
 //   try await DiskImage.convertToRaw(dmg, to: raw)                    // UDIF -> raw disk (hdiutil UDTO / diskutil RAW)
@@ -45,16 +45,16 @@ public enum DiskImage {
 
     // MARK: argv (pure)
 
-    /// `mount` false: attach the device only (nobrowse). `mount` true: mount where Finder shows it, owners off,
-    /// nosuid and nodev (hdiutil mounts a disk image's volumes so itself).
-    static func attachCommand(_ image: URL, readOnly: Bool, mount: Bool, backend: Backend) -> [String] {
+    /// The device only (nobrowse), never mounted: every mount is VolumeMount's, with its options (hdiutil has no way
+    /// to ask for quarantine, which it gives only an image that is itself quarantined).
+    static func attachCommand(_ image: URL, readOnly: Bool, backend: Backend) -> [String] {
         switch backend {
         case .hdiutil:
             return ["/usr/bin/hdiutil", "attach", "-plist"] + raw + (readOnly ? ["-readonly"] : [])
-                + (mount ? ["-owners", "off", "-noverify", "-noautoopen"] : ["-nomount", "-nobrowse"]) + [image.path]
+                + ["-nomount", "-nobrowse", image.path]
         case .diskutil:
             return ["/usr/sbin/diskutil", "image", "attach", "--plist"] + (readOnly ? ["--readOnly"] : [])
-                + (mount ? ["--mountOptions", "noowners,nosuid,nodev"] : ["--noMount", "--nobrowse"]) + [image.path]
+                + ["--noMount", "--nobrowse", image.path]
         }
     }
 
@@ -93,17 +93,15 @@ public enum DiskImage {
     /// The caller must serialize attachment of this image (managed storage owns
     /// its lease). Compensation cannot distinguish a simultaneous raw attach of
     /// the same image from a newly attached device owned by this operation.
-    public static func attach(_ image: URL, readOnly: Bool = false, mount: Bool = false, backend: Backend = backend)
-        async throws -> Attached
+    public static func attach(_ image: URL, readOnly: Bool = false, backend: Backend = backend) async throws -> Attached
     {
-        try await attach(image, readOnly: readOnly, mount: mount, backend: backend, execute: run)
+        try await attach(image, readOnly: readOnly, backend: backend, execute: run)
     }
     /// Internal executor boundary lets fixtures pause after an actual OS attach
     /// but before its result is delivered; production always uses the same runner.
     static func attach(
         _ image: URL,
         readOnly: Bool = false,
-        mount: Bool = false,
         backend: Backend = backend,
         execute: @Sendable ([String]) async throws -> String
     ) async throws -> Attached {
@@ -115,7 +113,7 @@ public enum DiskImage {
         let prior = Set(try await checkedAttachedImages().filter(isImage).map(\.device))
         var named: String?
         do {
-            let out = try await execute(attachCommand(image, readOnly: readOnly, mount: mount, backend: backend))
+            let out = try await execute(attachCommand(image, readOnly: readOnly, backend: backend))
             guard let attached = parseAttach(out) else {
                 throw FirmwareError(.internal, "attach \(image.lastPathComponent): no device in \(out.suffix(600))")
             }

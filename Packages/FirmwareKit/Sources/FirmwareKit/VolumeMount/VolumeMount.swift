@@ -143,8 +143,32 @@ public enum VolumeMount {
     public static func attach(_ image: URL) async throws -> String { try await DiskImage.attach(image).device }
 
     /// The device writes these volumes and is untrusted: a mount for Finder is quarantined (Gatekeeper checks what is
-    /// opened from it), and its setuid bits and device nodes mean nothing on the Mac.
-    static let hiddenOptions = "nobrowse,noowners,quarantine,nosuid,nodev"
+    /// opened from it, and a file copied out carries the quarantine), and its setuid bits and device nodes mean nothing
+    /// on the Mac.
+    static let finderOptions = "noowners,quarantine,nosuid,nodev"
+    static let hiddenOptions = "nobrowse," + finderOptions
+
+    /// Attaches `image` and mounts it where Finder shows it (diskutil's /Volumes/<name>), with finderOptions.
+    public static func attachVisible(_ image: URL, readOnly: Bool = false) async throws -> DiskImage.Attached {
+        let dev = try await DiskImage.attach(image, readOnly: readOnly).device
+        do {
+            try await run(
+                "/usr/sbin/diskutil",
+                ["mount"] + (readOnly ? ["readOnly"] : []) + ["-mountOptions", finderOptions, dev]
+            )
+            let info = try await run("/usr/sbin/diskutil", ["info", "-plist", dev])
+            let plist = info.range(of: "<?xml").flatMap {
+                try? PropertyListSerialization.propertyList(from: Data(info[$0.lowerBound...].utf8), format: nil)
+            }
+            guard let mountPoint = (plist as? [String: Any])?["MountPoint"] as? String, !mountPoint.isEmpty else {
+                throw FirmwareError(.internal, "diskutil mounted \(dev) nowhere: \(info.suffix(600))")
+            }
+            return DiskImage.Attached(device: dev, mountPoint: mountPoint)
+        } catch {
+            await cleanupDetach(dev, force: true)
+            throw error
+        }
+    }
 
     /// Attaches `image` and mounts it at `mountPoint` (created if needed) out of Finder's sidebar and Desktop
     /// (nobrowse), owners ignored, for a Finder window opened on the folder (hiddenOptions). Detaching the device

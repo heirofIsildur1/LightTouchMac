@@ -82,13 +82,15 @@ license() {   # LICENSE-NAME DIRECTORY FILES...: license texts into prefix/share
 }
 license openssl openssl-3.6.3 LICENSE.txt
 
-autobuild() {
-    local archive="$1" directory="$2"
+autobuild() {   # ARCHIVE DIRECTORY [--patch build-support/patches/NAME] [CONFIGURE-ARGS...]
+    local archive="$1" directory="$2" patch=""
     shift 2
+    if [ "${1:-}" = --patch ]; then patch="$SRC/$2"; shift 2; fi
     echo "Building $directory"
     untar "$archive"
     (
         cd "$ROOT/build/$directory"
+        [ -z "$patch" ] || patch -p1 < "$patch" > "$LOG/$directory.patch.log"
         ./configure --prefix="$PREFIX" --disable-shared --enable-static ${HOST[@]+"${HOST[@]}"} "$@" \
             > "$LOG/$directory.configure.log" 2>&1
         make -j"$JOBS" > "$LOG/$directory.build.log" 2>&1
@@ -99,7 +101,7 @@ autobuild() {
 autobuild nettle-3.10.2.tar.gz nettle-3.10.2 --disable-public-key --disable-openssl --disable-documentation --libdir="$PREFIX/lib"
 license nettle nettle-3.10.2 COPYINGv2 COPYINGv3 COPYING.LESSERv3
 "$SRC/scripts/ltm-build" sources note nettle > "$PREFIX/share/licenses/nettle/SOURCE.txt"
-autobuild libplist-2.7.0.tar.bz2 libplist-2.7.0 --without-cython
+autobuild libplist-2.8.0.tar.bz2 libplist-2.8.0 --patch build-support/patches/libplist-bin-limits.patch --without-cython
 autobuild libimobiledevice-glue-1.3.2.tar.bz2 libimobiledevice-glue-1.3.2
 autobuild libusbmuxd-2.1.1.tar.bz2 libusbmuxd-2.1.1
 autobuild libtatsu-1.0.5.tar.bz2 libtatsu-1.0.5

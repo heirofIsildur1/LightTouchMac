@@ -37,7 +37,9 @@ On a fresh Apple Silicon Mac, clone this repository and run `scripts/bootstrap`.
 build tools, the qemu-ios and usbmuxd checkouts at their pins, the iPhoneOS 3.1.3 and 3.2 SDKs, the SecureROMs and the
 built-in iPod's IPSW, prints each missing piece and where to get it (Apple's software and firmware are never
 downloaded or copied for you), and then runs `scripts/vendor` (about 15 minutes). After that, build the `LightTouchMac`
-scheme in Xcode. `scripts/bootstrap --check` only checks.
+scheme in Xcode. `scripts/bootstrap --check` only checks. Either way it turns on the pre-commit formatter
+(`git config core.hooksPath scripts/hooks`, and `git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'`
+so blame skips reformat commits); in a checkout set up before, run those two lines once.
 
 ## Building
 
@@ -189,7 +191,7 @@ directory and fails a run that touched the real `app.log`.
 | `Packages/*/Tests`, `Unit.xctestplan` | Swift Testing: LightTouchCoreTests (the app's logic), HostRuntimeTests, FirmwareKitTests, HostServiceWireTests, ReleaseChecksTests' fixtures, BuildToolsTests (the native merge, the dependency sources). LightTouchCore's tests run one at a time in a private home (Tests/TestIsolation) |
 | `tests/offline/` | A Swift package (OfflineTests, in the Unit plan) for what needs the app target's own files: AppKit views rendered offscreen, the display's input and layout, the helper's C API version and LCD color, the services engine against a fake libimobiledevice. The production files are compiled whole through symlinks beside small stand-ins; no window is ordered in |
 | `tests/sessions/` | A Swift package: `sessions` (the checks and their verdicts), the drivers that stand in for the app (`session-driver`: the app's session code; `helper-driver`: DeviceLink straight to the helper), and SessionKit (frame references, the Home verdict, the Setup walks), whose tests are in the Unit plan |
-| `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `host-ready.sh`; `ship.sh`: scripts/ship's and scripts/release's tags, notes, notary config, IPSW fill, pruning, argument checks and release-helper.swift), run by hand |
+| `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `format-hook.sh`: the pre-commit formatter in a scratch repository; `host-ready.sh`; `ship.sh`: scripts/ship's and scripts/release's tags, notes, notary config, IPSW fill, pruning, argument checks and release-helper.swift), run by hand |
 | `tests/activation/`, `tests/fixtures/` | C harnesses run by hand (`tests/activation/run.sh`: the activation finish and the lockdown zone writes); the fake preparer (`fake-firmwarekit`, bash), the store fixtures and `machines.json` the tests share |
 | `swift test --package-path Packages/FirmwareKit` | Also runs FirmwareKit's suites alone. Optional corpus tests report real skips unless `FK_TEST_CORPUS=1` or `FK_REQUIRE_FIXTURES=1` selects them; selected missing inputs fail. Format/bake oracle checks compare against qemu-ios's imgtools through `FIRMWAREKIT_QEMU_IOS` |
 
@@ -201,10 +203,17 @@ Apple's [API Design Guidelines](https://www.swift.org/documentation/api-design-g
 silent, [Google's Swift style guide](https://google.github.io/swift/). American spelling, except Apple's cancelled,
 cancelling and cancellable.
 
-**Format.** `swift-format` owns layout and the lint rules (`.swift-format`: 4 spaces, 120 columns, one argument per
-line once a call wraps, no blank line after `{` or before `}`, implicit returns, `[]`/`[:]` for empty collections,
-`for … where` over an `if` wrapping a loop body); `clang-format` (`.clang-format`) owns C. Before committing:
-`swift-format format -i -r <paths>`; `swift-format lint -r <paths>` should stay quiet.
+**Format.** The toolchain's formatters own layout, matching Xcode's editor settings (4 spaces, 120 columns;
+`.editorconfig` carries them to other editors): `swift-format` for Swift (`.swift-format`, the one configuration: its
+defaults with those widths and no trailing comma in a multi-line collection) and `clang-format` for C, Objective-C
+and C++ (`.clang-format`: LLVM with those widths and case labels indented). Always `xcrun swift-format` and `xcrun
+clang-format`, never Homebrew's. The pre-commit hook (`scripts/hooks/pre-commit`) runs `scripts/format --staged`: it
+formats each staged file and stages it again, and refuses a partly staged file whose staged text isn't formatted,
+printing the command to run. `scripts/format <paths>` formats files by hand, `scripts/format --check` lists every
+tracked file that isn't formatted, and `scripts/format --all` reformats the repository (that commit goes in
+`.git-blame-ignore-revs`). Code from upstream projects (`build-support/patches`, the GPL fixture in
+`tests/offline/fixtures`) is left alone; a generator writes what the formatter would (`scripts/machine-options`).
+`xcrun swift-format lint -r <paths>` should stay quiet.
 
 **Warnings.** None. Fix the cause: a `@Sendable` closure or a lock-guarded `@unchecked Sendable` box for state shared
 across threads, `MainActor.assumeIsolated` in an AppKit completion that runs on the main thread, `nonisolated` on test
@@ -287,7 +296,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `Packages/ReleaseChecks/` | The checks of a built app (`Release.xctestplan`): signatures, entitlements, slices and load closure, bundle hygiene, the bundled tools, boots through the bundle |
 | `Packages/DeviceServices/` | One device's stock lockdown services: `HostServiceWire` (the request/event protocol, errors, timeouts, device paths, the Home screen layout) and `HostServiceClient` (the app's `DeviceServices` calls, `HostServiceWorkers`, `NotificationProxy`) |
 | `Packages/FirmwareKit/` | `FirmwareKit` (IPSW → device), `FirmwareSchema` (the wire types, `StorageCapacity`, `DeveloperTools`, `GuestArchive`: what the app links), the `firmwarekit` CLI (`Sources/FirmwareKitCLI`), `CActivation` |
-| `scripts/` | `bootstrap`, `clean`, `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`), `check-export` |
+| `scripts/` | `bootstrap`, `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`), `check-export` |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
 | `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |

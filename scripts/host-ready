@@ -24,7 +24,8 @@ awk -v l="$load" -v m="$limit" 'BEGIN { exit !(l >= m) }' && why+=("load $load o
 ((free_slots > 0)) || why+=("all $slots emulator slots taken ($dir)")
 ((disk_gb >= min_disk)) || why+=("${disk_gb} GB free under ~/Developer (want $min_disk; scripts/clean)")
 if ((${#why[@]})); then
-    printf 'WAIT %s' "${why[0]}"; printf '; %s' "${why[@]:1}"; echo
+    joined="$(printf '%s; ' "${why[@]}")"
+    echo "WAIT ${joined%; }"
     exit 1
 fi
 echo "READY load $load/$cores, $free_slots of $slots slots free, ${disk_gb} GB free"
