@@ -315,20 +315,7 @@
       "url": "https://github.com/apple/swift-crypto/archive/refs/tags/5.0.3.tar.gz",
       "sha256": "ab84654f5e7746b67bcaa44562ff442882e31bab573f0a1fed4c69bc54849443",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/HostRuntime, FirmwareKit, LightTouchCore and DeviceRuntime. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras for FirmwareKit's AES-CBC (BoringSSL's AES_cbc_encrypt over the whole buffer) and the web proxy CA's RSA keys."
-    },
-    {
-      "name": "swift-certificates",
-      "version": "1.21.0",
-      "groups": [
-        "swiftpm"
-      ],
-      "archive": "swift-certificates-1.21.0.tar.gz",
-      "directory": "swift-certificates-1.21.0",
-      "url": "https://github.com/apple/swift-certificates/archive/refs/tags/1.21.0.tar.gz",
-      "sha256": "fc2d2590562f7bad16f6d9c41b9745a3d80981a4d2d0492cf89abf6e743a3161",
-      "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/DeviceRuntime. WebProxyCA builds and reads the web proxy's certificates with it (X509)."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit and LightTouchCore. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras for FirmwareKit's AES-CBC (BoringSSL's AES_cbc_encrypt over the whole buffer). Never in LightTouchDevice, which loads the GPL-2.0-only emulator: DeviceRuntime and HostRuntime keep Security and CryptoKit."
     },
     {
       "name": "swift-asn1",
@@ -341,7 +328,7 @@
       "url": "https://github.com/apple/swift-asn1/archive/refs/tags/1.7.3.tar.gz",
       "sha256": "77add3684fd75a586529893288af51ed092c565ec0c154d2b4eedb3a6bdc294c",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/DeviceRuntime (swift-certificates' DER, which WebProxyCA serializes through)."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Not pinned by any manifest: swift-crypto's CryptoExtras depends on it, so it is linked wherever CryptoExtras is (FirmwareKit)."
     }
   ]
 }

@@ -1,7 +1,7 @@
 // The Swift packages a build links, from their manifests (`swift package dump-package`): what the root packages'
 // targets reach, product by product, but not through a macro or a plugin (they run in the compiler: swift-syntax,
 // under swift-binary-parsing's macros, builds and never ships). A package resolved and checked out but not reached
-// (swift-syntax; swift-asn1, which only swift-crypto's _CryptoExtras takes) carries no license into the bundle.
+// (swift-syntax) carries no license into the bundle.
 import Foundation
 
 enum SwiftPackageLinks {

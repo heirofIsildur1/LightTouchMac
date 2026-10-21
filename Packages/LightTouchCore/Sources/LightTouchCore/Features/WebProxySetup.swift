@@ -9,6 +9,7 @@ import FirmwareSchema
 import Foundation
 import HostRuntime
 import HostServiceWire
+import Security
 
 public struct WebProxySetup: Sendable {
     public init(
@@ -44,7 +45,10 @@ public struct WebProxySetup: Sendable {
         let config = URL(fileURLWithPath: proxyFile)
         let der: Data
         do {
-            der = try await Task.detached { try WebProxyCA.prepare(config: config) }.value.certificate
+            der =
+                SecCertificateCopyData(
+                    try await Task.detached { try WebProxyCA.prepare(config: config) }.value.certificate
+                ) as Data
         } catch {
             logEvent("proxy: certificate preparation failed: \(error)")
             throw DeviceToolsError.failed("Couldn’t prepare the proxy certificate.")

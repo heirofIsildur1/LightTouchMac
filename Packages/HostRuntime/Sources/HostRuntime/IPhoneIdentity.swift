@@ -1,4 +1,4 @@
-import Crypto
+import CryptoKit
 import Foundation
 
 /// An iPhone's IMEI and UDID as pure functions of the unit's identity seed, shared by FirmwareKit (which writes them

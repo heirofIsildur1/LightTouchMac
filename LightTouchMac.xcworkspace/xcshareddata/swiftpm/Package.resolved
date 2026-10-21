@@ -1,5 +1,5 @@
 {
-  "originHash" : "69811ed3c2e186d1f49401b41c4494dc5981da3207b66b4fde3080b71d53c541",
+  "originHash" : "7d8e26b65cec8ac6c2d3327ac34c540f669f06a1e6ee789785327f8d752279ce",
   "pins" : [
     {
       "identity" : "sparkle",
@@ -35,15 +35,6 @@
       "state" : {
         "revision" : "8f0f56a795e36eff6d532b01e8e94f640e3443dd",
         "version" : "0.0.4"
-      }
-    },
-    {
-      "identity" : "swift-certificates",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-certificates.git",
-      "state" : {
-        "revision" : "ff86b924ead66f853b8baf91f3c41926a8f36177",
-        "version" : "1.21.0"
       }
     },
     {

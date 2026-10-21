@@ -50,4 +50,17 @@ struct SwiftPackageLinksTests {
                 == ["root", "swift-parsing", "small", "sparkle"]
         )
     }
+
+    /// LightTouchDevice loads the GPL-2.0-only emulator, so the local packages it links take no remote package (an
+    /// Apache-2.0 one such as swift-crypto can't be linked beside GPL-2.0-only code).
+    @Test func theHelpersPackagesTakeNoRemotePackage() throws {
+        let repository = URL(fileURLWithPath: #filePath).appendingPathComponent("../../../../..").standardized
+        for name in ["DeviceRuntime", "HostRuntime"] {
+            let path = repository.appendingPathComponent("Packages/\(name)").path
+            let json = try output(["swift", "package", "dump-package", "--package-path", path])
+            let manifest = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+            let remote = (manifest?["dependencies"] as? [[String: Any]] ?? []).filter { $0["sourceControl"] != nil }
+            #expect(manifest != nil && remote.isEmpty, "\(name) takes remote packages: \(remote)")
+        }
+    }
 }
