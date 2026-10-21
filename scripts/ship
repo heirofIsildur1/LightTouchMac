@@ -1,0 +1,211 @@
+#!/bin/bash
+# A release, end to end, from a clean checkout:
+#
+#     scripts/ship --notes path/to/notes.md [--title "Light Touch — October 21"] [--commit REV] [--dry-run]
+#
+# 1. preflight: the tree is clean and at REV (default origin/main, fetched); the notes are there, not empty and
+#    carry no template text; notarization has an App Store Connect API key (scripts/release-common.sh); the
+#    ExportOptions team's Developer ID Application identity is in the keychain; amore and gh are logged in; at
+#    least LTM_SHIP_MIN_DISK_GB (default 80) free in the release directory; scripts/host-ready says READY (asked
+#    every minute for up to LTM_SHIP_HOST_WAIT seconds, default 3600).
+# 2. vendor: every IPSW the vendor step and ReleaseBootTests need into the app's IPSW cache (the catalog's sha1),
+#    cloned from a local copy with that SHA-1 (LTM_BUILT_IN_IPSW for the built-in iPod, then any .ipsw of the
+#    catalog's size under LTM_IPSW_DIRS, colon-separated, default ~/Developer/ipod2g-re/OldSDK,
+#    ~/Developer/qemu-ios-files and ~/Downloads), else downloaded from the catalog's URL or its mirrors and checked;
+#    then scripts/vendor.
+# 3. xcodebuild archive (Release) to release-<commit>.xcarchive, then scripts/release on it: export, notarize,
+#    staple, the release zip and SHA256SUMS, the static checks and the boots (retried once).
+# 4. Amore (scripts/release --amore --publish): the DMG signed, notarized, stapled, uploaded with the notes, the
+#    CDN's copy checked, published, and the appcast's item checked.
+# 5. GitHub: `gh release create v<version>-<YYYY.MM.DD>[b|c|…]` at the commit, with the notes, the zip and
+#    SHA256SUMS; the title defaults to "Light Touch — <Month day>" (with " (b)" and so on).
+# 6. one line in LTM_RELEASE_LOG (default <release directory>/releases.log): build, commit, tag, notarization ids,
+#    Amore id, the zip's SHA-256; then archives and exports beyond the newest two are removed.
+# --dry-run runs 1 to 3 without notarizing or uploading (scripts/release --dry-run) and prints what 4 to 6 would do.
+# Everything lands in LTM_RELEASE_DIR (default ~/Developer/ltm-int-rel); this run's log and work in
+# ship-<commit>-<time>/ there, kept. The last line is the verdict: `PASS released build N (tag) <log>` (exit 0),
+# or `FAIL <step>: <why> <log>`, exit 2 for preflight and 1 for a step.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/scripts/release-common.sh"
+
+# next_tag BASE EXISTING...: BASE, else BASEb, BASEc, … whichever no EXISTING tag has taken.
+next_tag() {
+    local base=$1 s; shift
+    for s in "" b c d e f g h i j k l m n o p q r s t u v w x y z; do
+        [[ " $* " == *" $base$s "* ]] || { echo "$base$s"; return 0; }
+    done
+    return 1
+}
+
+# fill_ipsw CACHE ID SHA1 BYTES URL...: CACHE/SHA1.ipsw from a local copy with that SHA-1, else from the first URL
+# whose download has it. Prints where it came from; returns 1 when nothing did.
+fill_ipsw() {
+    local cache=$1 id=$2 sha1=$3 bytes=$4 f dir url
+    shift 4
+    local dest="$cache/$sha1.ipsw"
+    [[ -f "$dest" ]] && { echo "$id: in the cache"; return 0; }
+    mkdir -p "$cache"
+    local candidates=() dirs=()
+    [[ "$id" == "$BUILT_IN" && -n "${LTM_BUILT_IN_IPSW:-}" ]] && candidates+=("$LTM_BUILT_IN_IPSW")
+    IFS=: read -r -a dirs <<< "${LTM_IPSW_DIRS:-$HOME/Developer/ipod2g-re/OldSDK:$HOME/Developer/qemu-ios-files:$HOME/Downloads}"
+    for dir in "${dirs[@]}"; do
+        [[ -d "$dir" ]] || continue
+        while IFS= read -r f; do candidates+=("$f"); done \
+            < <(find "$dir" -maxdepth 4 -name '*.ipsw' -type f $( (( bytes > 0 )) && echo "-size ${bytes}c") 2>/dev/null)
+    done
+    for f in ${candidates[@]+"${candidates[@]}"}; do
+        [[ -f "$f" && "$(shasum -a 1 "$f" | cut -d' ' -f1)" == "$sha1" ]] || continue
+        cp -c "$f" "$dest.part" && mv "$dest.part" "$dest" && { echo "$id: cloned from $f"; return 0; }
+    done
+    for url in "$@"; do
+        echo "$id: downloading $url"
+        if curl -fL --retry 3 -s -o "$dest.part" "$url" && [[ "$(shasum -a 1 "$dest.part" | cut -d' ' -f1)" == "$sha1" ]]; then
+            mv "$dest.part" "$dest" && { echo "$id: downloaded"; return 0; }
+        fi
+        rm -f "$dest.part"
+    done
+    echo "$id: no local copy with SHA-1 $sha1 and no download matched"
+    return 1
+}
+
+# prune_releases DIR KEEP DRY: prints keep/remove for each DIR/release-*.xcarchive (newest first) and its -export,
+# and removes those past the newest KEEP unless DRY is 1.
+prune_releases() {
+    local dir=$1 keep=$2 dry=$3 n=0 a
+    while IFS= read -r a; do
+        n=$((n + 1))
+        if ((n <= keep)); then echo "keep   $a"; continue; fi
+        echo "remove $a ${a%.xcarchive}-export$( ((dry)) && echo " (dry run: not removed)")"
+        ((dry)) || rm -rf "$a" "${a%.xcarchive}-export"
+    done < <(ls -dt "$dir"/release-*.xcarchive 2>/dev/null)
+}
+
+# Sourced (tests/scripts/ship.sh): the functions only.
+[[ "${BASH_SOURCE[0]}" == "$0" ]] || return 0
+
+NOTES=""; TITLE=""; REV="origin/main"; DRY=0
+pre() { echo "FAIL preflight: $* -"; exit 2; }
+while (($#)); do
+    case "$1" in
+        --notes) NOTES="${2:-}"; shift ;;
+        --title) TITLE="${2:-}"; shift ;;
+        --commit) REV="${2:-}"; shift ;;
+        --dry-run) DRY=1 ;;
+        *) pre "unknown argument $1 (usage: scripts/ship --notes notes.md [--title T] [--commit REV] [--dry-run])" ;;
+    esac
+    shift
+done
+[[ -n "$NOTES" ]] || pre "--notes path/to/notes.md is required"
+why="$(notes_problem "$NOTES")"; [[ -z "$why" ]] || pre "$why"
+NOTES="$(cd "$(dirname "$NOTES")" && pwd)/$(basename "$NOTES")"
+RELDIR="${LTM_RELEASE_DIR:-$HOME/Developer/ltm-int-rel}"
+mkdir -p "$RELDIR"
+git -C "$ROOT" fetch -q origin || pre "git fetch origin"
+SHA="$(git -C "$ROOT" rev-parse --verify -q "$REV^{commit}")" || pre "no commit $REV"
+SHORT="${SHA:0:8}"
+WORK="$RELDIR/ship-$SHORT-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$WORK"
+LOG="$WORK/ship.log"
+
+main() {
+    set -e  # the pipeline into tee below runs main with errexit off
+    fail() { echo "FAIL $1: $2 $LOG"; exit "${3:-1}"; }
+    step() { echo "== $*"; }
+    echo "ship $SHA$( ((DRY)) && echo " (dry run)") into $RELDIR"
+
+    step "preflight"
+    [[ -z "$(git -C "$ROOT" status --porcelain)" ]] || fail preflight "the tree has changes (git status)" 2
+    [[ "$(git -C "$ROOT" rev-parse HEAD)" == "$SHA" ]] || fail preflight "HEAD is not $REV ($SHA)" 2
+    why="$(notary_config)" || fail preflight "$why" 2
+    notary_config
+    [[ "$NOTARY_FROM" != keychain ]] || fail preflight "no App Store Connect API key (LTM_NOTARY_KEY, LTM_NOTARY_KEY_ID, LTM_NOTARY_ISSUER or ~/.config/lighttouch/notary.env)" 2
+    echo "notary: API key from $NOTARY_FROM"
+    local team identities
+    team="$(plutil -extract teamID raw -o - "$ROOT/Configuration/ExportOptions.plist")"
+    identities="$(security find-identity -v -p codesigning)"
+    [[ "$identities" == *"Developer ID Application: "*"($team)"* ]] || fail preflight "no Developer ID Application identity for team $team in the keychain" 2
+    amore whoami > /dev/null 2>&1 || fail preflight "amore is not logged in (amore login)" 2
+    gh auth status > /dev/null 2>&1 || fail preflight "gh is not logged in (gh auth login)" 2
+    local free_gb min_gb="${LTM_SHIP_MIN_DISK_GB:-80}"
+    free_gb="$(df -Pk "$RELDIR" | awk 'NR == 2 { print int($4 / 1048576) }')"
+    ((free_gb >= min_gb)) || fail preflight "$free_gb GB free in $RELDIR (want $min_gb)" 2
+    local waited=0 ready last=""
+    until ready="$("$ROOT/scripts/host-ready")"; do
+        [[ "$ready" == "$last" ]] || echo "$ready"
+        last="$ready"
+        ((waited < ${LTM_SHIP_HOST_WAIT:-3600})) || fail preflight "host not ready after ${waited}s: $ready" 2
+        sleep 60; waited=$((waited + 60))
+    done
+    echo "$ready"
+
+    step "IPSWs"
+    BUILT_IN="$(sed -n 's/.*static let builtIn = "\([^"]*\)".*/\1/p' "$ROOT/Packages/ReleaseChecks/Tests/ReleaseChecksTests/ReleaseBootTests.swift")"
+    local routes line
+    routes="$(sed -n 's/.*static let routes = \[\(.*\)\].*/\1/p' "$ROOT/Packages/ReleaseChecks/Tests/ReleaseChecksTests/ReleaseBootTests.swift" | tr -d '",')"
+    [[ -n "$BUILT_IN" && -n "$routes" ]] || fail IPSWs "can't read ReleaseBootTests' builtIn and routes"
+    local cache="$HOME/Library/Caches/gold.samhenri.LightTouchMac/IPSW"
+    swift "$ROOT/scripts/release-helper.swift" catalog "$ROOT/LightTouchMac/Resources/firmware-catalog.json" \
+        $(printf '%s\n' "$BUILT_IN" $routes | sort -u) > "$WORK/ipsws.txt" || fail IPSWs "the catalog has no source for one of them"
+    while read -r -a line; do
+        fill_ipsw "$cache" "${line[@]}" || fail IPSWs "${line[0]} (SHA-1 ${line[1]}) is in no local directory and no download matched"
+    done < "$WORK/ipsws.txt"
+
+    step "vendor"
+    "$ROOT/scripts/vendor" > "$WORK/vendor.log" 2>&1 || { tail -20 "$WORK/vendor.log"; fail vendor "scripts/vendor (its log: $WORK/vendor.log)"; }
+
+    step "archive"
+    local archive="$RELDIR/release-$SHORT.xcarchive"
+    rm -rf "$archive"
+    xcodebuild archive -skipMacroValidation -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -configuration Release \
+        -destination 'generic/platform=macOS' -archivePath "$archive" > "$WORK/archive.log" 2>&1 \
+        || { grep -E "error:" "$WORK/archive.log" | head -20; fail archive "xcodebuild archive (its log: $WORK/archive.log)"; }
+
+    step "release (scripts/release)"
+    local rc=0 verdict
+    set +e
+    "$ROOT/scripts/release" "$archive" --amore --notes "$NOTES" --publish $( ((DRY)) && echo --dry-run) 2>&1 | tee "$WORK/release.log"
+    rc=${PIPESTATUS[0]}
+    set -e
+    verdict="$(tail -1 "$WORK/release.log")"
+    ((rc == 0)) || fail release "${verdict#FAIL }" "$rc"
+    local zip="${verdict##* }" out app build version amore_id notary_ids zip_sum
+    out="$(dirname "$zip")"
+    app="$(find "$out" -maxdepth 1 -name '*.app' | head -1)"
+    build="$(plutil -extract CFBundleVersion raw -o - "$app/Contents/Info.plist")"
+    version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")"
+    amore_id="$(sed -n 's/.* amore \([^ ]*\) published .*/\1/p' <<< "$verdict")"
+    notary_ids="$(sed -n 's/^submission \([^:]*\): Accepted$/\1/p' "$WORK/release.log" | paste -sd, -)"
+    zip_sum="$(shasum -a 256 "$zip" | cut -d' ' -f1)"
+
+    step "GitHub"
+    local base tag suffix
+    base="v$version-$(date +%Y.%m.%d)"
+    tag="$(next_tag "$base" $(git -C "$ROOT" ls-remote --tags origin "refs/tags/$base*" | sed 's#.*refs/tags/##'))" \
+        || fail GitHub "no free tag after ${base}z"
+    suffix="${tag#"$base"}"
+    [[ -n "$TITLE" ]] || TITLE="Light Touch — $(date '+%B %-d')${suffix:+ ($suffix)}"
+    if ((DRY)); then
+        echo "would run: gh release create $tag --target $SHA --title \"$TITLE\" --notes-file $NOTES $zip $out/SHA256SUMS"
+    else
+        gh release create "$tag" --target "$SHA" --title "$TITLE" --notes-file "$NOTES" "$zip" "$out/SHA256SUMS" \
+            || fail GitHub "gh release create $tag"
+    fi
+
+    step "record"
+    local record="${LTM_RELEASE_LOG:-$RELDIR/releases.log}"
+    local entry
+    entry="$(date -u +%Y-%m-%dT%H:%M:%SZ) build=$build commit=$SHA tag=$tag zip_sha256=$zip_sum notary=${notary_ids:-none} amore=${amore_id:-none}"
+    if ((DRY)); then echo "would append to $record: $entry"; else echo "$entry" >> "$record"; fi
+    prune_releases "$RELDIR" 2 "$DRY"
+
+    if ((DRY)); then
+        echo "PASS dry run build $build (would be $tag) $LOG"
+    else
+        echo "PASS released build $build ($tag) $LOG"
+    fi
+}
+
+set +e
+main 2>&1 | tee "$LOG"
+exit "${PIPESTATUS[0]}"

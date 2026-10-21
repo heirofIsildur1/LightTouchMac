@@ -83,7 +83,7 @@ public enum GuestPack {
         var offset = 0
         for e in index.entries {
             guard !e.name.hasPrefix("/"), !e.name.split(separator: "/").contains(".."), e.size >= 0,
-                offset + e.size <= stream.count
+                e.size <= stream.count - offset
             else { throw invalid("bad entry \(e.name)") }
             entries.append((e.name, stream.subdata(in: offset..<offset + e.size)))
             offset += e.size
