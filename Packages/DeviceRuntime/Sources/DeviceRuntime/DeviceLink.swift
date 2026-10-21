@@ -76,6 +76,8 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         public var connectTimeout: TimeInterval = 15
         /// The device's lease (HelperLaunch.lease).
         public var lease: URL?
+        /// A sandboxed helper's files beyond its device's (SandboxExtension; the harness's own logs).
+        public var grants: [SandboxExtension.Grant] = []
 
         public init(instance: UUID, outputDescriptor: Int32 = -1) {
             self.instance = instance
@@ -108,6 +110,15 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
     private var invalidated = false
     private var startCompletion: (@Sendable (Result<HelperInfo, DeviceLinkError>) -> Void)?
     private var exitSource: DispatchSourceProcess?
+    /// The helper is signed for the App Sandbox (HelperSandbox): it gets its files from this link.
+    private var sandboxed = false
+    /// Its audit token, from the rendezvous (its code requirement checked); its grants are bound to it.
+    private var audit: audit_token_t?
+    #if DEBUG
+        private static let debugBuild = true
+    #else
+        private static let debugBuild = false
+    #endif
 
     public init(configuration: Configuration, queue: DispatchQueue = .main) {
         self.configuration = configuration
@@ -149,6 +160,24 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
                 completion(.failure(.rendezvous("no code requirement for \(self.configuration.helper.path)")))
             }
         }
+        sandboxed = HelperSandbox.isSandboxed(configuration.helper)
+        guard sandboxed == HelperSandbox.enabled else {
+            let reason =
+                "\(configuration.helper.path) is \(sandboxed ? "" : "not ")sandboxed, but this process set up its "
+                + "rendezvous and sockets for \(sandboxed ? "un" : "")sandboxed helpers (HelperSandbox.use(helper:))"
+            return queue.async { completion(.failure(.rendezvous(reason))) }
+        }
+        // A sandboxed Debug helper's emulator folders, which it loads before the rendezvous: on its standard input,
+        // issued to its pid once it is spawned (SandboxExtension). Everything else waits for the rendezvous.
+        var grantPipe: [Int32] = [-1, -1]
+        if sandboxed, Self.debugBuild {
+            guard pipe(&grantPipe) == 0 else {
+                let e = errno
+                return queue.async { completion(.failure(.spawnFailed(e))) }
+            }
+            _ = fcntl(grantPipe[0], F_SETFD, FD_CLOEXEC)
+            _ = fcntl(grantPipe[1], F_SETFD, FD_CLOEXEC)
+        }
         var sv: [Int32] = [-1, -1]
         guard socketpair(AF_UNIX, SOCK_STREAM, 0, &sv) == 0 else {
             let e = errno
@@ -180,7 +209,14 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
             {
                 withCStrings(argv) { cargv in
                     withCStrings(envp) { cenv in
-                        ltm_spawn(configuration.helper.path, cargv, cenv, configuration.outputDescriptor, sv[1])
+                        ltm_spawn(
+                            configuration.helper.path,
+                            cargv,
+                            cenv,
+                            grantPipe[0],
+                            configuration.outputDescriptor,
+                            sv[1]
+                        )
                     }
                 }
             },
@@ -188,6 +224,11 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         )
         argv.removeAll()
         close(sv[1])
+        if grantPipe[0] >= 0 {
+            close(grantPipe[0])
+            if pid > 0 { sendGrants(emulatorGrants(), to: pid, over: grantPipe[1]) }
+            close(grantPipe[1])
+        }
         guard pid > 0 else {
             close(sv[0])
             lock.withLock { startCompletion = nil }
@@ -210,6 +251,16 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         )
         lock.withLock { self.channel = channel }
 
+        // A sandboxed helper's hello waits for the rendezvous: its device's grants, bound to the audit token whose
+        // code requirement was just checked, go first, and the hello takes the lease with them.
+        if !sandboxed { sendHello() }
+        queue.asyncAfter(deadline: .now() + configuration.connectTimeout) { [weak self] in
+            guard let self, lock.withLock({ self.startCompletion != nil }) else { return }
+            invalidate(.timedOut, kill: true)
+        }
+    }
+
+    private func sendHello() {
         request(
             .hello(protocolVersion: DeviceLinkWire.protocolVersion, board: configuration.board),
             timeout: configuration.connectTimeout
@@ -227,15 +278,19 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
             case .failure(let error): invalidate(error, kill: true)
             }
         }
-        queue.asyncAfter(deadline: .now() + configuration.connectTimeout) { [weak self] in
-            guard let self, lock.withLock({ self.startCompletion != nil }) else { return }
-            invalidate(.timedOut, kill: true)
-        }
     }
 
     private func surfacesArrived(_ hello: DeviceRendezvousServer.Hello) {
         let status = StatusBlock(hello.surfaces[0])
         guard status.isValid else { return invalidate(.rejected("bad status block"), kill: true) }
+        if sandboxed, lock.withLock({ audit == nil }) {
+            lock.withLock { audit = hello.audit }
+            queue.async { [weak self] in
+                guard let self else { return }
+                sendGrants(spawnGrants())
+                sendHello()
+            }
+        }
         lock.withLock {
             ring?.release()
             statusBlock = status
@@ -263,11 +318,13 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
 
     /// Fire-and-forget, ordered. Dropped once the link is invalid.
     public func send(_ command: LinkCommand) {
+        if sandboxed, case .snapshotSave(let path) = command { grantSnapshot(path) }
         lock.withLock { channel }?.send(.command(command))
     }
 
     /// One request; `reply` runs once on `queue` (a reply, or .timedOut / .closed).
     public func request(_ request: LinkRequest, timeout: TimeInterval = 10, reply: @escaping Reply) {
+        if sandboxed, case .boot(let config) = request { grantBoot(config) }
         let (id, channel, dead): (UInt64, LinkChannel<HelperMessage, AppMessage>?, Bool) = lock.withLock {
             let id = nextID
             nextID += 1
@@ -304,6 +361,146 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
             onEvent?(event)
         }
     }
+
+    // MARK: - Sandbox grants
+
+    /// The device's folder (the lease's, <device>/work/lease) and the library root and Devices folder above it,
+    /// never granted themselves.
+    private var deviceFolder: URL? { configuration.lease?.deletingLastPathComponent().deletingLastPathComponent() }
+    private var libraryFolders: [URL] {
+        guard let devices = deviceFolder?.deletingLastPathComponent() else { return [] }
+        return [devices, devices.deletingLastPathComponent()]
+    }
+
+    /// After the rendezvous: the device's folder read-only (its record for the storage proof, the web proxy's
+    /// routing, CA and location) and its work folder read-write (the lease, the clean-stop marker), made first (a
+    /// grant is for a path that exists). Nothing else the app trusts in the device folder is writable.
+    private func spawnGrants() -> [SandboxExtension.Grant] {
+        #if DEBUG
+            if ProcessInfo.processInfo.environment["LTM_HELPER_NO_GRANTS"] != nil { return [] }  // a negative control
+        #endif
+        var grants = configuration.grants
+        if let lease = configuration.lease {
+            let work = lease.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+            grants += [.init(work.deletingLastPathComponent(), .read), .init(work, .readWrite)]
+        }
+        return grants
+    }
+
+    /// Debug: the emulator the helper loads before the rendezvous, outside the bundle (the rpath's QEMU_BUILD_DIR and
+    /// vendor directory, LTM_QEMU_DYLIB's folder), read-only.
+    private func emulatorGrants() -> [SandboxExtension.Grant] {
+        #if DEBUG
+            var grants = Self.runPaths(configuration.helper).map {
+                SandboxExtension.Grant(URL(fileURLWithPath: $0), .read)
+            }
+            if let dylib = configuration.dylib ?? ProcessInfo.processInfo.environment["LTM_QEMU_DYLIB"] {
+                grants.append(.init(URL(fileURLWithPath: dylib).deletingLastPathComponent(), .read))
+            }
+            return grants
+        #else
+            return []
+        #endif
+    }
+
+    /// Before a boot: what it opens, by role (BootConfig.files, from the boot recipe; a config without them gets
+    /// nothing, and fails at its first file), and its web proxy's URL cache, read-write.
+    private func grantBoot(_ config: BootConfig) {
+        #if DEBUG
+            if ProcessInfo.processInfo.environment["LTM_HELPER_NO_GRANTS"] != nil { return }
+        #endif
+        guard let files = config.files else { return noteRefused(["this boot (it names no files)"]) }
+        var grants = files.grants
+        if let proxy = config.webProxy {
+            let cache = URL(fileURLWithPath: proxy.config + ".cache")
+            try? FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+            grants += [
+                .init(URL(fileURLWithPath: proxy.config).deletingLastPathComponent(), .read), .init(cache, .readWrite)
+            ]
+        }
+        sendGrants(grants)
+    }
+
+    /// A snapshot is written only inside the device's folder (the app sends none; the harness's helper-driver does):
+    /// the file, made empty first, read-write. Anywhere else gets no grant.
+    private func grantSnapshot(_ path: String) {
+        let url = URL(fileURLWithPath: path).standardizedFileURL
+        guard let device = deviceFolder?.standardizedFileURL,
+            url.path.hasPrefix(device.path + "/"), !url.path.contains("/../")
+        else { return noteRefused(["\(path) (a snapshot outside the device's folder)"]) }
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
+        sendGrants([.init(url, .readWrite)])
+    }
+
+    /// Over the link, ahead of what needs them (the channel is ordered), bound to the rendezvous' audit token.
+    private func sendGrants(_ grants: [SandboxExtension.Grant]) {
+        guard !grants.isEmpty, let audit = lock.withLock({ audit }) else { return }
+        let (tokens, refused) = SandboxExtension.issue(grants, to: .process(audit), deny: libraryFolders)
+        noteRefused(refused)
+        if !tokens.isEmpty { lock.withLock { channel }?.send(.command(.sandboxExtensions(tokens))) }
+    }
+
+    /// On the helper's standard input, as JSON (SandboxExtension.consumeStandardInput), bound to its pid (an unreaped
+    /// child's).
+    private func sendGrants(_ grants: [SandboxExtension.Grant], to pid: pid_t, over fd: Int32) {
+        let (tokens, refused) = SandboxExtension.issue(grants, to: .pid(pid), deny: libraryFolders)
+        noteRefused(refused)
+        guard let data = try? JSONEncoder().encode(tokens) else { return }
+        _ = data.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+    }
+
+    /// Into the device's native.log, beside the helper's own "Operation not permitted". Paths and reasons only.
+    private func noteRefused(_ refused: [String]) {
+        guard !refused.isEmpty, configuration.outputDescriptor >= 0 else { return }
+        let line = "device link: no sandbox grant for \(refused.joined(separator: ", "))\n"
+        _ = line.withCString { write(configuration.outputDescriptor, $0, strlen($0)) }
+    }
+
+    #if DEBUG
+        /// The helper's LC_RPATH folders that exist, @executable_path and @loader_path resolved.
+        static func runPaths(_ binary: URL) -> [String] {
+            guard let data = try? Data(contentsOf: binary, options: .alwaysMapped), data.count > 32 else { return [] }
+            func u32(_ at: Int, big: Bool = false) -> Int {
+                guard at + 4 <= data.count else { return 0 }
+                let v = data.subdata(in: at..<at + 4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+                return Int(big ? v.bigEndian : v)
+            }
+            var start = 0
+            if u32(0, big: true) == 0xcafe_babe {  // fat: this machine's slice
+                #if arch(arm64)
+                    let want = 0x0100_000c
+                #else
+                    let want = 0x0100_0007
+                #endif
+                guard
+                    let slice = (0..<u32(4, big: true)).map({ 8 + $0 * 20 }).first(where: { u32($0, big: true) == want }
+                    )
+                else { return [] }
+                start = u32(slice + 8, big: true)
+            }
+            guard u32(start) == 0xfeed_facf else { return [] }
+            let folder = binary.deletingLastPathComponent().path
+            var paths: [String] = []
+            var at = start + 32
+            for _ in 0..<u32(start + 16) {
+                let command = u32(at)
+                let size = u32(at + 4)
+                guard size > 0, at + size <= data.count else { break }
+                if command == 0x8000_001c {  // LC_RPATH
+                    let bytes = data.subdata(in: at + u32(at + 8)..<at + size).prefix { $0 != 0 }
+                    let path = String(decoding: bytes, as: UTF8.self)
+                        .replacingOccurrences(of: "@executable_path", with: folder)
+                        .replacingOccurrences(of: "@loader_path", with: folder)
+                    if FileManager.default.fileExists(atPath: path) { paths.append(path) }
+                }
+                at += size
+            }
+            return paths
+        }
+    #endif
 
     // MARK: - Teardown
 

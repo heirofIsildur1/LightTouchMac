@@ -281,6 +281,12 @@ final class DeviceHost: @unchecked Sendable {
             noteInput()
             qemu.keyMac(Int32(code), down)
         case .screenVisible(let visible): setScreenVisible(visible)
+        case .sandboxExtensions(let tokens):
+            let refused = SandboxExtension.consume(tokens)
+            helperLog(
+                "sandbox: \(tokens.count - refused.count) of \(tokens.count) grants taken"
+                    + (refused.isEmpty ? "" : "; refused: \(refused)")
+            )
         case .rotate(let clockwise): qemu.rotate(clockwise)
         case .shake: qemu.shake()
         case .attitude(let pitch, let roll, let pose): qemu.attitude(pitch, roll, Int32(pose))

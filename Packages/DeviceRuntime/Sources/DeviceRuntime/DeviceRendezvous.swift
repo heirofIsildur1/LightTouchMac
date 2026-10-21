@@ -2,7 +2,7 @@
 //
 // A dynamic NSXPCListener(machServiceName:) is refused for a name launchd does
 // not know, so the app checks in
-// "<bundle id>.devices.<app pid>" with bootstrap_check_in and the helper sends
+// "<bundle id>.devices.<app pid>" (a sandboxed helper's: "<app group>.devices.<app pid>") with bootstrap_check_in and the helper sends
 // one Mach message per ring: its one-time token and the IOSurfaceCreateMachPort
 // ports of [status block, ring0, ring1, ring2] (status only before the first
 // frame). The name is visible to every process in the session, so each hello
@@ -19,6 +19,7 @@
 // Control never goes over Mach: it is on the private socketpair.
 
 import Foundation
+import HostRuntime
 import IOSurface
 import LTMLinkC
 import Security
@@ -99,6 +100,8 @@ nonisolated final class DeviceRendezvousServer: @unchecked Sendable {
     struct Hello {
         var generation: UInt64
         var surfaces: [IOSurface]
+        /// The sender's, checked against the requirement: a sandboxed helper's grants are bound to it.
+        var audit: audit_token_t
     }
     struct Registration {
         var token: String
@@ -115,7 +118,9 @@ nonisolated final class DeviceRendezvousServer: @unchecked Sendable {
     private var port: mach_port_t = 0
 
     private init() {
-        serviceName = "\(Bundle.main.bundleIdentifier ?? "gold.samhenri.LightTouchMac").devices.\(getpid())"
+        // A sandboxed helper may look up only names under its app group.
+        serviceName =
+            "\(HelperSandbox.enabled ? HelperSandbox.appGroup : Bundle.main.bundleIdentifier ?? "gold.samhenri.LightTouchMac").devices.\(getpid())"
     }
 
     /// Check in (once per process) and start the receive thread. Nonzero: the kern_return_t.
@@ -181,7 +186,7 @@ nonisolated final class DeviceRendezvousServer: @unchecked Sendable {
                 registration.reject("a surface port did not resolve")
                 continue
             }
-            registration.deliver(Hello(generation: hello.generation, surfaces: surfaces))
+            registration.deliver(Hello(generation: hello.generation, surfaces: surfaces, audit: hello.audit))
         }
     }
 

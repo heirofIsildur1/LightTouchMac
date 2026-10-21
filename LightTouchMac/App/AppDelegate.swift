@@ -144,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for (title, action) in [
             ("Home Screen", #selector(MainWindowController.deviceHome(_:))),
             ("Lock", #selector(MainWindowController.deviceLock(_:))),
-            ("Restart…", #selector(MainWindowController.deviceReset(_:))),
+            ("Restart…", #selector(MainWindowController.deviceReset(_:)))
         ] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = windowController
@@ -314,6 +314,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for record in records { USBMux.secure(DeviceInstance.url(record.storage.usbmuxConf, state: state)) }
         // A crashed or killed run's daemons, reparented to launchd: a device not started again kept its daemon.
         USBMux.reapOrphans(records, state: state, logs: logs)
+        // A sandboxed helper's sockets that a crashed or killed run left (HelperSandbox's folder per process).
+        let stale = HelperSandbox.sweepStaleSockets()
+        if !stale.isEmpty { logEvent("sockets: removed the folders of processes that are gone: \(stale)") }
         // Bases published by earlier builds become immutable too (a development base, outside State, is left alone).
         for record in records where !record.base.path.hasPrefix("/") {
             DeviceStateStorage.lockBase(DeviceInstance.url(record.base.path, state: state))
@@ -467,7 +470,7 @@ private final class MigrationProgress {
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -20),
-            bar.widthAnchor.constraint(equalToConstant: 320),
+            bar.widthAnchor.constraint(equalToConstant: 320)
         ])
         window.contentView = content
         window.center()

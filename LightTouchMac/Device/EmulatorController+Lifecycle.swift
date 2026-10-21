@@ -117,6 +117,14 @@ extension EmulatorController {
         // helper is finished writing.
         serialCapture?.removeEndpoints()
         usbmux.stop()
+        removeSockets()
+    }
+
+    /// The boot's web proxy and debug port sockets (usbmuxd's go in usbmux.stop()): a listener keeps its socket open
+    /// after its path is gone, and the paths pile up otherwise (HelperSandbox's folder isn't purged).
+    private func removeSockets() {
+        proxy.forgetEndpoint()
+        _ = options.chooseDebugSocket(booting: false)
     }
 
     /// Booting and recording: a notice (non-blocking) below 2 GB free, gone once there's room.
@@ -144,6 +152,7 @@ extension EmulatorController {
         updateVibration(nil)
         audioSink?(.audioEnded(generation: 0, failed: true))
         usbmux.stop()
+        removeSockets()
         serialCapture?.finish()
         serialCapture = nil
     }

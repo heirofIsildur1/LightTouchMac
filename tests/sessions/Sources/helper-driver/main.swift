@@ -123,6 +123,7 @@ var logFD: Int32 = -1
 if let log = opts.log { logFD = open(log, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0o644) }
 var configuration = DeviceLink.Configuration(instance: UUID(), outputDescriptor: logFD)
 configuration.helper = URL(fileURLWithPath: opts.helper)
+HelperSandbox.use(helper: configuration.helper)
 configuration.dylib = scenario.dylib
 configuration.board = scenario.board
 configuration.requirement = opts.requirement
@@ -191,7 +192,7 @@ func statusFields() -> [String: Any] {
         "uiReady": s.uiReady, "storageFailed": s.storageFailed, "shutdownConfirmed": s.shutdownConfirmed,
         "displaySleeping": s.displaySleeping, "agentStatus": s.agentStatus, "glesContexts": s.glesContexts,
         "iconGeneration": s.iconGeneration, "qemuState": s.qemuState.rawValue, "vibrating": s.vibrating,
-        "vibratorPulses": s.vibratorPulses,
+        "vibratorPulses": s.vibratorPulses
     ]
 }
 
@@ -229,7 +230,7 @@ case .success(let info):
             "deviceInfo": info.deviceInfo.map {
                 "\($0.machine) \($0.screenWidth)x\($0.screenHeight) scale \($0.screenScale)"
             } ?? "",
-            "status": statusFields(),
+            "status": statusFields()
         ]
     )
 case .failure(let error):
@@ -316,7 +317,7 @@ Thread.detachNewThread {
                 "lit",
                 [
                     "seconds": Date().timeIntervalSince(start), "brightness": b, "frames": framesSeen,
-                    "status": statusFields(),
+                    "status": statusFields()
                 ]
             )
         case "dump":
@@ -409,7 +410,7 @@ Thread.detachNewThread {
                         [
                             "secondsSinceBoot": since, "powerOffsAt": offs, "powerOffs": powerOffs,
                             "attached": attached,
-                            "timedOut": !(since >= v[0] && steady),
+                            "timedOut": !(since >= v[0] && steady)
                         ]
                     )
                     break
@@ -497,7 +498,7 @@ Thread.detachNewThread {
                     [
                         "kind": p[1], "from": fromPage ? "page" : "left", "to": toPage ? "page" : "left",
                         "dPage": dPage, "dLeft": dLeft, "dStart": min(fromPageD, fromLeftD), "touches": log,
-                        "frameTimes": frames.times, "framesSkipped": frames.skipped,
+                        "frameTimes": frames.times, "framesSkipped": frames.skipped
                     ]
                 )
             }
@@ -617,7 +618,7 @@ Thread.detachNewThread {
                 "tweaks",
                 [
                     "result": "\(r.map { "written \($0.written) resprung \($0.resprung) missing \($0.missing)" })",
-                    "resprung": (try? r.get().resprung) ?? false, "ok": (try? r.get()) != nil,
+                    "resprung": (try? r.get().resprung) ?? false, "ok": (try? r.get()) != nil
                 ]
             )
         // sbread NAME: what SpringBoard's status bar server holds (the agent's statusbarget): whether its overrides
@@ -636,7 +637,7 @@ Thread.detachNewThread {
                 [
                     "name": p[1], "readable": ops?.has("statusbarget") == true,
                     "held": (try? held.get()) == layout.data(marketing), "time": shown?.time ?? "",
-                    "carrier": shown?.carrier ?? "", "battery": shown?.battery ?? -1, "result": "\(raw.map(\.count))",
+                    "carrier": shown?.carrier ?? "", "battery": shown?.battery ?? -1, "result": "\(raw.map(\.count))"
                 ]
             )
         // sbrestore: DeviceTweaks' check at every poll (TweakApplier.restoreStatusBar) with the Marketing Status Bar on
@@ -664,7 +665,7 @@ Thread.detachNewThread {
                 "hidden",
                 [
                     "apps": (try? found.get().map(\.bundleID)) ?? [], "opened": opened,
-                    "front": (try? front.get().bundleID) ?? "",
+                    "front": (try? front.get().bundleID) ?? ""
                 ]
             )
         case "respring":  // Device ▸ Respring and Tweaks' restart (GuestServices.respring)
@@ -701,7 +702,7 @@ Thread.detachNewThread {
                 "snapshot",
                 [
                     "status": code, "error": error, "seconds": Date().timeIntervalSince(start), "bytes": bytes,
-                    "glesContexts": link.status?.glesContexts ?? -1,
+                    "glesContexts": link.status?.glesContexts ?? -1
                 ]
             )
             if code != 2 { fail("snapshot failed") }
@@ -731,7 +732,7 @@ Thread.detachNewThread {
             let codes: [Character: Int] = [
                 "a": 0, "b": 11, "c": 8, "d": 2, "e": 14, "f": 3, "g": 5, "h": 4, "i": 34, "j": 38, "k": 40, "l": 37,
                 "m": 46, "n": 45, "o": 31, "p": 35, "q": 12, "r": 15, "s": 1, "t": 17, "u": 32, "v": 9, "w": 13,
-                "x": 7, "y": 16, "z": 6,
+                "x": 7, "y": 16, "z": 6
             ]
             for code in p[1].compactMap({ codes[$0] }) {
                 link.send(.key(macKeyCode: code, down: true))
@@ -756,7 +757,7 @@ Thread.detachNewThread {
                     "label": p[1], "seconds": s, "hz": Double(h1 &- h0) / s, "fps": Double(f1 &- f0) / s,
                     "cpuPercent": (u1.cpu - u0.cpu) / s * 100, "wakeupsPerSecond": Double(u1.wakeups &- u0.wakeups) / s,
                     "milliwatts": Double(u1.energy &- u0.energy) / s / 1e6, "preventsIdleSleep": preventsIdleSleep(pid),
-                    "displaySleeping": link.status?.displaySleeping ?? false,
+                    "displaySleeping": link.status?.displaySleeping ?? false
                 ]
             )
         case "visible":  // visible on|off
@@ -800,7 +801,7 @@ Thread.detachNewThread {
                 "noticed",
                 [
                     "invalidatedMs": ((n["invalidated"] ?? 0) - killed) * 1000,
-                    "terminatedMs": ((n["terminated"] ?? 0) - killed) * 1000,
+                    "terminatedMs": ((n["terminated"] ?? 0) - killed) * 1000
                 ]
             )
         default:
@@ -876,7 +877,7 @@ func dump(_ name: String) {
         "dump",
         [
             "name": name, "path": url.path, "ok": FrameTools.writePNG(surface, to: url),
-            "brightness": FrameTools.brightness(surface), "width": surface.width, "height": surface.height,
+            "brightness": FrameTools.brightness(surface), "width": surface.width, "height": surface.height
         ]
     )
 }

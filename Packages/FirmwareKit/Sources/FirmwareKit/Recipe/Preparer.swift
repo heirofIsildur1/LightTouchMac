@@ -156,7 +156,7 @@ public enum Preparer {
 
     /// One `LightTouchDevice` oneshot boot of `argv` (which routes -serial to `serial`). `during` runs on its own
     /// thread once the helper is started (the iPod keybag's gdbstub handoff); if it throws, the helper is stopped
-    /// and the error rethrown.
+    /// and the error rethrown. `grants`: what argv opens outside `work`, by role, for a sandboxed helper.
     static func oneshot(
         _ helper: URL,
         argv: [String],
@@ -166,6 +166,7 @@ public enum Preparer {
         stopPattern: String? = nil,
         timeout: Double,
         work: URL,
+        grants: [SandboxExtension.Grant],
         log: (String) -> Void,
         during: (@Sendable () throws -> Void)? = nil
     ) throws -> (OneShot, String) {
@@ -181,10 +182,23 @@ public enum Preparer {
         let out = Pipe()
         p.executableURL = helper
         p.arguments = HelperLaunch(.oneshot(config: cfg.path)).arguments
-        p.standardInput = FileHandle.nullDevice
+        // A sandboxed helper's files, issued to its pid once it runs (an unreaped child) and passed on its standard
+        // input (SandboxExtension): the work folder (this config) and the serial log's read-write, and `grants`.
+        let sandboxed = HelperSandbox.isSandboxed(helper)
+        let grantPipe = sandboxed ? Pipe() : nil
+        p.standardInput = grantPipe ?? FileHandle.nullDevice
         p.standardOutput = out
         p.standardError = FileHandle.standardError
         try p.run()
+        if let grantPipe {
+            let (tokens, refused) = SandboxExtension.issue(
+                grants + [.init(work, .readWrite), .init(serial.deletingLastPathComponent(), .readWrite)],
+                to: .pid(p.processIdentifier)
+            )
+            if !refused.isEmpty { log("one-shot: no sandbox grant for \(refused.joined(separator: ", "))") }
+            try? grantPipe.fileHandleForWriting.write(contentsOf: JSONEncoder().encode(tokens))
+            try? grantPipe.fileHandleForWriting.close()
+        }
         final class Failure: @unchecked Sendable { var error: Error? }
         let failure = Failure()
         let finished = DispatchSemaphore(value: 0)

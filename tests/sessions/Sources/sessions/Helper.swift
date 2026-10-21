@@ -27,7 +27,7 @@ final class HelperDriver {
             "helper-driver",
             [
                 "--helper", (helper ?? tools.helper).path, "--scenario", file.path, "--dump", dir.path,
-                "--log", log.path, "--requirement", Tools.teamRequirement,
+                "--log", log.path, "--requirement", Tools.teamRequirement
             ] + extra,
             out: dir.appendingPathComponent("driver.jsonl"),
             environment: environment
@@ -57,7 +57,7 @@ func preparedScenario(
     let dir = work.appendingPathComponent(name)
     var prepared: [String: Any] = [
         "base": base.url.path, "overlay": dir.appendingPathComponent("overlay").path,
-        "serial": dir.appendingPathComponent("serial.log").path, "files": tools.files.path,
+        "serial": dir.appendingPathComponent("serial.log").path, "files": tools.files.path
     ]
     if let carrier { prepared["carrier"] = carrier }
     return ["board": base.board, "prepared": prepared, "steps": steps]
@@ -100,15 +100,7 @@ func helperChecks(_ args: HelperCheck) -> Never {
     let r = Report()
 
     print("reject")
-    let impostor = work.appendingPathComponent("LightTouchDevice-adhoc")
-    let entitlements = work.appendingPathComponent("helper.entitlements")
-    try? FileManager.default.copyItem(at: tools.helper, to: impostor)
-    try? output("/usr/bin/codesign", ["-d", "--entitlements", "-", "--xml", tools.helper.path]).write(
-        to: entitlements,
-        atomically: true,
-        encoding: .utf8
-    )
-    run("/usr/bin/codesign", ["-f", "-o", "runtime", "-s", "-", "--entitlements", entitlements.path, impostor.path])
+    let impostor = helperCopy(tools.helper, named: "adhoc", in: work, options: ["-o", "runtime"])
     let reject = HelperDriver(
         "reject",
         tools: tools,
@@ -171,7 +163,7 @@ func helperChecks(_ args: HelperCheck) -> Never {
         (
             "preparationFailure", "preparationFailureVerified",
             "a preparation failure after hello keeps its diagnostic; helper reaped, lease released, nothing published"
-        ),
+        )
     ] {
         print(mode)
         let dir = work.appendingPathComponent(mode)
@@ -228,7 +220,7 @@ func helperBoot(_ args: HelperBootCheck) -> Never {
                 steps: [
                     "boot", "lit 0.03 240", "dump lock", unlockSlide, "wait 4", "dump home", "rotate cw", "wait 2",
                     "dump rotated",
-                    "rotate ccw", "wait 2", "battery 50 0", "wait 2", "status", "hold",
+                    "rotate ccw", "wait 2", "battery 50 0", "wait 2", "status", "hold"
                 ]
             )
         )
@@ -266,7 +258,7 @@ func helperBoot(_ args: HelperBootCheck) -> Never {
                 work: work,
                 name: "meddle",
                 steps: [
-                    "boot", "lit 0.03 240", "wait 3", "watch \(overlay.path)", "hold",
+                    "boot", "lit 0.03 240", "wait 3", "watch \(overlay.path)", "hold"
                 ]
             )
         )
@@ -304,7 +296,7 @@ func helperBoot(_ args: HelperBootCheck) -> Never {
         print("power")
         for (name, env, low, high) in [
             ("power-free", [String: String](), 50.0, 65.0),
-            ("power-constrained", ["LTM_HOST_CONSTRAINED": "1"], 25, 33),
+            ("power-constrained", ["LTM_HOST_CONSTRAINED": "1"], 25, 33)
         ] {
             let d = HelperDriver(
                 name,
@@ -320,13 +312,13 @@ func helperBoot(_ args: HelperBootCheck) -> Never {
         var steps = [
             "boot", "lit 0.03 300", "wait 2", "button 0", "wait 2", unlockSlide, "wait 3", "sample shown 5",
             "pause", "wait 1", "sample paused 3", "unpause", "wait 1", "sample resumed 2",
-            "visible off", "sample hidden 5",
+            "visible off", "sample hidden 5"
         ]
         // Shown again 40-240 ms before the next 4 Hz tick (hidden starts its ticks when the command lands).
         for gap in [0.51, 0.56, 0.61, 0.66, 0.71] { steps += ["visible on", "wait 0.5", "visible off", "wait \(gap)"] }
         steps += [
             "visible on", "button 1", "waitSleep 20", "wait 3", "sample asleep 5", "button 1", "wait 1",
-            "sample woken 2", "quit", "expectExit 60",
+            "sample woken 2", "quit", "expectExit 60"
         ]
         let d = HelperDriver(
             "power",
@@ -433,7 +425,7 @@ func phone(_ args: PhoneCheck) -> Never {
         print("carrier")
         cloneOverlay("carrier")
         let saved: [String: Any] = [
-            "carrier": "Saved, Carrier", "mccMNC": "00101", "registered": true, "simPresent": true, "bars": 4,
+            "carrier": "Saved, Carrier", "mccMNC": "00101", "registered": true, "simPresent": true, "bars": 4
         ]
         let d = HelperDriver(
             "carrier",
@@ -454,7 +446,7 @@ func phone(_ args: PhoneCheck) -> Never {
                     // imagent re-register iMessage and wait on Apple's servers, sometimes for minutes, taking no
                     // SMS until it is done. No wait before the SMS covered that.
                     "modem carrier Cell Panel", "modem signal-dbm -97", "modem mcc-mnc 001", "wait 1", "modemStatus",
-                    "modem no-such-property x", "quit", "expectExit 60",
+                    "modem no-such-property x", "quit", "expectExit 60"
                 ],
                 carrier: saved
             )
@@ -549,7 +541,7 @@ func phone(_ args: PhoneCheck) -> Never {
                     "tap 0.617 0.9", "wait 8",
                     "dump home", "status",
                     "orientation 4", "wait 1", "dump turned", "status", "wait 4", "dump turned5", "status", "quit",
-                    "expectExit 60",
+                    "expectExit 60"
                 ]
             )
         )
@@ -577,7 +569,7 @@ func phone(_ args: PhoneCheck) -> Never {
                 work: work,
                 name: "shutdown",
                 steps: [
-                    "boot", "lit 0.03 300", "wait 20", "shutdown 120", "status", "quit", "expectExit 60",
+                    "boot", "lit 0.03 300", "wait 20", "shutdown 120", "status", "quit", "expectExit 60"
                 ]
             )
         )
@@ -600,7 +592,7 @@ func phone(_ args: PhoneCheck) -> Never {
                 work: work,
                 name: "keyboard",
                 steps: [
-                    "boot", "lit 0.03 300", "wait 5", "keyboard off", "wait 2", "keyboard on", "quit", "expectExit 60",
+                    "boot", "lit 0.03 300", "wait 5", "keyboard off", "wait 2", "keyboard on", "quit", "expectExit 60"
                 ]
             )
         )
@@ -629,7 +621,7 @@ func thermal(_ base: Base, tools: Tools, work: URL, _ r: Report) {
     let prefs = work.appendingPathComponent("OSThermalStatus.plist")
     let settings: [String: Any] = [
         "OSThermalNotificationLoggingEnabled": true, "summaryLoggingEnabled": true,
-        "logFile": "/private/var/mobile/cltm.log",
+        "logFile": "/private/var/mobile/cltm.log"
     ]
     try? PropertyListSerialization.data(fromPropertyList: settings, format: .binary, options: 0).write(to: prefs)
     let d = HelperDriver(
@@ -645,7 +637,7 @@ func thermal(_ base: Base, tools: Tools, work: URL, _ r: Report) {
                 "boot", "lit 0.03 400", "wait 60",
                 "agentput \(prefs.path) /private/var/preferences/SystemConfiguration/OSThermalStatus.plist",
                 "spawn /bin/launchctl stop com.apple.UserEventAgent-System", "wait 1200",
-                "agentget cltm.log /private/var/mobile/cltm.log", "quit", "expectExit 60",
+                "agentget cltm.log /private/var/mobile/cltm.log", "quit", "expectExit 60"
             ]
         )
     )
@@ -689,20 +681,20 @@ func emergencyCall(_ base: Base, tools: Tools, work: URL, _ r: Report) {
             // twice; each row by its label, which 4.0, 4.2 and 4.3 put in different places.
             + [
                 "tapword Settings -0.06", "wait 4", "tapword General", "wait 3", "drag 0.5 0.85 0.5 0.3", "wait 3",
-                "tapword Passcode_Lock", "wait 3", "tapword Turn_Passcode_On", "wait 3",
+                "tapword Passcode_Lock", "wait 3", "tapword Turn_Passcode_On", "wait 3"
             ]
             + code + ["wait 2"] + code + ["wait 3"]
             // Lock, wake, slide: the passcode screen, then its Emergency Call key (two lines: found by "Emergency").
             + ["button 1", "wait 3", "button 0", "wait 2", unlockSlide, "wait 3", "tapword Emergency", "wait 4"]
             + [
                 "tap 0.784 0.556", "wait 0.5", "tap 0.207 0.33", "wait 0.5", "tap 0.207 0.33", "wait 1",
-                "tap 0.728 0.906",
+                "tap 0.728 0.906"
             ]
     case 7:
         dialing = [
             "boot", "lit 0.9 600", "wait 10", "button 0", "wait 3", "drag 0.2 0.86 0.9 0.86", "wait 5", "button 0",
             "wait 3", "tap 0.5 0.735", "wait 4",
-            "tap 0.75 0.54", "wait 0.5", "tap 0.26 0.22", "wait 0.5", "tap 0.26 0.22", "wait 1", "tap 0.5 0.825",
+            "tap 0.75 0.54", "wait 0.5", "tap 0.26 0.22", "wait 0.5", "tap 0.26 0.22", "wait 1", "tap 0.5 0.825"
         ]
     default:
         print("  skip: no emergency dialer route for \(base.version)")
@@ -719,7 +711,7 @@ func emergencyCall(_ base: Base, tools: Tools, work: URL, _ r: Report) {
             name: "emergency",
             steps: dialing + [
                 "wait 4", "modemStatus", "modem remote-answer 1", "wait 3", "dump call", "modemStatus",
-                "modem remote-hangup 1", "wait 3", "modemStatus", "quit", "expectExit 60",
+                "modem remote-hangup 1", "wait 3", "modemStatus", "quit", "expectExit 60"
             ]
         ),
         environment: ["IOS_BB_TRACE": "2"]
@@ -759,14 +751,14 @@ func simPIN(_ base: Base, tools: Tools, work: URL, _ r: Report) {
     guard base.major == 4 else { return print("  skip: no SIM PIN route for \(base.version)") }
     let keys: [Character: String] = [
         "1": "0.165 0.59", "2": "0.5 0.59", "3": "0.835 0.59", "4": "0.165 0.70", "5": "0.5 0.70", "6": "0.835 0.70",
-        "7": "0.165 0.82", "8": "0.5 0.82", "9": "0.835 0.82", "0": "0.5 0.93",
+        "7": "0.165 0.82", "8": "0.5 0.82", "9": "0.835 0.82", "0": "0.5 0.93"
     ]
     func type(_ code: String) -> [String] { code.flatMap { ["tap \(keys[$0]!)", "wait 0.6"] } }
     let done = ["tap 0.9 0.145", "wait 5"]  // the Settings sheets' Done and Save
     let toggle = ["tap 0.83 0.2", "wait 3"]
     let simPINPage = [
         "tap 0.385 0.68", "wait 4", "drag 0.5 0.85 0.5 0.35", "wait 3", "tapword Phone", "wait 4",
-        "drag 0.5 0.85 0.5 0.4", "wait 3", "tapword SIM_PIN", "wait 4",
+        "drag 0.5 0.85 0.5 0.4", "wait 3", "tapword SIM_PIN", "wait 4"
     ]
     func boot(_ name: String, _ steps: [String]) -> HelperDriver {
         let d = HelperDriver(
@@ -818,7 +810,7 @@ func simPIN(_ base: Base, tools: Tools, work: URL, _ r: Report) {
             // Home again after the read: the lock screen may have gone dark meanwhile.
             "lit 0.5 400", "keyboard off", "wait 60", "button 0", "wait 2", "ocr lock", "button 0", "wait 2",
             unlockSlide, "wait 4",
-            "tapword Unlock", "wait 3",
+            "tapword Unlock", "wait 3"
         ]
             + type("2222") + ["tap 0.82 0.45", "wait 5", "ocr incorrect"]
             + type("1111") + ["tap 0.82 0.45", "wait 20", "modemStatus"]
@@ -878,7 +870,7 @@ func location(_ base: Base, tools: Tools, work: URL, _ r: Report) {
                 "boot", "lit 0.1 400", "wait 30", "modem gps-fix \(fixes[0].0),\(fixes[0].1),30,0,-1,5", "modemStatus",
                 "agentput \(probe.path) /usr/local/bin/it_location", "spawn /usr/local/bin/it_location 15",
                 "modem gps-fix \(fixes[1].0),\(fixes[1].1),20,\(fixes[1].2),\(fixes[1].3),10",
-                "spawn /usr/local/bin/it_location 15", "quit", "expectExit 60",
+                "spawn /usr/local/bin/it_location 15", "quit", "expectExit 60"
             ]
         ),
         environment: ["IOS_BB_TRACE": "2"]

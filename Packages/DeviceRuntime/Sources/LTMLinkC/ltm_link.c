@@ -99,12 +99,15 @@ kern_return_t ltm_recv_hello(mach_port_t rx, int timeout_ms, ltm_hello *out) {
     return KERN_SUCCESS;
 }
 
-pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int out_fd, int link_fd) {
+pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int in_fd, int out_fd, int link_fd) {
     posix_spawn_file_actions_t fa;
     posix_spawnattr_t attr;
     posix_spawn_file_actions_init(&fa);
     posix_spawnattr_init(&attr);
-    posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+    if (in_fd >= 0)
+        posix_spawn_file_actions_adddup2(&fa, in_fd, 0);
+    else
+        posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
     if (out_fd >= 0) {
         posix_spawn_file_actions_adddup2(&fa, out_fd, 1);
         posix_spawn_file_actions_adddup2(&fa, out_fd, 2);
