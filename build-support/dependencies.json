@@ -290,6 +290,32 @@
       "sha256": "62bb12fb84d07d7f9ebbbbae205d32f941bcfecdcebdd09889f6e7f7f96f04ac",
       "license": "Apache-2.0",
       "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-07. Pinned exact in Packages/FirmwareKit/Package.swift (FirmwareSchema's FirmwareCommand: the firmwarekit command lines the app builds and the CLI parses), Packages/BuildTools, tests/sessions and tools/device-access. Never in LightTouchDevice, which loads the GPL-2.0-only emulator: it takes its launch as one HostRuntime HelperLaunch value."
+    },
+    {
+      "name": "swift-binary-parsing",
+      "version": "0.0.4",
+      "groups": [
+        "swiftpm"
+      ],
+      "archive": "swift-binary-parsing-0.0.4.tar.gz",
+      "directory": "swift-binary-parsing-0.0.4",
+      "url": "https://github.com/apple/swift-binary-parsing/archive/refs/tags/0.0.4.tar.gz",
+      "sha256": "ca15f673bc8d258d785fd1d45f0011a6e1cceb7ff31c8781ad7fb0eec55d6907",
+      "license": "Apache-2.0 WITH Swift-exception",
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-21. Pinned exact in Packages/FirmwareKit/Package.swift. FirmwareKit's readers of firmware files (HFSPlus, BTreeFile, UDIFReader, TarArchive) parse through its ParserSpan, whose reads check their bounds and throw. Its macro target builds swift-syntax (the next record: build time only), so xcodebuild runs with -skipMacroValidation; its RawSpan needs the toolchain's libswiftCompatibilitySpan.dylib below macOS 26, which the app embeds in Frameworks."
+    },
+    {
+      "name": "swift-syntax",
+      "version": "603.0.2",
+      "groups": [
+        "swiftpm-build"
+      ],
+      "archive": "swift-syntax-603.0.2.tar.gz",
+      "directory": "swift-syntax-603.0.2",
+      "url": "https://github.com/swiftlang/swift-syntax/archive/refs/tags/603.0.2.tar.gz",
+      "sha256": "4858b54834fae301e36ea63529302d51ce0b4de9da48a465ebab6f6f3d096cf2",
+      "license": "Apache-2.0 WITH Swift-exception",
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-21. Build time only: swift-binary-parsing's macro target takes it (from 603.0.0, so SwiftPM resolves the 603 releases, not 604; Package.resolved pins the version), and SwiftPM uses its prebuilt MacroSupport where the toolchain has one. The macro runs in the compiler; nothing of swift-syntax is linked or ships, so scripts/vendor (SwiftPackageLinks) copies no license of it and records it in build-inputs.json's swift_packages_unlinked."
     }
   ]
 }

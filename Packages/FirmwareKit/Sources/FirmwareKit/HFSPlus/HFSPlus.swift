@@ -12,6 +12,7 @@
 //
 // Paths are volume-relative, "/"-separated, no leading slash ("" is the root folder).
 
+import BinaryParsing
 import Compression
 import CryptoKit
 import Foundation
@@ -23,11 +24,19 @@ public final class HFSPlusVolume {
         public let logicalSize: UInt64
         public let totalBlocks: UInt32
         public let extents: [Extent]
-        init(_ b: [UInt8], _ o: Int) {
-            logicalSize = be64(b, o)
-            totalBlocks = be32(b, o + 12)
-            extents = (0..<8).map { Extent(start: be32(b, o + 16 + 8 * $0), count: be32(b, o + 20 + 8 * $0)) }.filter {
-                $0.count > 0
+        /// HFSPlusForkData: logicalSize (no more than an Int holds), clumpSize, totalBlocks, eight extents.
+        init(parsing s: inout ParserSpan) throws {
+            logicalSize = UInt64(try Int(parsing: &s, storedAsBigEndian: UInt64.self))
+            _ = try UInt32(parsingBigEndian: &s)
+            totalBlocks = try UInt32(parsingBigEndian: &s)
+            extents = try [Extent](parsing: &s, count: 8) { e in
+                Extent(start: try UInt32(parsingBigEndian: &e), count: try UInt32(parsingBigEndian: &e))
+            }.filter { $0.count > 0 }
+        }
+        init(_ b: [UInt8], _ o: Int) throws {
+            self = try parsing(b, "fork data") { s in
+                try s.seek(toRelativeOffset: o)
+                return try Fork(parsing: &s)
             }
         }
     }
@@ -88,9 +97,13 @@ public final class HFSPlusVolume {
         totalBlocks = Int(be32(vh, 44))
         freeBlocks = Int(be32(vh, 48))
         nextCatalogID = Int(be32(vh, 64))
-        extentsFork = Fork(vh, 192)
-        catalogFork = Fork(vh, 272)
-        attributesFork = Fork(vh, 352)
+        guard (512...(1 << 24)).contains(blockSize), blockSize & (blockSize - 1) == 0 else {
+            close(fd)
+            throw FirmwareError(.unsupported, "\(url.lastPathComponent): block size \(blockSize)")
+        }
+        extentsFork = try Fork(vh, 192)
+        catalogFork = try Fork(vh, 272)
+        attributesFork = try Fork(vh, 352)
     }
 
     deinit { close(fd) }
@@ -137,6 +150,9 @@ public final class HFSPlusVolume {
     }
 
     func read(_ fork: Fork, fileID: UInt32, resource: Bool = false, offset: Int, count: Int) throws -> [UInt8] {
+        guard offset >= 0, count >= 0, offset + count <= Int(fork.totalBlocks) * blockSize else {
+            throw FirmwareError(.unsupported, "\(url.lastPathComponent): read past the end of file \(fileID)")
+        }
         var out = [UInt8](repeating: 0, count: count)
         try io(fork, fileID: fileID, resource: resource, offset: offset, count: count) { disk, at, n in
             let got = out.withUnsafeMutableBytes { p in p.baseAddress.map { pread(fd, $0 + at, n, off_t(disk)) } ?? 0 }
@@ -185,8 +201,8 @@ public final class HFSPlusVolume {
     public func attributeOwners() throws -> Set<UInt32> {
         var out = Set<UInt32>()
         guard attributesFork.logicalSize > 0 else { return out }
-        try leaves(try btree(attributesFork, fileID: Self.attributesID)) { _, buf, offs in
-            for i in 0..<(offs.count - 1) where offs[i + 1] - offs[i] >= 14 { out.insert(be32(buf, offs[i] + 4)) }
+        try leaves(try btree(attributesFork, fileID: Self.attributesID)) { _, _, r in
+            if r.count >= 14 { out.insert(try r.be32(at: 4)) }
         }
         return out
     }
@@ -195,20 +211,18 @@ public final class HFSPlusVolume {
         var out: [UInt32: [UInt8]] = [:]
         guard attributesFork.logicalSize > 0 else { return out }
         let want = Array("com.apple.decmpfs".utf16)
-        try leaves(try btree(attributesFork, fileID: Self.attributesID)) { _, buf, offs in
-            for i in 0..<(offs.count - 1) where offs[i + 1] - offs[i] >= 14 {
-                let o = offs[i]
-                let keyLen = Int(be16(buf, o))
-                let nameLen = Int(be16(buf, o + 12))
-                guard nameLen == want.count, o + 14 + 2 * nameLen <= offs[i + 1],
-                    (0..<nameLen).allSatisfy({ be16(buf, o + 14 + 2 * $0) == want[$0] })
-                else { continue }
-                let body = o + 2 + keyLen
-                guard body + 16 <= offs[i + 1], be32(buf, body) == 0x10 else { continue }  // kHFSPlusAttrInlineData
-                let size = Int(be32(buf, body + 12))
-                guard body + 16 + size <= offs[i + 1] else { continue }
-                out[be32(buf, o + 4)] = Array(buf[body + 16..<body + 16 + size])
-            }
+        try leaves(try btree(attributesFork, fileID: Self.attributesID)) { _, _, r in
+            guard r.count >= 14 else { return }
+            let keyLen = Int(try r.be16(at: 0))
+            let nameLen = Int(try r.be16(at: 12))
+            guard nameLen == want.count, 14 + 2 * nameLen <= r.count,
+                try (0..<nameLen).allSatisfy({ try r.be16(at: 14 + 2 * $0) == want[$0] })
+            else { return }
+            let body = 2 + keyLen
+            guard body + 16 <= r.count, try r.be32(at: body) == 0x10 else { return }  // kHFSPlusAttrInlineData
+            let size = Int(try r.be32(at: body + 12))
+            guard body + 16 + size <= r.count else { return }
+            out[try r.be32(at: 4)] = try r.bytes(at: body + 16, size)
         }
         return out
     }
@@ -226,12 +240,19 @@ public final class HFSPlusVolume {
 
     /// The content of a compressed file from its com.apple.decmpfs attribute `x` and, for type 4, its resource fork.
     static func decmpfs(_ x: [UInt8], name: String, resourceFork: () throws -> [UInt8]) throws -> [UInt8] {
-        let type = le32(x, 4)
-        let size = Int(le64(x, 8))
+        // decmpfs_disk_header: magic, compression_type, uncompressed_size (little-endian)
+        let (type, size) = try parsing(x, "\(name): decmpfs header") { s in
+            try s.seek(toRelativeOffset: 4)
+            return (try UInt32(parsingLittleEndian: &s), try Int(parsing: &s, storedAsLittleEndian: UInt64.self))
+        }
         func inflate(_ c: ArraySlice<UInt8>, _ max: Int) throws -> [UInt8] {
             guard let first = c.first else { return [] }
             if first & 0x0F == 0x0F { return Array(c.dropFirst()) }  // stored
             let z = Array(c.dropFirst(2))  // zlib header; COMPRESSION_ZLIB is raw deflate
+            // deflate expands at most 1032:1
+            guard max <= 1032 * z.count + 1032 else {
+                throw FirmwareError(.unsupported, "\(name): decmpfs size past what its data holds")
+            }
             var out = [UInt8](repeating: 0, count: max)
             let n = compression_decode_buffer(&out, max, z, z.count, nil, COMPRESSION_ZLIB)
             guard n > 0 || max == 0 else { throw FirmwareError(.unsupported, "\(name): bad decmpfs zlib data") }
@@ -243,13 +264,21 @@ public final class HFSPlusVolume {
         case 4:
             let fork = try resourceFork()
             guard fork.count >= 260 else { throw FirmwareError(.unsupported, "\(name): no compressed resource fork") }
-            let base = Int(be32(fork, 0)) + 4
-            let n = Int(le32(fork, base))
+            // a resource fork header's data offset, then there: its length, the block count, (offset, length) each
+            let blocks = try parsing(fork, "\(name): decmpfs block table") { s in
+                let base = Int(try UInt32(parsingBigEndian: &s)) + 4
+                try s.seek(toAbsoluteOffset: base)
+                var blocks: [(Int, Int)] = []
+                for _ in 0..<(try UInt32(parsingLittleEndian: &s)) {
+                    blocks.append(
+                        (base + Int(try UInt32(parsingLittleEndian: &s)), Int(try UInt32(parsingLittleEndian: &s)))
+                    )
+                }
+                return blocks
+            }
             out = []
-            out.reserveCapacity(size)
-            for k in 0..<n {
-                let off = base + Int(le32(fork, base + 4 + 8 * k))
-                let len = Int(le32(fork, base + 8 + 8 * k))
+            out.reserveCapacity(min(size, blocks.count << 16))
+            for (off, len) in blocks {
                 guard off + len <= fork.count else {
                     throw FirmwareError(.unsupported, "\(name): decmpfs block past the fork")
                 }
@@ -277,11 +306,17 @@ public final class HFSPlusVolume {
 
     func btree(_ fork: Fork, fileID: UInt32) throws -> BTree {
         let h = try read(fork, fileID: fileID, offset: 0, count: 512)
-        return BTree(fork: fork, fileID: fileID, nodeSize: Int(be16(h, 14 + 18)), firstLeaf: be32(h, 14 + 10))
+        let (nodeSize, firstLeaf) = try parsing(h, "\(url.lastPathComponent): B-tree header") { s in
+            (Int(try s.be16(at: 14 + 18)), try s.be32(at: 14 + 10))
+        }
+        guard (512...32768).contains(nodeSize), nodeSize & (nodeSize - 1) == 0 else {
+            throw FirmwareError(.unsupported, "\(url.lastPathComponent): B-tree node size \(nodeSize)")
+        }
+        return BTree(fork: fork, fileID: fileID, nodeSize: nodeSize, firstLeaf: firstLeaf)
     }
 
-    /// Every leaf node, in order: (node number, bytes, record offsets incl. the free-space offset).
-    func leaves(_ t: BTree, _ body: (Int, [UInt8], [Int]) throws -> Void) throws {
+    /// Every record of every leaf node, in order: (node number, the record's offset in the node, the record).
+    func leaves(_ t: BTree, _ body: (Int, Int, inout ParserSpan) throws -> Void) throws {
         var n = t.firstLeaf
         var seen = Set<UInt32>()
         while n != 0 {
@@ -289,24 +324,37 @@ public final class HFSPlusVolume {
                 throw FirmwareError(.unsupported, "\(url.lastPathComponent): B-tree leaf loop at node \(n)")
             }
             let buf = try read(t.fork, fileID: t.fileID, offset: Int(n) * t.nodeSize, count: t.nodeSize)
-            let count = Int(be16(buf, 10))
-            let offs = (0...count).map { Int(be16(buf, t.nodeSize - 2 * ($0 + 1))) }
-            try body(Int(n), buf, offs)
-            n = be32(buf, 0)
+            n = try parsing(buf, "\(url.lastPathComponent): B-tree node \(n)") { node in
+                // the records' offsets, then the free space's, from the node's end
+                let count = Int(try node.be16(at: 10))
+                var table = try node.seeking(toOffsetFromEnd: 2 * (count + 1))
+                let offs = try [UInt16](parsing: &table, count: count + 1) { try UInt16(parsingBigEndian: &$0) }
+                    .reversed().map(Int.init)
+                for i in 0..<count where offs[i + 1] >= offs[i] {
+                    var r = try node.seeking(toRelativeOffset: offs[i])
+                    var record = try r.sliceSpan(byteCount: offs[i + 1] - offs[i])
+                    try body(Int(n), offs[i], &record)
+                }
+                return try node.be32(at: 0)
+            }
         }
     }
 
     private func readOverflow() throws -> [UInt64: [(UInt32, [Extent])]] {
         var out: [UInt64: [(UInt32, [Extent])]] = [:]
         guard extentsFork.logicalSize > 0 else { return out }
-        try leaves(try btree(extentsFork, fileID: Self.extentsID)) { _, buf, offs in
-            for i in 0..<(offs.count - 1) where offs[i + 1] - offs[i] >= 12 + 64 {
-                let o = offs[i]
-                let key = UInt64(be32(buf, o + 4)) << 8 | UInt64(buf[o + 2])
-                let exts = (0..<8).map { Extent(start: be32(buf, o + 12 + 8 * $0), count: be32(buf, o + 16 + 8 * $0)) }
-                    .filter { $0.count > 0 }
-                out[key, default: []].append((be32(buf, o + 8), exts))
-            }
+        try leaves(try btree(extentsFork, fileID: Self.extentsID)) { _, _, r in
+            // HFSPlusExtentKey (keyLength, forkType, pad, fileID, startBlock), then eight extents
+            guard r.count >= 12 + 64 else { return }
+            try r.seek(toRelativeOffset: 2)
+            let fork = try UInt8(parsing: &r)
+            try r.seek(toRelativeOffset: 1)
+            let key = UInt64(try UInt32(parsingBigEndian: &r)) << 8 | UInt64(fork)
+            let start = try UInt32(parsingBigEndian: &r)
+            let exts = try [Extent](parsing: &r, count: 8) { e in
+                Extent(start: try UInt32(parsingBigEndian: &e), count: try UInt32(parsingBigEndian: &e))
+            }.filter { $0.count > 0 }
+            out[key, default: []].append((start, exts))
         }
         return out
     }
@@ -315,43 +363,44 @@ public final class HFSPlusVolume {
     public func catalog() throws -> [CatalogRecord] {
         if let c = catalogCache { return c }
         var out: [CatalogRecord] = []
-        try leaves(try btree(catalogFork, fileID: Self.catalogID)) { node, buf, offs in
-            for i in 0..<(offs.count - 1) {
-                let start = offs[i]
-                let end = offs[i + 1]
-                guard end - start >= 10 else { continue }
-                let keyLen = Int(be16(buf, start))
-                let parent = be32(buf, start + 2)
-                let nameLen = Int(be16(buf, start + 6))
-                var body = start + 2 + keyLen
-                if body % 2 == 1 { body += 1 }
-                guard body + 2 <= end, start + 8 + 2 * nameLen <= end else { continue }
-                let type = be16(buf, body)
-                guard type == 1 || type == 2, body + 48 <= end else { continue }  // folder / file (threads skipped)
-                let name = String(decoding: (0..<nameLen).map { be16(buf, start + 8 + 2 * $0) }, as: UTF16.self)
-                let file = type == 2 && body + 248 <= end
-                out.append(
-                    CatalogRecord(
-                        kind: type == 1 ? .folder : .file,
-                        parent: parent,
-                        name: name,
-                        cnid: be32(buf, body + 8),
-                        uid: be32(buf, body + 32),
-                        gid: be32(buf, body + 36),
-                        adminFlags: buf[body + 40],
-                        ownerFlags: buf[body + 41],
-                        mode: be16(buf, body + 42),
-                        special: be32(buf, body + 44),
-                        fileType: body + 56 <= end ? be32(buf, body + 48) : 0,
-                        creator: body + 56 <= end ? be32(buf, body + 52) : 0,
-                        data: file ? Fork(buf, body + 88) : nil,
-                        resource: file ? Fork(buf, body + 168) : nil,
-                        dates: (0..<5).map { be32(buf, body + 12 + 4 * $0) },
-                        node: node,
-                        bodyOffset: body
-                    )
+        try leaves(try btree(catalogFork, fileID: Self.catalogID)) { node, start, r in
+            guard r.count >= 10 else { return }
+            let keyLen = Int(try r.be16(at: 0))
+            let parent = try r.be32(at: 2)
+            let nameLen = Int(try r.be16(at: 6))
+            var body = start + 2 + keyLen
+            if body % 2 == 1 { body += 1 }
+            let b = body - start
+            guard b + 2 <= r.count, 8 + 2 * nameLen <= r.count else { return }
+            let type = try r.be16(at: b)
+            guard type == 1 || type == 2, b + 48 <= r.count else { return }  // folder / file (threads skipped)
+            var n = try r.seeking(toRelativeOffset: 8)
+            let name = String(
+                decoding: try [UInt16](parsing: &n, count: nameLen) { try UInt16(parsingBigEndian: &$0) },
+                as: UTF16.self
+            )
+            let file = type == 2 && b + 248 <= r.count
+            out.append(
+                CatalogRecord(
+                    kind: type == 1 ? .folder : .file,
+                    parent: parent,
+                    name: name,
+                    cnid: try r.be32(at: b + 8),
+                    uid: try r.be32(at: b + 32),
+                    gid: try r.be32(at: b + 36),
+                    adminFlags: try r.byte(at: b + 40),
+                    ownerFlags: try r.byte(at: b + 41),
+                    mode: try r.be16(at: b + 42),
+                    special: try r.be32(at: b + 44),
+                    fileType: b + 56 <= r.count ? try r.be32(at: b + 48) : 0,
+                    creator: b + 56 <= r.count ? try r.be32(at: b + 52) : 0,
+                    data: file ? try r.fork(at: b + 88) : nil,
+                    resource: file ? try r.fork(at: b + 168) : nil,
+                    dates: try (0..<5).map { try r.be32(at: b + 12 + 4 * $0) },
+                    node: node,
+                    bodyOffset: body
                 )
-            }
+            )
         }
         catalogCache = out
         return out
@@ -419,10 +468,8 @@ public final class HFSPlusVolume {
         var memo: [UInt32: String?] = [Self.rootID: ""]
         func path(_ id: UInt32) -> String? {
             if let p = memo[id] { return p }
-            guard let r = byID[id], r.parent != 1 else {
-                memo[id] = .some(nil)
-                return nil
-            }
+            memo[id] = .some(nil)  // a parent loop in a damaged catalog leads nowhere
+            guard let r = byID[id], r.parent != 1 else { return nil }
             let p: String? =
                 r.parent == Self.rootID && Self.privateDirs.contains(r.name)
                 ? nil
@@ -708,5 +755,13 @@ public final class HFSPlusVolume {
                 throw FirmwareError(.internal, "write \(url.lastPathComponent) at \(p.offset)")
             }
         }
+    }
+}
+
+extension ParserSpan {
+    /// The HFSPlusForkData `o` bytes in; the span stays where it is.
+    func fork(at o: Int) throws -> HFSPlusVolume.Fork {
+        var s = try seeking(toRelativeOffset: o)
+        return try HFSPlusVolume.Fork(parsing: &s)
     }
 }

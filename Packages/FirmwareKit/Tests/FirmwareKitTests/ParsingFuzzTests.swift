@@ -1,0 +1,230 @@
+import Compression
+import Foundation
+import Testing
+
+@testable import FirmwareKit
+
+/// The parsers over firmware files against cut-short and bit-flipped inputs: each throws or returns, never traps
+/// (a trap ends the test run). The inputs are made here; the flips are seeded, the same on every run.
+@Suite(.serialized) struct ParsingFuzzTests {
+    typealias Seeded = HFSPlusWriterTests.Seeded
+
+    /// `count` sets of one to three bit flips in `region`: (offset, the bit).
+    static func flips(in region: Range<Int>, count: Int, seed: UInt64) -> [[(at: Int, bit: UInt8)]] {
+        var rng = Seeded(state: seed)
+        return (0..<count).map { _ in
+            (0..<Int.random(in: 1...3, using: &rng)).map { _ in
+                (Int.random(in: region, using: &rng), 1 << UInt8.random(in: 0..<8, using: &rng))
+            }
+        }
+    }
+
+    /// `count` copies of `bytes`, each with one to three bits flipped in `region`.
+    static func flipped(_ bytes: [UInt8], in region: Range<Int>, count: Int, seed: UInt64) -> [[UInt8]] {
+        flips(in: region, count: count, seed: seed).map { f in
+            var b = bytes
+            for (at, bit) in f { b[at] ^= bit }
+            return b
+        }
+    }
+
+    /// `bytes` cut at `cuts` evenly spaced lengths.
+    static func cut(_ bytes: [UInt8], _ cuts: Int) -> [[UInt8]] {
+        (0..<cuts).map { Array(bytes.prefix(bytes.count * $0 / cuts)) }
+    }
+
+    /// A writer-made volume's volume header and B-tree nodes, flipped, through HFSPlusVolume's listing and the
+    /// writer's open and reads; and the volume cut short.
+    @Test func hfsVolumesThrowOnCorruption() throws {
+        try Oracle.withTemp { dir in
+            let img = dir.appendingPathComponent("v.img")
+            try HFSPlusWriter.makeHFS(img, size: 8 << 20, journaled: false)
+            let w = try HFSPlusWriter(img)
+            var paths: [String] = []
+            for d in 0..<6 {
+                try w.makeDirectory("d\(d)")
+                for f in 0..<40 {
+                    try w.put(Data(repeating: UInt8(f), count: 100 * f), at: "d\(d)/a long file name \(f)")
+                    paths.append("d\(d)/a long file name \(f)")
+                }
+                try w.makeSymlink("d\(d)/s", to: "../d0")
+                try w.link("d\(d)/h", to: "d0/a long file name 3")
+            }
+            try w.close()
+            let clean = [UInt8](try Data(contentsOf: img))
+            let v = try HFSPlusVolume(img)
+            #expect(try v.listing().count > 240)
+            // the volume header; the catalog's and extents tree's first 8 nodes whole, and their descriptors and
+            // record offsets (a node's first 14 bytes and last 64)
+            var regions = [1024..<1536]
+            for (fork, id) in [(v.catalogFork, HFSPlusVolume.catalogID), (v.extentsFork, HFSPlusVolume.extentsID)] {
+                let at = Int(fork.extents[0].start) * v.blockSize
+                let size = try v.btree(fork, fileID: id).nodeSize
+                let nodes = min(Int(fork.logicalSize) / size, 8)
+                regions.append(at..<at + nodes * size)
+                for n in 0..<nodes {
+                    regions += [at + n * size..<at + n * size + 14, at + (n + 1) * size - 64..<at + (n + 1) * size]
+                }
+            }
+            func survive() {
+                if let v = try? HFSPlusVolume(img) { _ = try? v.listing() }
+                if let w = try? HFSPlusWriter(img) {
+                    for p in paths.prefix(20) { _ = try? w.item(at: p) }
+                    _ = try? w.item(at: "d1/h")
+                }
+            }
+            let file = try FileHandle(forUpdating: img)
+            defer { try? file.close() }
+            func flip(_ f: [(at: Int, bit: UInt8)]) throws {
+                for (at, bit) in f {
+                    try file.seek(toOffset: UInt64(at))
+                    let b = try file.read(upToCount: 1)![0] ^ bit
+                    try file.seek(toOffset: UInt64(at))
+                    try file.write(contentsOf: [b])
+                }
+            }
+            for (i, r) in regions.enumerated() {
+                for f in Self.flips(in: r, count: 80, seed: UInt64(i)) {
+                    try flip(f)
+                    survive()
+                    try flip(f)  // and back
+                }
+            }
+            for b in Self.cut(clean, 64) {
+                try Data(b).write(to: img)
+                survive()
+            }
+        }
+    }
+
+    /// decmpfs headers and type 4 resource forks (zlib blocks), flipped and cut, through HFSPlusVolume.decmpfs.
+    @Test func decmpfsThrowsOnCorruption() throws {
+        let content = [UInt8]((0..<200_000).map { UInt8(truncatingIfNeeded: $0 * 7 / 3) })
+        func zlib(_ b: ArraySlice<UInt8>) -> [UInt8] {
+            var out = [UInt8](repeating: 0, count: b.count + 1024)
+            let n = Array(b).withUnsafeBufferPointer {
+                compression_encode_buffer(&out, out.count, $0.baseAddress!, b.count, nil, COMPRESSION_ZLIB)
+            }
+            return [0x78, 0x9C] + out.prefix(n)
+        }
+        func header(_ type: UInt32, _ size: Int) -> [UInt8] {
+            var h = [UInt8](repeating: 0, count: 16)
+            put32(&h, 0, 0x636D_7066)
+            put32(&h, 4, type)
+            put32(&h, 8, UInt32(size))
+            return h
+        }
+        // inline (type 3)
+        let inline = header(3, 4000) + zlib(content.prefix(4000))
+        // resource fork (type 4): its header's data offset (256), then there the length, the block count and
+        // (offset, length) from the length field on
+        let blocks = stride(from: 0, to: content.count, by: 1 << 16).map {
+            zlib(content[$0..<min($0 + (1 << 16), content.count)])
+        }
+        var table = [UInt8](repeating: 0, count: 8 + 8 * blocks.count)
+        put32(&table, 4, UInt32(blocks.count))
+        var off = table.count
+        for (i, b) in blocks.enumerated() {
+            put32(&table, 8 + 8 * i, UInt32(off - 4))
+            put32(&table, 12 + 8 * i, UInt32(b.count))
+            off += b.count
+        }
+        var fork = [UInt8](repeating: 0, count: 256)
+        putBE32(&fork, 0, 256)
+        fork += table + blocks.joined()
+        let forked = header(4, content.count)
+        #expect(try HFSPlusVolume.decmpfs(inline, name: "t") { [] } == Array(content.prefix(4000)))
+        #expect(try HFSPlusVolume.decmpfs(forked, name: "t") { fork } == content)
+        for x in Self.flipped(inline, in: 0..<inline.count, count: 400, seed: 1) + Self.cut(inline, 32) {
+            _ = try? HFSPlusVolume.decmpfs(x, name: "t") { [] }
+        }
+        for x in Self.flipped(forked, in: 0..<16, count: 200, seed: 2) {
+            _ = try? HFSPlusVolume.decmpfs(x, name: "t") { fork }
+        }
+        for f in Self.flipped(fork, in: 0..<256 + table.count, count: 400, seed: 3) + Self.cut(fork, 32) {
+            _ = try? HFSPlusVolume.decmpfs(forked, name: "t") { f }
+        }
+    }
+
+    /// A UDIF image's trailer and block tables, flipped, and the image cut short, through UDIFReader.
+    @Test func udifImagesThrowOnCorruption() async throws {
+        try await Oracle.withTemp { dir in
+            let src = dir.appendingPathComponent("src")
+            try FileManager.default.createDirectory(at: src, withIntermediateDirectories: true)
+            try Data(String(repeating: "hello\n", count: 100_000).utf8).write(to: src.appendingPathComponent("t"))
+            let dmg = dir.appendingPathComponent("t.dmg")
+            try await DiskImage.run([
+                "/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.path, "-fs", "HFS+", "-volname", "T",
+                "-format", "UDZO", dmg.path,
+            ])
+            let clean = [UInt8](try Data(contentsOf: dmg))
+            let koly = Array(clean.suffix(512))
+            let xmlAt = Int(be64(koly, 0xD8))
+            let plist = try #require(
+                try PropertyListSerialization.propertyList(
+                    from: Data(clean[xmlAt..<xmlAt + Int(be64(koly, 0xE0))]),
+                    format: nil
+                ) as? [String: Any]
+            )
+            var fork = try #require(plist["resource-fork"] as? [String: Any])
+            let blkx = try #require(fork["blkx"] as? [[String: Any]])
+            let tables = blkx.compactMap { $0["Data"] as? Data }.map { [UInt8]($0) }
+            let out = dir.appendingPathComponent("raw")
+            func survive(_ bytes: [UInt8]) throws {
+                try Data(bytes).write(to: dmg)
+                _ = try? UDIFReader.convertToRaw(dmg, to: out)
+            }
+            /// The image with block table `k` replaced by `table`.
+            func image(_ k: Int, _ table: [UInt8]) throws -> [UInt8] {
+                var entries = blkx
+                entries[k]["Data"] = Data(table)
+                fork["blkx"] = entries
+                var p = plist
+                p["resource-fork"] = fork
+                let xml = [UInt8](try PropertyListSerialization.data(fromPropertyList: p, format: .xml, options: 0))
+                var k = koly
+                putBE64(&k, 0xE0, UInt64(xml.count))
+                return Array(clean[..<xmlAt]) + xml + k
+            }
+            try survive(try image(0, tables[0]))
+            #expect(FileManager.default.fileExists(atPath: out.path))
+            for b in Self.flipped(clean, in: clean.count - 512..<clean.count, count: 300, seed: 4) { try survive(b) }
+            for (k, t) in tables.enumerated() {
+                for f in Self.flipped(t, in: 0..<t.count, count: 150, seed: 5 + UInt64(k)) {
+                    try survive(try image(k, f))
+                }
+            }
+            for b in Self.cut(clean, 32) { try survive(b) }
+        }
+    }
+
+    /// A tar archive's headers, flipped, and the archive cut short, through TarArchive.
+    @Test func tarArchivesThrowOnCorruption() async throws {
+        try await Oracle.withTemp { dir in
+            let src = dir.appendingPathComponent("src")
+            try FileManager.default.createDirectory(
+                at: src.appendingPathComponent("d"),
+                withIntermediateDirectories: true
+            )
+            for i in 0..<6 {
+                try Data(repeating: UInt8(i), count: 700 * i).write(to: src.appendingPathComponent("d/f\(i)"))
+            }
+            try FileManager.default.createSymbolicLink(
+                atPath: src.appendingPathComponent("l").path,
+                withDestinationPath: "d"
+            )
+            let tar = dir.appendingPathComponent("t.tar")
+            try await DiskImage.run(["/usr/bin/tar", "--format", "ustar", "-cf", tar.path, "-C", src.path, "."])
+            let clean = [UInt8](try Data(contentsOf: tar))
+            #expect(try TarArchive(Data(clean)).members.count == 9)
+            // and a negative size (a header's octal field is text)
+            var negative = clean
+            negative.replaceSubrange(124..<136, with: Array("-0000001000\0".utf8))
+            for b in Self.flipped(clean, in: 0..<min(clean.count, 8192), count: 600, seed: 6) + Self.cut(clean, 64)
+                + [negative]
+            {
+                _ = try? TarArchive(Data(b))
+            }
+        }
+    }
+}

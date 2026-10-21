@@ -19,7 +19,7 @@ rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 ditto -x -k "$ZIP" "$WORK"
 TEST_RUNNER_LTM_RELEASE_APP="$WORK/$(basename "$APP")" TEST_RUNNER_LTM_RELEASE_EXPORTED=1 \
-    xcodebuild -quiet -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
+    xcodebuild -quiet -skipMacroValidation -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
     -derivedDataPath "$WORK/dd" test || { echo "FAILED: the Release tests on the unzipped export" >&2; exit 1; }
 (cd "$OUT" && shasum -a 256 "$(basename "$ZIP")" > SHA256SUMS)
 echo "ok: $ZIP"

@@ -754,7 +754,7 @@ enum K48Oracle {
         func forks(_ name: String, _ f: HFSPlusVolume.Fork) {
             for e in f.extents { regions.append((name, Int(e.start) * v.blockSize, Int(e.count) * v.blockSize)) }
         }
-        forks("allocation file", HFSPlusVolume.Fork(vh, 112))
+        forks("allocation file", try HFSPlusVolume.Fork(vh, 112))
         forks("extents file", v.extentsFork)
         forks("catalog file", v.catalogFork)
         forks("attributes file", v.attributesFork)

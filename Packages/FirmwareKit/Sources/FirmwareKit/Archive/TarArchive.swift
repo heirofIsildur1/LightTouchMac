@@ -5,6 +5,7 @@
 //
 //   let n = try TarArchive(contentsOf: bootstrap).extract(into: writer, excluding: ["private/var/stash"])
 
+import BinaryParsing
 import Foundation
 import zlib
 
@@ -24,12 +25,16 @@ struct TarArchive {
 
     init(_ archive: Data) throws {
         let bytes = archive.starts(with: [0x1F, 0x8B]) ? try Self.gunzip(archive) : archive
+        members = try parsing(bytes, "tar") { input in try Self.members(&input) }
+    }
+
+    /// 512-byte headers, each followed by its member's content padded to a 512-byte multiple.
+    static func members(_ input: inout ParserSpan) throws -> [Member] {
         var out: [Member] = []
-        var at = 0
         var longName: String?
         var longLink: String?
-        while at + 512 <= bytes.count {
-            let h = [UInt8](bytes[at..<at + 512])
+        while input.count >= 512 {
+            let h = try [UInt8](parsing: &input, byteCount: 512)
             if h.allSatisfy({ $0 == 0 }) { break }
             func field(_ o: Int, _ n: Int) -> String {
                 String(decoding: h[o..<o + n].prefix { $0 != 0 }, as: UTF8.self)
@@ -39,10 +44,9 @@ struct TarArchive {
             }
             let size = octal(124, 12)
             let type = h[156]
-            let start = at + 512
-            guard start + size <= bytes.count else { throw FirmwareError(.unsupported, "tar: truncated member") }
-            let body = bytes[start..<start + size]
-            at = start + (size + 511) / 512 * 512
+            guard size >= 0, size <= input.count else { throw FirmwareError(.unsupported, "tar: truncated member") }
+            let body = try Data(parsing: &input, byteCount: size)
+            try input.seek(toRelativeOffset: min((512 - size % 512) % 512, input.count))
             let text = { String(decoding: body.prefix { $0 != 0 }, as: UTF8.self) }
             switch type {
             case UInt8(ascii: "L"):
@@ -79,11 +83,11 @@ struct TarArchive {
                     kind: kind,
                     mode: UInt16(octal(100, 8) & 0o7777),
                     link: kind == .hardLink ? Self.volumePath(link) : link,
-                    data: kind == .file ? Data(body) : Data()
+                    data: kind == .file ? body : Data()
                 )
             )
         }
-        members = out
+        return out
     }
 
     /// A member name as a volume path: no leading ./ or /, no trailing /.

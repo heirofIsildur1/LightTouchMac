@@ -72,7 +72,7 @@ EXPORTED=1; (( DRY )) && EXPORTED=0
 release_tests() {
     TEST_RUNNER_LTM_RELEASE_APP="$APP" TEST_RUNNER_LTM_RELEASE_EXPORTED=$EXPORTED \
         TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE="$SKIP_PREPARE" \
-        xcodebuild -quiet -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
+        xcodebuild -quiet -skipMacroValidation -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
         -only-testing:"ReleaseChecksTests/$2" -derivedDataPath "$WORK/dd" \
         -resultBundlePath "$WORK/$1.xcresult" test > "$WORK/$1.log" 2>&1 \
         || {

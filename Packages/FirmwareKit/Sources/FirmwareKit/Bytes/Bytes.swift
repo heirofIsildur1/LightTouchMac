@@ -1,4 +1,5 @@
 // The byte readers and writers FirmwareKit's formats share: integers at offsets of an image, hex, zlib's CRC-32.
+import BinaryParsing
 import Foundation
 import zlib
 
@@ -77,4 +78,50 @@ extension UnsafeRawBufferPointer {
 extension Data {
     /// The little-endian UInt32 at `o` (from the data's start), or the readers' error.
     func u32le(_ o: Int) throws -> UInt32 { try withUnsafeBytes { try $0.u32le(o) } }
+}
+
+/// The parsers read firmware files through BinaryParsing's ParserSpan, whose reads check their bounds and throw.
+extension ParserSpan {
+    /// The integer `o` bytes in, big-endian; the span stays where it is.
+    func be16(at o: Int) throws(ParsingError) -> UInt16 {
+        var s = try seeking(toRelativeOffset: o)
+        return try UInt16(parsingBigEndian: &s)
+    }
+    func be32(at o: Int) throws(ParsingError) -> UInt32 {
+        var s = try seeking(toRelativeOffset: o)
+        return try UInt32(parsingBigEndian: &s)
+    }
+    func be64(at o: Int) throws(ParsingError) -> UInt64 {
+        var s = try seeking(toRelativeOffset: o)
+        return try UInt64(parsingBigEndian: &s)
+    }
+    func le32(at o: Int) throws(ParsingError) -> UInt32 {
+        var s = try seeking(toRelativeOffset: o)
+        return try UInt32(parsingLittleEndian: &s)
+    }
+    func le64(at o: Int) throws(ParsingError) -> UInt64 {
+        var s = try seeking(toRelativeOffset: o)
+        return try UInt64(parsingLittleEndian: &s)
+    }
+    func byte(at o: Int) throws(ParsingError) -> UInt8 {
+        var s = try seeking(toRelativeOffset: o)
+        return try UInt8(parsing: &s)
+    }
+    /// The `n` bytes `o` bytes in.
+    func bytes(at o: Int, _ n: Int) throws(ParsingError) -> [UInt8] {
+        var s = try seeking(toRelativeOffset: o)
+        return try [UInt8](parsing: &s, byteCount: n)
+    }
+}
+
+/// `body` over `bytes`, a ParsingError (input cut short or out of range) as FirmwareError's unsupported, naming
+/// `what`.
+func parsing<T>(
+    _ bytes: some ParserSpanProvider,
+    _ what: @autoclosure () -> String,
+    _ body: (inout ParserSpan) throws -> T
+) throws -> T {
+    do { return try bytes.withParserSpan(body) } catch let e as ParsingError {
+        throw FirmwareError(.unsupported, "\(what()): \(e)")
+    }
 }

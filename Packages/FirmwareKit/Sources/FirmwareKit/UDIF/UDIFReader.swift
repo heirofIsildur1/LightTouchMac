@@ -5,10 +5,15 @@
 //
 //   try UDIFReader.convertToRaw(dmg, to: raw)
 
+import BinaryParsing
 import Foundation
 import zlib
 
 enum UDIFReader {
+    /// A block table's run: its type, where it goes in the disk and how long it is there, where it is stored and
+    /// how long it is stored.
+    struct Chunk { let type: UInt32, at: Int, size: Int, offset: UInt64, length: Int }
+
     static func convertToRaw(_ src: URL, to out: URL) throws {
         let input = open(src.path, O_RDONLY)
         guard input >= 0 else { throw FirmwareError(.internal, "open \(src.path)") }
@@ -18,6 +23,9 @@ enum UDIFReader {
             throw FirmwareError(.unsupported, "\(src.lastPathComponent): too short")
         }
         func read(_ at: UInt64, _ n: Int) throws -> [UInt8] {
+            guard at <= UInt64(st.st_size), UInt64(n) <= UInt64(st.st_size) - at else {
+                throw FirmwareError(.unsupported, "\(src.lastPathComponent): read past its end at \(at)")
+            }
             var b = [UInt8](repeating: 0, count: n)
             guard pread(input, &b, n, off_t(at)) == n else {
                 throw FirmwareError(.unsupported, "\(src.lastPathComponent): read past its end at \(at)")
@@ -28,9 +36,17 @@ enum UDIFReader {
         guard koly.starts(with: Array("koly".utf8)) else {
             throw FirmwareError(.unsupported, "\(src.lastPathComponent): no UDIF trailer")
         }
-        let dataFork = be64(koly, 0x18)
-        let sectors = be64(koly, 0x1EC)
-        let xml = Data(try read(be64(koly, 0xD8), Int(be64(koly, 0xE0))))
+        // the data fork's offset, the XML property list's offset and length, the disk's size (its sectors' bytes)
+        let (dataFork, xmlAt, xmlLength, disk) = try parsing(koly, "\(src.lastPathComponent): UDIF trailer") { s in
+            try s.seek(toRelativeOffset: 0x18)
+            let dataFork = try UInt64(parsingBigEndian: &s)
+            try s.seek(toAbsoluteOffset: 0xD8)
+            let xml = (try UInt64(parsingBigEndian: &s), try Int(parsing: &s, storedAsBigEndian: UInt64.self))
+            try s.seek(toAbsoluteOffset: 0x1EC)
+            let disk = try Int(parsing: &s, storedAsBigEndian: UInt64.self).multipliedThrowingOnOverflow(by: 512)
+            return (dataFork, xml.0, xml.1, disk)
+        }
+        let xml = Data(try read(xmlAt, xmlLength))
         guard let plist = try PropertyListSerialization.propertyList(from: xml, format: nil) as? [String: Any],
             let blkx = (plist["resource-fork"] as? [String: Any])?["blkx"] as? [[String: Any]]
         else { throw FirmwareError(.unsupported, "\(src.lastPathComponent): no blkx table") }
@@ -42,39 +58,72 @@ enum UDIFReader {
         guard output >= 0 else { throw FirmwareError(.internal, "open \(out.path)") }
         defer { close(output) }
         for entry in blkx {
-            guard let m = (entry["Data"] as? Data).map({ [UInt8]($0) }), m.count >= 204,
-                m.starts(with: Array("mish".utf8))
-            else { throw FirmwareError(.unsupported, "\(src.lastPathComponent): a blkx entry is not a block table") }
-            let first = be64(m, 8)
-            let base = dataFork + be64(m, 24)
-            let count = Int(be32(m, 200))
-            guard m.count >= 204 + 40 * count else { throw FirmwareError(.unsupported, "short block table") }
-            for i in 0..<count {
-                let c = 204 + 40 * i
-                let type = be32(m, c)
-                let at = (first + be64(m, c + 8)) * 512
-                let size = Int(be64(m, c + 16)) * 512
-                let stored = { try read(base + be64(m, c + 24), Int(be64(m, c + 32))) }
+            guard let m = entry["Data"] as? Data, m.starts(with: Array("mish".utf8)) else {
+                throw FirmwareError(.unsupported, "\(src.lastPathComponent): a blkx entry is not a block table")
+            }
+            for (i, c) in try chunks(m, dataFork: dataFork, src).enumerated() {
+                let (at, size) = (c.at, c.size)
+                guard at <= disk, size <= disk - at else {
+                    throw FirmwareError(.unsupported, "\(src.lastPathComponent): chunk \(i) past the disk's end")
+                }
+                let stored = { try read(c.offset, c.length) }
                 let bytes: [UInt8]
-                switch type {
+                switch c.type {
                 case 0, 2, 0x7FFF_FFFE, 0xFFFF_FFFF: continue  // zero-filled, ignored, comment, end
                 case 1: bytes = try stored()
                 case 0x8000_0005: bytes = try inflate(try stored(), size, src)
                 case 0x8000_0004: bytes = try adc(try stored(), size, src)
                 default:
-                    throw FirmwareError(.unsupported, "\(src.lastPathComponent): chunk type \(String(type, radix: 16))")
+                    throw FirmwareError(
+                        .unsupported,
+                        "\(src.lastPathComponent): chunk type \(String(c.type, radix: 16))"
+                    )
                 }
                 guard bytes.count == size, pwrite(output, bytes, size, off_t(at)) == size else {
                     throw FirmwareError(.internal, "\(src.lastPathComponent): chunk \(i) at sector \(at / 512)")
                 }
             }
         }
-        guard ftruncate(output, off_t(sectors * 512)) == 0 else {
+        guard ftruncate(output, off_t(disk)) == 0 else {
             throw FirmwareError(.internal, "truncate \(out.path)")
         }
     }
 
+    /// A "mish" block table's runs: the table's first sector and its data's offset (from the data fork's), then at
+    /// 200 the run count and the 40-byte runs (type, comment, sector, sector count, offset, length).
+    static func chunks(_ m: Data, dataFork: UInt64, _ src: URL) throws -> [Chunk] {
+        try parsing(m, "\(src.lastPathComponent): block table") { s in
+            try s.seek(toRelativeOffset: 8)
+            let first = try UInt64(parsingBigEndian: &s)
+            try s.seek(toRelativeOffset: 8)
+            let base = try dataFork.addingThrowingOnOverflow(try UInt64(parsingBigEndian: &s))
+            try s.seek(toAbsoluteOffset: 200)
+            var out: [Chunk] = []
+            for _ in 0..<(try UInt32(parsingBigEndian: &s)) {
+                let type = try UInt32(parsingBigEndian: &s)
+                try s.seek(toRelativeOffset: 4)
+                let sector = try first.addingThrowingOnOverflow(try UInt64(parsingBigEndian: &s))
+                out.append(
+                    Chunk(
+                        type: type,
+                        at: try Int(throwingOnOverflow: sector.multipliedThrowingOnOverflow(by: 512)),
+                        size: try Int(parsing: &s, storedAsBigEndian: UInt64.self).multipliedThrowingOnOverflow(
+                            by: 512
+                        ),
+                        offset: try base.addingThrowingOnOverflow(try UInt64(parsingBigEndian: &s)),
+                        length: try Int(parsing: &s, storedAsBigEndian: UInt64.self)
+                    )
+                )
+            }
+            return out
+        }
+    }
+
     static func inflate(_ z: [UInt8], _ size: Int, _ src: URL) throws -> [UInt8] {
+        // deflate expands at most 1032:1
+        guard size <= 1032 * z.count + 1032 else {
+            throw FirmwareError(.unsupported, "\(src.lastPathComponent): bad zlib chunk")
+        }
         var out = [UInt8](repeating: 0, count: size)
         var n = uLongf(size)
         guard uncompress(&out, &n, z, uLong(z.count)) == Z_OK, n == size else {
@@ -87,7 +136,7 @@ enum UDIFReader {
     /// codes) or 4-67 bytes from up to 64 KiB back (three-byte codes).
     static func adc(_ c: [UInt8], _ size: Int, _ src: URL) throws -> [UInt8] {
         var out: [UInt8] = []
-        out.reserveCapacity(size)
+        out.reserveCapacity(min(size, 67 * c.count))
         var i = 0
         while i < c.count && out.count < size {
             let b = Int(c[i])

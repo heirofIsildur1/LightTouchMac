@@ -64,13 +64,20 @@ public final class HFSPlusWriter: VolumeFiles {
             blockSize = Int(be32(vh, 40))
             totalBlocks = Int(be32(vh, 44))
             date = be32(vh, 20)
+            guard (512...(1 << 24)).contains(blockSize), blockSize & (blockSize - 1) == 0 else {
+                throw FirmwareError(.unsupported, "\(url.lastPathComponent): block size \(blockSize)")
+            }
             let readSpecial = { [fd, vh, blockSize] o in try Self.readSpecial(fd, vh, o, blockSize: blockSize) }
             let cat = try readSpecial(272)
             guard vh[1] == 0x58, cat.count > 512, cat[14 + 37] == 0xBC else {
                 throw FirmwareError(.unsupported, "\(url.lastPathComponent): not a case-sensitive (HFSX) volume")
             }
-            catalog = try BTreeFile(cat, compare: BTreeFile.catalogOrder)
-            extents = try BTreeFile(try readSpecial(192), compare: BTreeFile.extentsOrder)
+            catalog = try BTreeFile(cat, compare: BTreeFile.catalogOrder, wellFormed: Self.catalogRecord)
+            extents = try BTreeFile(
+                try readSpecial(192),
+                compare: BTreeFile.extentsOrder,
+                wellFormed: Self.extentRecord
+            )
             let attr = try readSpecial(352)
             attributes =
                 attr.isEmpty
@@ -80,7 +87,7 @@ public final class HFSPlusWriter: VolumeFiles {
                     clumpSize: UInt32(blockSize),
                     attributes: BTreeFile.bigKeys | BTreeFile.variableIndexKeys,
                     compare: BTreeFile.attributesOrder
-                ) : try BTreeFile(attr, compare: BTreeFile.attributesOrder)
+                ) : try BTreeFile(attr, compare: BTreeFile.attributesOrder, wellFormed: Self.attributeRecord)
             bitmap = Array(try readSpecial(112).prefix((totalBlocks + 7) / 8))
             guard bitmap.count == (totalBlocks + 7) / 8 else {
                 throw FirmwareError(.unsupported, "\(url.lastPathComponent): the allocation file is short")
@@ -93,6 +100,33 @@ public final class HFSPlusWriter: VolumeFiles {
     }
 
     deinit { if !closed { Darwin.close(fd) } }
+
+    /// What the writer reads of a catalog record at fixed offsets: a key (keyLength, parentID, name length, name)
+    /// and a whole folder (88 bytes) or file (248) record, or a thread (type, reserved, parentID, name).
+    static func catalogRecord(_ r: BTreeFile.Record) -> Bool {
+        guard r.key.count >= 8, r.key.count >= 8 + 2 * Int(be16(r.key, 6)), r.value.count >= 10 else { return false }
+        switch be16(r.value, 0) {
+        case folderType: return r.value.count >= 88
+        case fileType: return r.value.count >= 248
+        case folderThread, fileThread: return r.value.count >= 10 + 2 * Int(be16(r.value, 8))
+        default: return false
+        }
+    }
+
+    /// An extents overflow record: its 12-byte key and eight extents.
+    static func extentRecord(_ r: BTreeFile.Record) -> Bool { r.key.count >= 12 && r.value.count >= 64 }
+
+    /// An attributes record: a key (keyLength, pad, fileID, startBlock, name length, name) and an inline-data
+    /// (type, reserved, size: 16 bytes before the data), fork-data (88) or extents (72) record.
+    static func attributeRecord(_ r: BTreeFile.Record) -> Bool {
+        guard r.key.count >= 14, r.key.count >= 14 + 2 * Int(be16(r.key, 12)), r.value.count >= 4 else { return false }
+        switch be32(r.value, 0) {
+        case 0x10: return r.value.count >= 16
+        case 0x20: return r.value.count >= 88
+        case 0x30: return r.value.count >= 72
+        default: return true
+        }
+    }
 
     /// Writes the B-trees, the bitmap and the volume headers, and closes the image.
     public func close() throws {
@@ -651,7 +685,11 @@ public final class HFSPlusWriter: VolumeFiles {
     }
 
     private func readFork(_ r: [UInt8], data: Bool) throws -> [UInt8] {
-        let size = Int(be64(r, data ? 88 : 168))
+        let fork = try HFSPlusVolume.Fork(r, data ? 88 : 168)
+        guard fork.logicalSize <= UInt64(fork.totalBlocks) * UInt64(blockSize) else {
+            throw FirmwareError(.unsupported, "file \(be32(r, 8)) is larger than its blocks")
+        }
+        let size = Int(fork.logicalSize)
         var out = [UInt8](repeating: 0, count: size)
         var done = 0
         for e in forkExtents(r, data: data) where done < size {
@@ -879,14 +917,16 @@ public final class HFSPlusWriter: VolumeFiles {
 
     /// A system file's bytes along its volume-header fork (at `o`); empty for an absent one.
     private static func readSpecial(_ fd: Int32, _ vh: [UInt8], _ o: Int, blockSize: Int) throws -> [UInt8] {
-        let size = Int(be64(vh, o))
+        let fork = try HFSPlusVolume.Fork(vh, o)
+        guard fork.logicalSize <= UInt64(fork.totalBlocks) * UInt64(blockSize) else {
+            throw FirmwareError(.unsupported, "a system file is larger than its blocks")
+        }
+        let size = Int(fork.logicalSize)
         var out = [UInt8](repeating: 0, count: size)
         var done = 0
-        for i in 0..<8 where done < size {
-            let start = Int(be32(vh, o + 16 + 8 * i))
-            let n = min(size - done, Int(be32(vh, o + 20 + 8 * i)) * blockSize)
-            guard n > 0 else { break }
-            guard try preadFully(fd, &out, at: done, count: n, from: start * blockSize) else { break }
+        for e in fork.extents where done < size {
+            let n = min(size - done, Int(e.count) * blockSize)
+            guard try preadFully(fd, &out, at: done, count: n, from: Int(e.start) * blockSize) else { break }
             done += n
         }
         guard done == size else { throw FirmwareError(.unsupported, "a system file has overflow extents") }

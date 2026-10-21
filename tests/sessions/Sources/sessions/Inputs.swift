@@ -112,7 +112,7 @@ struct Tools {
         let status = run(
             "/usr/bin/xcodebuild",
             [
-                "-project", repository.appendingPathComponent("LightTouchMac.xcodeproj").path,
+                "-skipMacroValidation", "-project", repository.appendingPathComponent("LightTouchMac.xcodeproj").path,
                 "-target", "LightTouchDevice", "-target", "LightTouchServices", "-target", "firmwarekit",
                 "-configuration", "Debug", "SYMROOT=\(symroot.path)", "OBJROOT=\(symroot.path)/obj",
                 "COMPILER_INDEX_STORE_ENABLE=NO", "build",

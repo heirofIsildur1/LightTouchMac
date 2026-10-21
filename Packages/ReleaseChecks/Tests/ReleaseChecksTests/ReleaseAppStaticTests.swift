@@ -272,7 +272,15 @@ struct ReleaseAppStaticTests {
             ),
             repository.appendingPathComponent("Packages/FirmwareKit/Package.resolved"),
         ]
-        let found = try BundleHygiene.problems(app: app, packages: try BundleHygiene.swiftPackages(resolved: resolved))
+        let inputs =
+            try JSONSerialization.jsonObject(
+                with: Data(contentsOf: contents.appendingPathComponent("Resources/build-inputs.json"))
+            ) as? [String: Any]
+        let packages = try BundleHygiene.swiftPackages(
+            resolved: resolved,
+            unlinked: inputs?["swift_packages_unlinked"] as? [String] ?? []
+        )
+        let found = try BundleHygiene.problems(app: app, packages: packages)
         #expect(found.isEmpty, "\(found.joined(separator: "\n"))")
     }
 

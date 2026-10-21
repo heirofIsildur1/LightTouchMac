@@ -8,6 +8,7 @@
 //   t[key] = value; t[key] = nil                     // keys include their 2-byte keyLength
 //   let bytes = try t.layout(totalNodes: n)          // the whole B-tree file; t.nodesNeeded(totalNodes:) first
 
+import BinaryParsing
 import Foundation
 
 struct BTreeFile {
@@ -47,8 +48,13 @@ struct BTreeFile {
         self.compare = compare
     }
 
-    /// The tree in `file` (the B-tree file's bytes, from node 0), its records read along the leaf chain.
-    init(_ file: [UInt8], compare: @escaping ([UInt8], [UInt8]) -> Int) throws {
+    /// The tree in `file` (the B-tree file's bytes, from node 0), its records read along the leaf chain; each must
+    /// be `wellFormed` (hold what `compare` and the tree's users read of it).
+    init(
+        _ file: [UInt8],
+        compare: @escaping ([UInt8], [UInt8]) -> Int,
+        wellFormed: (Record) -> Bool = { _ in true }
+    ) throws {
         guard file.count >= 512, file[8] == 1 else { throw FirmwareError(.unsupported, "no B-tree header node") }
         let h = 14
         nodeSize = Int(be16(file, h + 18))
@@ -66,18 +72,32 @@ struct BTreeFile {
             guard seen.insert(n).inserted, (n + 1) * nodeSize <= file.count else {
                 throw FirmwareError(.unsupported, "B-tree leaf chain breaks at node \(n)")
             }
-            let node = Array(file[n * nodeSize..<(n + 1) * nodeSize])
-            guard node[8] == 0xFF else { throw FirmwareError(.unsupported, "B-tree node \(n) in the leaf chain") }
-            let count = Int(be16(node, 10))
-            let offs = (0...count).map { Int(be16(node, nodeSize - 2 * ($0 + 1))) }
-            for i in 0..<count {
-                let keyEnd = offs[i] + 2 + Int(be16(node, offs[i]))
-                guard offs[i] < keyEnd, keyEnd <= offs[i + 1] else {
-                    throw FirmwareError(.unsupported, "B-tree node \(n) record \(i) is malformed")
-                }
-                records.append(Record(key: Array(node[offs[i]..<keyEnd]), value: Array(node[keyEnd..<offs[i + 1]])))
+            guard file[n * nodeSize + 8] == 0xFF else {
+                throw FirmwareError(.unsupported, "B-tree node \(n) in the leaf chain")
             }
-            n = Int(be32(node, 0))
+            n = try parsing(file[n * nodeSize..<(n + 1) * nodeSize], "B-tree node \(n)") { node in
+                // the records' offsets, then the free space's, from the node's end
+                let count = Int(try node.be16(at: 10))
+                var table = try node.seeking(toOffsetFromEnd: 2 * (count + 1))
+                let offs = try [UInt16](parsing: &table, count: count + 1) { try UInt16(parsingBigEndian: &$0) }
+                    .reversed().map(Int.init)
+                for i in 0..<count {
+                    var r = try node.seeking(toRelativeOffset: offs[i])
+                    let keyEnd = offs[i] + 2 + Int(try r.be16(at: 0))
+                    guard offs[i] < keyEnd, keyEnd <= offs[i + 1] else {
+                        throw FirmwareError(.unsupported, "B-tree node \(n) record \(i) is malformed")
+                    }
+                    let record = Record(
+                        key: try [UInt8](parsing: &r, byteCount: keyEnd - offs[i]),
+                        value: try [UInt8](parsing: &r, byteCount: offs[i + 1] - keyEnd)
+                    )
+                    guard wellFormed(record) else {
+                        throw FirmwareError(.unsupported, "B-tree node \(n) record \(i) is malformed")
+                    }
+                    records.append(record)
+                }
+                return Int(try node.be32(at: 0))
+            }
         }
         for i in records.indices.dropFirst() where compare(records[i - 1].key, records[i].key) >= 0 {
             throw FirmwareError(.unsupported, "B-tree records out of order at \(i)")

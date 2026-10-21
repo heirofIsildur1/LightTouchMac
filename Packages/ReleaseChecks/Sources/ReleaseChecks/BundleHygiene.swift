@@ -41,6 +41,9 @@ public enum BundleHygiene {
         ("Contents/Frameworks/libplist-2.0*.dylib", ["libplist"]),
         // a Swift package (licensed through Package.resolved), with its helpers and XPC services
         ("Contents/Frameworks/Sparkle.framework/*", []),
+        // the toolchain's Span back-deployment, which Xcode embeds for BinaryParsing below macOS 26 (the Swift
+        // runtime: Apache-2.0 with the Runtime Library Exception, no notice to carry)
+        ("Contents/Frameworks/libswiftCompatibilitySpan.dylib", []),
         // the guest tools: qemu-ios contrib, built for the guest
         ("Contents/Resources/Guest/guest.aar/guest-tools/*", ["qemu"]),
         ("Contents/Resources/Guest/guest.aar/tools/*", ["qemu"]),
@@ -72,8 +75,9 @@ public enum BundleHygiene {
         }
     }
 
-    /// The Swift packages Package.resolved files pin (their identities).
-    public static func swiftPackages(resolved: [URL]) throws -> [String] {
+    /// The Swift packages Package.resolved files pin (their identities), but those `unlinked` (build-inputs.json's
+    /// swift_packages_unlinked: resolved, never linked, as scripts/vendor found them).
+    public static func swiftPackages(resolved: [URL], unlinked: [String] = []) throws -> [String] {
         var names: Set<String> = []
         for file in resolved {
             let json = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
@@ -81,7 +85,7 @@ public enum BundleHygiene {
                 if let identity = pin["identity"] as? String { names.insert(identity) }
             }
         }
-        return names.sorted()
+        return names.subtracting(unlinked).sorted()
     }
 
     /// Every problem with `app`; empty when it may ship.

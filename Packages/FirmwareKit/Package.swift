@@ -26,6 +26,7 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.0"),
         .package(url: "https://github.com/mtgto/Unrar.swift.git", exact: "0.5.4"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2"),
+        .package(url: "https://github.com/apple/swift-binary-parsing.git", exact: "0.0.4"),
     ],
     targets: [
         .target(
@@ -42,6 +43,7 @@ let package = Package(
                 .product(name: "MachOKit", package: "MachOKit"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
                 .product(name: "Unrar", package: "Unrar.swift"),
+                .product(name: "BinaryParsing", package: "swift-binary-parsing"),
             ]
         ),
         .executableTarget(

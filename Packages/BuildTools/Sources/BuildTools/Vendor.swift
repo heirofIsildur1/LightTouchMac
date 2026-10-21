@@ -297,8 +297,8 @@ public struct Vendor {
         let bin = try output(swift + ["--show-bin-path"])
         try run(
             [
-                "xcodebuild", "-project", root.appendingPathComponent("LightTouchMac.xcodeproj").path, "-target",
-                "LightTouchDevice",
+                "xcodebuild", "-skipMacroValidation", "-project",
+                root.appendingPathComponent("LightTouchMac.xcodeproj").path, "-target", "LightTouchDevice",
                 "-configuration", "Release", "SYMROOT=\(work.path)/xcode", "COMPILER_INDEX_STORE_ENABLE=NO",
                 "OBJROOT=\(work.path)/xcode/obj", "-clonedSourcePackagesDirPath", "\(work.path)/xcode/packages",
                 "CODE_SIGNING_ALLOWED=NO", "build",
@@ -622,7 +622,33 @@ public struct Vendor {
                 licenses.appendingPathComponent("iBoot32Patcher/\(name)")
             )
         }
-        for package in try checkouts.flatMap(entries) {
+        // the packages linked (SwiftPackageLinks), from the local packages and the project's remote ones
+        var packages: [String: URL] = [:]
+        for package in try checkouts.flatMap(entries) { packages[package.lastPathComponent.lowercased()] = package }
+        let local = try entries(root.appendingPathComponent("Packages")).filter {
+            files.fileExists(atPath: $0.appendingPathComponent("Package.swift").path)
+        }
+        var manifests: [String: [String: Any]] = [:]
+        for package in Array(packages.values) + local {
+            let json = try output(["swift", "package", "dump-package", "--package-path", package.path])
+            manifests[package.lastPathComponent.lowercased()] =
+                try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+        }
+        let project = try String(
+            contentsOf: root.appendingPathComponent("LightTouchMac.xcodeproj/project.pbxproj"),
+            encoding: .utf8
+        )
+        let direct = project.matches(of: /repositoryURL = "([^"]+)"/).map {
+            String($0.1.split(separator: "/").last ?? "").replacingOccurrences(of: ".git", with: "").lowercased()
+        }
+        let linked = SwiftPackageLinks.linked(
+            roots: local.map { $0.lastPathComponent.lowercased() },
+            direct: direct,
+            manifests: manifests
+        )
+        let unlinked = packages.keys.filter { !linked.contains($0) }.sorted()
+        for package in packages.values.sorted(by: { $0.path < $1.path })
+        where linked.contains(package.lastPathComponent.lowercased()) {
             let target = licenses.appendingPathComponent("swift/\(package.lastPathComponent)")
             try files.createDirectory(at: target, withIntermediateDirectories: true)
             for text in try entries(package)
@@ -659,6 +685,8 @@ public struct Vendor {
             [
                 "schema_version": 2, "pins": ["qemu-ios": pinFields(qemuPin), "usbmuxd": pinFields(usbPin)],
                 "components": components,
+                // resolved but not linked (SwiftPackageLinks): no license of theirs ships, BundleHygiene asks none
+                "swift_packages_unlinked": unlinked,
                 "host_architectures": Self.archs, "firmware": ["bootroms_sha256": roms],
                 "guest_manifest_sha256": try sha256(guestRoot.appendingPathComponent("manifest.json")),
                 "xcode": try output(["xcodebuild", "-version"]),
