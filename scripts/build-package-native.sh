@@ -181,9 +181,17 @@ fi
 # iPhone OS 1.x lockdownd speaks SSLv3 only: offer exactly SSLv3 below ProductVersion 2.0 (smoke.md #51); no ECDHE
 # suites below 10.0 (5.0 beta 1 lockdownd aborts a ClientHello that offers one; smoke.md "9A5220p USB lockdown").
 (cd libimobiledevice-1.4.0 && patch -p1 < "$SRC/build-support/patches/libimobiledevice-sslv3-ios1.patch")
+# The device names the length of each reply (a plist service's length prefix, an AFC packet, an ostrace message, a
+# debugserver response) and the library allocates it: libimobiledevice-reply-limits.patch refuses more than 32 MiB.
+(cd libimobiledevice-1.4.0 && patch -p1 < "$SRC/build-support/patches/libimobiledevice-reply-limits.patch")
 (cd libimobiledevice-1.4.0 && LDFLAGS="$LDFLAGS -framework SystemConfiguration -framework CoreFoundation" ./configure --prefix="$P" ${HOST[@]+"${HOST[@]}"} --enable-shared --disable-static --without-cython && make -j"$JOBS" && make install)
-license libimobiledevice libimobiledevice-1.4.0 COPYING COPYING.LESSER "$SRC/build-support/patches/libimobiledevice-sslv3-ios1.patch"
-source_note libimobiledevice libimobiledevice libimobiledevice-sslv3-ios1.patch
+license libimobiledevice libimobiledevice-1.4.0 COPYING COPYING.LESSER "$SRC/build-support/patches/libimobiledevice-sslv3-ios1.patch" "$SRC/build-support/patches/libimobiledevice-reply-limits.patch"
+source_note libimobiledevice libimobiledevice libimobiledevice-sslv3-ios1.patch libimobiledevice-reply-limits.patch
+if [ "$ARCH" = arm64 ]; then   # the built library itself: a 1 KiB plist reply arrives, a 40 MiB one is refused
+    (cd libimobiledevice-1.4.0 && xcrun clang -O2 -I. -Isrc -Iinclude -I"$P/include" -I"$STATIC/include" \
+        "$SRC/build-support/checks/reply-limit.c" -L"$P/lib" -limobiledevice-1.0 -lplist-2.0 -o "$ROOT/reply-limit")
+    "$ROOT/reply-limit"
+fi
 (cd usbmuxd && glibtoolize --copy --force && autoreconf -fi)
 (cd usbmuxd && LDFLAGS="$LDFLAGS -framework IOKit -framework CoreFoundation -framework Security" ./configure --prefix="$P" ${HOST[@]+"${HOST[@]}"} --without-systemd && make -j"$JOBS")
 # iBoot32Patcher (GPL-3.0, the "tools" group of the manifest): firmwarekit runs it for the k48 real-iBoot

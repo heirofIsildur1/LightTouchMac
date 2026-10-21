@@ -66,6 +66,7 @@ public struct Vendor {
         [
             "build-support/sources.json", "build-support/dependencies.json", "scripts/build-package-native.sh",
             "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh", developerImages,
+            "build-support/checks",
         ] + tools
     static let staticKeyed = [
         "scripts/build-static-deps.sh", "build-support/dependencies.json",
