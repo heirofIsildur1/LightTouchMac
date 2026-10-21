@@ -27,7 +27,7 @@ what to do and not do on a shared Mac.
   vendor directory is missing or stale; run what it says.
 - Before `sessions`: `swift build --package-path tests/sessions`, then `swift run --package-path tests/sessions
   sessions …`.
-- Unit tests: `xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit`, or
+- Unit tests: `xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit -skipMacroValidation`, or
   `swift test --package-path Packages/<Package>` for one package. Tests live in `Packages/*/Tests`, `tests/offline`
   and `tests/sessions` (CONTRIBUTING.md, Gates); the scripts' shell tests in `tests/scripts`.
 - `sessions`, `scripts/release` and `scripts/ship` end with one line, `PASS <summary> <log>` or
