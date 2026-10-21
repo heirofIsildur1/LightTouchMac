@@ -149,6 +149,11 @@ extension SharedState {
                 DeviceFile(name: "note.txt", path: "Folder/note.txt", isDirectory: false, isRegular: true, size: 5)
             )
             #expect(vc.filePromiseProvider(provider, fileNameForType: provider.fileType) == "note.txt")
+            // A name whose bidi override would show "photo.zip" as "photopiz.jpg" lands with the override visible.
+            let spoof = vc.promise(
+                DeviceFile(name: "photo\u{202E}gpj.zip", path: "x", isDirectory: false, isRegular: true, size: 1)
+            )
+            #expect(vc.filePromiseProvider(spoof, fileNameForType: spoof.fileType) == "photo[U+202E]gpj.zip")
             var fulfilled: Error?? = nil
             vc.filePromiseProvider(provider, writePromiseTo: out.appendingPathComponent("note.txt")) {
                 fulfilled = .some($0)

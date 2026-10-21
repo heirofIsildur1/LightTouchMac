@@ -69,6 +69,22 @@ import Testing
         }
     }
 
+    /// Show File System's mount, read and write: quarantined, setuid and device nodes ignored, as the kernel reports it.
+    @Test func finderMountIsQuarantined() async throws {
+        try await Oracle.withTemp { dir in
+            let img = dir.appendingPathComponent("v.img")
+            try await VolumeMount.makeHFS(img, size: 16 << 20)
+            let mnt = dir.appendingPathComponent("mnt")
+            let attached = try await VolumeMount.attachHidden(img, at: mnt)
+            var fs = statfs()
+            let mounted = statfs(mnt.path, &fs) == 0
+            try await VolumeMount.detach(attached.device)
+            #expect(mounted)
+            let want = UInt32(MNT_QUARANTINE | MNT_NOSUID | MNT_NODEV | MNT_DONTBROWSE)
+            #expect(fs.f_flags & want == want && fs.f_flags & UInt32(MNT_RDONLY) == 0, "flags \(fs.f_flags)")
+        }
+    }
+
     @Test func busyVolumeIsDetached() async throws {
         try await Oracle.withTemp { dir in
             let img = dir.appendingPathComponent("v.img")

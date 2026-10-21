@@ -99,8 +99,13 @@ public enum VolumeMount {
     /// Attaches a raw image without mounting it; returns its /dev/diskN.
     public static func attach(_ image: URL) async throws -> String { try await DiskImage.attach(image).device }
 
+    /// The device writes these volumes and is untrusted: a mount for Finder is quarantined (Gatekeeper checks what is
+    /// opened from it), and its setuid bits and device nodes mean nothing on the Mac.
+    static let hiddenOptions = "nobrowse,noowners,quarantine,nosuid,nodev"
+
     /// Attaches `image` and mounts it at `mountPoint` (created if needed) out of Finder's sidebar and Desktop
-    /// (nobrowse), owners ignored, for a Finder window opened on the folder. Detaching the device unmounts it.
+    /// (nobrowse), owners ignored, for a Finder window opened on the folder (hiddenOptions). Detaching the device
+    /// unmounts it.
     public static func attachHidden(_ image: URL, at mountPoint: URL, readOnly: Bool = false) async throws
         -> DiskImage.Attached
     {
@@ -111,14 +116,14 @@ public enum VolumeMount {
                 try await run(
                     "/usr/sbin/diskutil",
                     ["mount"] + (readOnly ? ["readOnly"] : [])
-                        + ["-mountOptions", "nobrowse,noowners", "-mountPoint", mountPoint.path, dev]
+                        + ["-mountOptions", hiddenOptions, "-mountPoint", mountPoint.path, dev]
                 )
             } catch {
                 // macOS 15's diskutil fails a mount point inside a volume mounted noowners (the data volume on the
                 // system volume's private/var: "Volume on diskN failed to mount"); mount(8) takes it.
                 try await run(
                     "/sbin/mount",
-                    ["-t", "hfs", "-o", "nobrowse,noowners" + (readOnly ? ",rdonly" : ""), dev, mountPoint.path]
+                    ["-t", "hfs", "-o", hiddenOptions + (readOnly ? ",rdonly" : ""), dev, mountPoint.path]
                 )
             }
         } catch {

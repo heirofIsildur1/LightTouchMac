@@ -27,6 +27,26 @@ public nonisolated struct DeviceFile: Codable, Sendable {
     }
 }
 
+/// A name the device supplies (a file's, an app's), as the Mac shows and saves it: control characters, line breaks
+/// and Unicode's bidirectional controls, which can make a name read with another extension than its own, are written
+/// as visible [U+XXXX] escapes. Any other name is unchanged.
+public nonisolated enum DeviceName {
+    static let bidiControls = Set<UInt32>([0x061C, 0x200E, 0x200F, 0x2028, 0x2029])
+        .union(0x202A...0x202E).union(0x2066...0x2069)
+
+    public static func visible(_ name: String) -> String {
+        var out = String.UnicodeScalarView()
+        for scalar in name.unicodeScalars {
+            if scalar.properties.generalCategory == .control || bidiControls.contains(scalar.value) {
+                out.append(contentsOf: String(format: "[U+%04X]", scalar.value).unicodeScalars)
+            } else {
+                out.append(scalar)
+            }
+        }
+        return String(out)
+    }
+}
+
 /// A host worker can never select another device after it starts. The session
 /// distinguishes reused ports and prevents completions crossing a cold boot.
 public nonisolated struct HostServiceEndpoint: Hashable, Codable, Sendable {

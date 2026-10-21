@@ -2,6 +2,7 @@
 // process (HostServiceWorkers); nothing here touches libimobiledevice, and blocking library calls never enter
 // the GUI. What the helper does for each is LightTouchServices/Engine.
 
+import CoreServices
 import Foundation
 import HostServiceWire
 
@@ -187,9 +188,34 @@ extension DeviceServices {
             if case .fraction(let value) = $0 { progress(value) }
         }
         try Task.checkCancellation()
+        try Self.quarantine(candidate, from: file.path, root: afcRoot)
         guard Darwin.rename(candidate.path, destination.path) == 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
+    }
+
+    /// Marks `url` as downloaded by Light Touch from the device's `path` (of `root`) before it gets its final name, so
+    /// no copy of the device's bytes is ever on the Mac unmarked: the device is untrusted (an app on it, or a page in
+    /// its Safari, may own it), and Gatekeeper checks a quarantined file when it is opened, an app in a zip included.
+    /// Throws where the mark can't be set, and the file is then not published.
+    public static func quarantine(_ url: URL, from path: String, root: AFCRoot) throws {
+        var origin = URLComponents()
+        origin.scheme = "x-light-touch-device"
+        origin.path =
+            switch root {
+            case .media: "/Media/" + path
+            case .fileSystem: "/" + path
+            case .app(let id): "/" + id + "/" + path
+            }
+        var properties: [String: Any] = [
+            kLSQuarantineAgentNameKey as String: "Light Touch",
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+        ]
+        properties[kLSQuarantineDataURLKey as String] = origin.url
+        var values = URLResourceValues()
+        values.quarantineProperties = properties
+        var marked = url
+        try marked.setResourceValues(values)
     }
 
     /// The Files browser's edits (of afcRoot): `path` and everything in it.

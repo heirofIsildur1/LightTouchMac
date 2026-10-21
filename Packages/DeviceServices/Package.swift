@@ -24,5 +24,6 @@ let package = Package(
             ]
         ),
         .testTarget(name: "HostServiceWireTests", dependencies: ["HostServiceWire"]),
+        .testTarget(name: "HostServiceClientTests", dependencies: ["HostServiceClient"]),
     ]
 )

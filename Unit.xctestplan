@@ -46,6 +46,13 @@
     },
     {
       "target": {
+        "containerPath": "container:Packages\/DeviceServices",
+        "identifier": "HostServiceClientTests",
+        "name": "HostServiceClientTests"
+      }
+    },
+    {
+      "target": {
         "containerPath": "container:Packages\/ReleaseChecks",
         "identifier": "ReleaseChecksTests",
         "name": "ReleaseChecksTests"

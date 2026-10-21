@@ -276,7 +276,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
 
     private var deviceRootName: String { services?.wholeFileSystem == true ? "File System" : "Media" }
     private var rootName: String {
-        services?.app.map { id in apps.first { $0.id == id }?.name ?? id } ?? deviceRootName
+        services?.app.map { id in DeviceName.visible(apps.first { $0.id == id }?.name ?? id) } ?? deviceRootName
     }
 
     private func updateSourcePicker() {
@@ -286,7 +286,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
             menu.addItem(.separator())
             menu.addItem(.sectionHeader(title: "Apps"))
             for app in apps {
-                let item = menu.addItem(withTitle: app.name, action: nil, keyEquivalent: "")
+                let item = menu.addItem(withTitle: DeviceName.visible(app.name), action: nil, keyEquivalent: "")
                 item.representedObject = app.id
                 item.image = NSImage(systemSymbolName: "app", accessibilityDescription: nil)
             }
@@ -350,7 +350,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
             let entries = directories[path], entries.indices.contains(row)
         else { return }
         let file = entries[row]
-        cell.stringValue = file.name
+        cell.stringValue = DeviceName.visible(file.name)
         cell.isLeaf = !file.isDirectory
         cell.image = NSImage(systemSymbolName: file.isDirectory ? "folder" : "doc", accessibilityDescription: nil)
     }
@@ -388,7 +388,8 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
     @objc private func selectionChanged() {
         let path = selected?.path ?? directory(for: max(0, browser.selectedColumn)) ?? ""
         let root = rootName
-        pathLabel.stringValue = path.isEmpty ? root : root + " / " + path.replacingOccurrences(of: "/", with: " / ")
+        pathLabel.stringValue =
+            path.isEmpty ? root : root + " / " + DeviceName.visible(path).replacingOccurrences(of: "/", with: " / ")
         updateControls()
     }
     private func updateControls() {
@@ -507,10 +508,10 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Rename “\(item.name)”"
+        alert.messageText = "Rename “\(DeviceName.visible(item.name))”"
         alert.addButton(withTitle: "Rename")
         alert.addButton(withTitle: "Cancel")
-        askName(alert, initial: item.name) { [weak self] name in
+        askName(alert, initial: DeviceName.visible(item.name)) { [weak self] name in
             self?.beginTransfer(working: "Renaming…", finished: "Renamed") { _ in
                 try await services.rename(item.path, to: name)
             }
@@ -521,7 +522,8 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
         let items = selectedEntries
         guard let services, transfer == nil, !items.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = items.count == 1 ? "Delete “\(items[0].name)”?" : "Delete \(items.count) items?"
+        alert.messageText =
+            items.count == 1 ? "Delete “\(DeviceName.visible(items[0].name))”?" : "Delete \(items.count) items?"
         alert.informativeText =
             items.contains(where: \.isDirectory)
             ? "Folders are deleted with everything in them. This can’t be undone."
@@ -545,7 +547,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
         let generation = revision
         if files.count == 1, let file = files.first {
             let panel = NSSavePanel()
-            panel.nameFieldStringValue = file.name
+            panel.nameFieldStringValue = DeviceName.visible(file.name)
             panel.beginSheetModal(for: window) { [weak self] response in
                 guard response == .OK, let self, generation == self.revision, let url = panel.url else { return }
                 self.beginTransfer { progress in
@@ -563,7 +565,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
                 guard response == .OK, let self, generation == self.revision, let folder = panel.url else { return }
                 self.beginTransfer { progress in
                     for (index, file) in files.enumerated() {
-                        let url = folder.appendingPathComponent(file.name).unused
+                        let url = folder.appendingPathComponent(DeviceName.visible(file.name)).unused
                         try await services.download(file, to: url) {
                             progress((Double(index) + $0) / Double(files.count))
                         }
@@ -639,7 +641,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
     }
 
     func promise(_ file: DeviceFile) -> NSFilePromiseProvider {
-        let type = UTType(filenameExtension: (file.name as NSString).pathExtension) ?? .data
+        let type = UTType(filenameExtension: (DeviceName.visible(file.name) as NSString).pathExtension) ?? .data
         let provider = NSFilePromiseProvider(fileType: type.identifier, delegate: self)
         provider.userInfo = file
         return provider
@@ -647,7 +649,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
 
     nonisolated func filePromiseProvider(_ provider: NSFilePromiseProvider, fileNameForType fileType: String) -> String
     {
-        (provider.userInfo as? DeviceFile)?.name ?? "File"
+        (provider.userInfo as? DeviceFile).map { DeviceName.visible($0.name) } ?? "File"
     }
 
     nonisolated func filePromiseProvider(
@@ -663,7 +665,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
                 return
             }
             let previous = promiseChain
-            status.stringValue = "Copying \(file.name)…"
+            status.stringValue = "Copying \(DeviceName.visible(file.name))…"
             promiseChain = Task { [weak self] in
                 await previous?.value
                 do {
@@ -737,7 +739,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
     /// Each Quick Look copy gets its own folder: the device's volume is case-sensitive and the Mac's usually isn't,
     /// so a.JPG and a.jpg in one folder would land on one file here.
     private nonisolated static func previewItem(in folder: URL, index: Int, name: String) -> URL {
-        folder.appendingPathComponent(String(index), isDirectory: true).appendingPathComponent(name)
+        folder.appendingPathComponent(String(index), isDirectory: true).appendingPathComponent(DeviceName.visible(name))
     }
 
     private func clearPreview() {
