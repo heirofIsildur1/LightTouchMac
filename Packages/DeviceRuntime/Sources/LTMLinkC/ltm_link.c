@@ -1,6 +1,8 @@
 #include "ltm_link.h"
 #include <servers/bootstrap.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <sys/socket.h>
 #include <signal.h>
 #include <spawn.h>
 #include <string.h>
@@ -99,7 +101,56 @@ kern_return_t ltm_recv_hello(mach_port_t rx, int timeout_ms, ltm_hello *out) {
     return KERN_SUCCESS;
 }
 
-pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int in_fd, int out_fd, int link_fd) {
+int ltm_send_fd(int sock, char byte, int fd) {
+    struct iovec iov = {.iov_base = &byte, .iov_len = 1};
+    union {
+        struct cmsghdr header;
+        char space[CMSG_SPACE(sizeof(int))];
+    } control;
+    struct msghdr msg = {.msg_iov = &iov, .msg_iovlen = 1};
+    if (fd >= 0) {
+        memset(&control, 0, sizeof control);
+        msg.msg_control = control.space;
+        msg.msg_controllen = sizeof control.space;
+        struct cmsghdr *c = CMSG_FIRSTHDR(&msg);
+        c->cmsg_level = SOL_SOCKET;
+        c->cmsg_type = SCM_RIGHTS;
+        c->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(c), &fd, sizeof(int));
+    }
+    ssize_t n;
+    do {
+        n = sendmsg(sock, &msg, 0);
+    } while (n < 0 && errno == EINTR);
+    return n == 1 ? 0 : -errno;
+}
+
+int ltm_recv_fd(int sock, char *byte, int *fd) {
+    struct iovec iov = {.iov_base = byte, .iov_len = 1};
+    union {
+        struct cmsghdr header;
+        char space[CMSG_SPACE(sizeof(int))];
+    } control;
+    struct msghdr msg = {
+        .msg_iov = &iov, .msg_iovlen = 1, .msg_control = control.space, .msg_controllen = sizeof control.space};
+    *fd = -1;
+    ssize_t n;
+    do {
+        n = recvmsg(sock, &msg, 0);
+    } while (n < 0 && errno == EINTR);
+    if (n <= 0)
+        return n == 0 ? 0 : -errno;
+    for (struct cmsghdr *c = CMSG_FIRSTHDR(&msg); c; c = CMSG_NXTHDR(&msg, c)) {
+        if (c->cmsg_level == SOL_SOCKET && c->cmsg_type == SCM_RIGHTS && c->cmsg_len == CMSG_LEN(sizeof(int))) {
+            memcpy(fd, CMSG_DATA(c), sizeof(int));
+            fcntl(*fd, F_SETFD, FD_CLOEXEC);
+        }
+    }
+    return 1;
+}
+
+pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int in_fd, int out_fd, int link_fd,
+                int bridge_fd) {
     posix_spawn_file_actions_t fa;
     posix_spawnattr_t attr;
     posix_spawn_file_actions_init(&fa);
@@ -117,6 +168,8 @@ pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int in
     }
     if (link_fd >= 0)
         posix_spawn_file_actions_adddup2(&fa, link_fd, 3);
+    if (bridge_fd >= 0)
+        posix_spawn_file_actions_adddup2(&fa, bridge_fd, 4);
     sigset_t all, none;
     sigfillset(&all);
     sigemptyset(&none);

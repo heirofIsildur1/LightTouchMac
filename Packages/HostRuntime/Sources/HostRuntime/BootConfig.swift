@@ -30,6 +30,9 @@ public nonisolated struct BootConfig: Codable, Sendable, Equatable {
         files = try c.decodeIfPresent(BootFiles.self, forKey: .files)
     }
 
+    /// argv's usb-tcp-addr (usbmuxd's guest socket), nil without one.
+    public var usbAddress: String? { BootRecipe.usbAddress(in: argv) }
+
     /// The panel's refresh, Hz: 60 as on the devices, or what argv's `refresh-hz` global asks for
     /// (Board.refreshGlobals). The helper takes frames at this rate.
     public var refreshHz: Int {

@@ -66,6 +66,24 @@ public nonisolated enum BootRecipe {
 
     /// Legacy locks with no strategy retain the explicit direct-kernel fallback.
     /// New boot paths cannot be inferred from whether a key file happens to exist.
+    /// The value of the -M line's usb-tcp-addr (usbmuxd's guest socket), nil without one.
+    public static func usbAddress(in argv: [String]) -> String? {
+        for value in argv {
+            guard let range = value.range(of: "usb-tcp-addr=") else { continue }
+            return String(value[range.upperBound...].prefix { $0 != "," })
+        }
+        return nil
+    }
+
+    /// `argv` with its usb-tcp-addr's value replaced by `address` (a sandboxed helper's USB bridge).
+    public static func replacingUSBAddress(in argv: [String], with address: String) -> [String] {
+        argv.map { value in
+            guard let range = value.range(of: "usb-tcp-addr=") else { return value }
+            let end = value[range.upperBound...].firstIndex(of: ",") ?? value.endIndex
+            return value.replacingCharacters(in: range.upperBound..<end, with: address)
+        }
+    }
+
     public static func preparedIPadBoot(strategy: String?, image: String, writableNOR: String?, gidBlobs: String?)
         throws -> IPadBoot
     {
@@ -284,7 +302,7 @@ public nonisolated enum BootRecipe {
         let argv =
             [
                 "LightTouchMac", "-M", machine, "-drive", "if=pflash,format=raw,file=\(escape(d.writableNOR))",
-                "-display", "none", "-no-shutdown",
+                "-display", "none", "-no-shutdown"
             ] + audio + ["-serial", serial] + (netdev.map { ["-netdev", $0] } ?? [])
             // The iPhone's modem carries its EDGE data (raw IP over a mux DLCI) to its own slirp, cell0, with the web
             // proxy's guestfwd as Wi-Fi's (the image routes cellular through the proxy too) and its lan= setting; with
@@ -292,7 +310,7 @@ public nonisolated enum BootRecipe {
             + (hardware.hasCellular
                 ? [
                     "-netdev",
-                    netdev.map { $0.replacingOccurrences(of: "id=wifi0", with: "id=cell0") } ?? "user,id=cell0,lan=off",
+                    netdev.map { $0.replacingOccurrences(of: "id=wifi0", with: "id=cell0") } ?? "user,id=cell0,lan=off"
                 ] : [])
         return BootConfig(argv: argv, machine: hardware.machine)
     }
@@ -378,7 +396,7 @@ public nonisolated enum BootRecipe {
                     .fileWriteUnknown,
                     userInfo: [
                         NSFilePathErrorKey: source.path,
-                        NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO),
+                        NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
                     ]
                 )
             }

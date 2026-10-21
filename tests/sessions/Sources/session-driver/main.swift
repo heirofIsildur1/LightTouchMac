@@ -94,9 +94,8 @@ final class Mux {
     let clientSocket: String, guestAddress: String
     let process = Process()
     init(name: String) throws {
-        // As USBMux.Session.make: both ends Unix sockets in the per-user temporary directory, or the app group's
-        // container for a sandboxed helper.
-        let base = HelperSandbox.socketPath("mux-" + UUID().uuidString.prefix(8))
+        // As USBMux.Session.make: both ends Unix sockets in the per-user temporary directory.
+        let base = NSTemporaryDirectory() + "ltm-mux-" + UUID().uuidString.prefix(8)
         clientSocket = "UNIX:" + base + "-c.sock"
         guestAddress = base + "-g.sock"
         let conf = work.appendingPathComponent("\(name)/usbmuxd-conf")

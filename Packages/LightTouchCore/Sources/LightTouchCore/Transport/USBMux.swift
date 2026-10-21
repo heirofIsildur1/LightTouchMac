@@ -2,8 +2,8 @@
 // libimobiledevice tools. QEMU dials OUT to usbmuxd when the guest USB core
 // comes up, so usbmuxd must be listening BEFORE the VM boots — hence this is
 // started ahead of the QEMU thread and its address handed over (usb-tcp-addr).
-// Both ends are Unix sockets in the per-user temporary directory (a sandboxed helper's: the app group's container,
-// HelperSandbox), owner-only:
+// Both ends are Unix sockets in the per-user temporary directory, owner-only (a sandboxed helper can't reach it:
+// DeviceLink's USB bridge hands it each connection):
 // no loopback port any local process could reach, and no free-port race.
 //
 // Spawned with swift-subprocess. The daemon is kept alive inside a detached
@@ -31,10 +31,11 @@ import System
         public let clientSocket: String  // USBMUXD_SOCKET_ADDRESS for host tools: "UNIX:<path>"
         public let guestAddress: String  // usb-tcp-addr the VM dials out to: a socket path
 
-        /// Fresh socket paths under the per-user temporary directory, or where a sandboxed helper reaches them
-        /// (HelperSandbox; a Unix socket path stays under 104 bytes).
+        /// Fresh socket paths under the per-user temporary directory (a Unix socket path stays under 104 bytes), where no
+        /// sandboxed helper reaches either: a sandboxed helper's QEMU gets each connection to the guest socket from
+        /// the app (DeviceLink's USB bridge), so another device's helper can't take either path.
         public static func make() -> (session: Session, client: String) {
-            let base = HelperSandbox.socketPath("mux-" + UUID().uuidString.prefix(8))
+            let base = NSTemporaryDirectory() + "ltm-mux-" + UUID().uuidString.prefix(8)
             return (Session(clientSocket: "UNIX:" + base + "-c.sock", guestAddress: base + "-g.sock"), base + "-c.sock")
         }
         public var paths: [String] { [String(clientSocket.dropFirst("UNIX:".count)), guestAddress] }

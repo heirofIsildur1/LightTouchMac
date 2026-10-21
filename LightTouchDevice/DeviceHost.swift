@@ -18,6 +18,8 @@ final class DeviceHost: @unchecked Sendable {
     /// QEMU returned (or the shutdown gave up). Default: exit with the code.
     var onExit: ((Int32) -> Void)?
     var bootStorageAuthority: ((StorageBootProof) throws -> Void)?
+    /// A sandboxed helper's USB cable (USBBridge): QEMU's usb-tcp-addr points at it. Set before the boot.
+    var usbBridge: USBBridge?
 
     private let pumpQueue = DispatchQueue(label: "LightTouch.frames", qos: .userInteractive)
     private var pump: DispatchSourceTimer?
@@ -235,7 +237,8 @@ final class DeviceHost: @unchecked Sendable {
         pumpQueue.async { [self] in pace() }
         qemu.attach(nil, nil)
         status[.qemuState] = QemuState.running.rawValue
-        let argv = config.argv
+        // A sandboxed helper's QEMU dials its USB bridge, which gets each connection to usbmuxd from the app.
+        let argv = usbBridge.map { BootRecipe.replacingUSBAddress(in: config.argv, with: $0.address) } ?? config.argv
         let thread = Thread { [self] in
             var cargs = argv.map { strdup($0) }
             cargs.append(nil)

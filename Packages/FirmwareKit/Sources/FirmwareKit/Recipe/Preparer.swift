@@ -155,7 +155,7 @@ public enum Preparer {
     static func esc(_ p: URL) -> String { p.path.replacingOccurrences(of: ",", with: ",,") }
 
     /// One `LightTouchDevice` oneshot boot of `argv` (which routes -serial to `serial`). `during` runs on its own
-    /// thread once the helper is started (the iPod keybag's gdbstub handoff); if it throws, the helper is stopped
+    /// thread once the helper is started, with its pid (the iPod keybag's gdbstub handoff); if it throws, the helper is stopped
     /// and the error rethrown. `grants`: what argv opens outside `work`, by role, for a sandboxed helper.
     static func oneshot(
         _ helper: URL,
@@ -168,7 +168,7 @@ public enum Preparer {
         work: URL,
         grants: [SandboxExtension.Grant],
         log: (String) -> Void,
-        during: (@Sendable () throws -> Void)? = nil
+        during: (@Sendable (pid_t) throws -> Void)? = nil
     ) throws -> (OneShot, String) {
         var config: [String: Any] = [
             "boot": ["argv": argv, "environment": [String: String](), "machine": machine],
@@ -204,7 +204,7 @@ public enum Preparer {
         let finished = DispatchSemaphore(value: 0)
         if let during {
             Thread.detachNewThread {
-                do { try during() } catch {
+                do { try during(p.processIdentifier) } catch {
                     failure.error = error
                     p.terminate()
                 }

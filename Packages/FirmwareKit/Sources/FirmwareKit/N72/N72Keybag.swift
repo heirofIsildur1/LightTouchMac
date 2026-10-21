@@ -77,7 +77,7 @@ enum N72Keybag {
             grants: [.init(out, .readWrite), .init(bootrom.deletingLastPathComponent(), .read)],
             log: log
         ) {
-            note.text = try handoff(GDBRemote(socket: socket), kernelcache: kc, ramdisk: image)
+            note.text = try handoff(GDBRemote(socket: socket, helper: $0), kernelcache: kc, ramdisk: image)
         }
         log(note.text)
         for line in text.split(separator: "\n") where line.contains("it_keybag:") {
@@ -198,9 +198,10 @@ final class GDBRemote {
     let fd: Int32
     var buffer: [UInt8] = []
 
-    /// Connects to the stub's Unix socket (in the user's own 0700 temporary directory), retrying for up to 10 s
-    /// while the helper starts QEMU.
-    init(socket path: String) throws {
+    /// Connects to the stub's Unix socket (in the user's own 0700 temporary directory, or the app group's container),
+    /// retrying for up to 10 s while the helper starts QEMU. The stub must be `helper`'s: in the group container
+    /// another device's sandboxed helper could have bound the path first.
+    init(socket path: String, helper: pid_t) throws {
         var a = sockaddr_un()
         a.sun_family = sa_family_t(AF_UNIX)
         let bytes = Array(path.utf8)
@@ -215,6 +216,11 @@ final class GDBRemote {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                     connect(s, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) == 0
                 }
+            }
+            if ok, let peer = HelperSandbox.peerPID(s), peer != helper {
+                close(s)
+                throw FirmwareError(
+                    .oneshotFailed, "the gdbstub at \(path) is pid \(peer)'s, not the helper's (\(helper))")
             }
             if ok {
                 var tv = timeval(tv_sec: 120, tv_usec: 0)  // `c` waits for iBoot to reach the kernel

@@ -149,21 +149,29 @@ final class WebProxy: @unchecked Sendable {
             close(fd)
             throw Reply(503, "Can't listen on \(path): \(String(cString: strerror(errno)))")
         }
-        // A period browser opens a handful per host; past 48 at once a guest connection is closed unanswered.
-        accepting(fd, name: "web-proxy", limit: ConnectionLimit(capacity: 48)) { self.serve($0) }
+        // A period browser opens a handful per host; past 48 at once a guest connection is closed unanswered. Only
+        // this process's slirp connects: another device's sandboxed helper reaches the same group container.
+        accepting(fd, name: "web-proxy", limit: ConnectionLimit(capacity: 48), from: getpid()) { self.serve($0) }
     }
 
-    /// One thread accepting on `fd`, one more per connection (with `limit`, only as many as it admits).
+    /// One thread accepting on `fd`, one more per connection (with `limit`, only as many as it admits; with `peer`, only
+    /// connections from that process, the rest closed and logged).
     private func accepting(
         _ fd: Int32,
         name: String,
         limit: ConnectionLimit? = nil,
+        from peer: pid_t? = nil,
         _ serve: @escaping @Sendable (Int32) -> Void
     ) {
         let thread = Thread {
             while true {
                 let connection = accept(fd, nil, nil)
                 if connection < 0 { if errno == EINTR || errno == ECONNABORTED { continue } else { return } }
+                if let peer, let other = HelperSandbox.peerPID(connection), other != peer {
+                    helperLog("\(name): refused a connection from pid \(other)")
+                    close(connection)
+                    continue
+                }
                 if let limit { limit.start(connection, serve) } else { Thread.detachNewThread { serve(connection) } }
             }
         }
@@ -435,7 +443,7 @@ final class WebProxy: @unchecked Sendable {
         let decoded = ["gzip", "deflate", "br", "zstd"].contains(encoding)
         var skip: Set<String> = [
             "connection", "proxy-connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade",
-            "proxy-authorization", "proxy-authenticate", "set-cookie",
+            "proxy-authorization", "proxy-authenticate", "set-cookie"
         ]
         if decoded { skip.formUnion(["content-encoding", "content-length"]) }
         skip.formUnion(extra)
@@ -456,7 +464,7 @@ final class WebProxy: @unchecked Sendable {
             400: "Bad Request",
             401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 410: "Gone",
             429: "Too Many Requests",
-            500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable",
+            500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable"
         ][status] ?? "Status"
     }
 
@@ -709,7 +717,7 @@ final class WebProxy: @unchecked Sendable {
         while true {
             var fds = [
                 pollfd(fd: input ? guest : -1, events: Int16(POLLIN), revents: 0),
-                pollfd(fd: remote, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: remote, events: Int16(POLLIN), revents: 0)
             ]
             guard poll(&fds, 2, 60_000) > 0 else { return }
             for (i, p) in fds.enumerated() where p.revents & Int16(POLLIN | POLLHUP | POLLERR) != 0 {

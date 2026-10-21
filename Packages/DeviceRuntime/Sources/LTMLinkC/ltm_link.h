@@ -37,9 +37,14 @@ kern_return_t ltm_send_hello(const char *name, const char *token, uint32_t proto
                              const mach_port_t *ports, int n);
 // App: receive one hello; timeout_ms < 0 waits forever.
 kern_return_t ltm_recv_hello(mach_port_t rx, int timeout_ms, ltm_hello *out);
-// Spawn with stdin in_fd (/dev/null when < 0), stdout+stderr on out_fd, the link socket on fd 3 and
-// nothing else inherited (POSIX_SPAWN_CLOEXEC_DEFAULT), default signal dispositions.
-// Returns the pid, or -errno.
-pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int in_fd, int out_fd, int link_fd);
+// Spawn with stdin in_fd (/dev/null when < 0), stdout+stderr on out_fd, the link socket on fd 3, a sandboxed
+// helper's USB bridge socket on fd 4 (bridge_fd >= 0) and nothing else inherited (POSIX_SPAWN_CLOEXEC_DEFAULT),
+// default signal dispositions. Returns the pid, or -errno.
+pid_t ltm_spawn(const char *path, char *const argv[], char *const envp[], int in_fd, int out_fd, int link_fd,
+                int bridge_fd);
+// One byte and, when fd >= 0, the descriptor (SCM_RIGHTS) on the Unix socket `sock`. 0, or -errno.
+int ltm_send_fd(int sock, char byte, int fd);
+// The byte and the descriptor ltm_send_fd sent (*fd -1 without one). 1, 0 at end of file, or -errno.
+int ltm_recv_fd(int sock, char *byte, int *fd);
 
 #endif

@@ -143,6 +143,48 @@ struct HelperSandboxTests {
         )
     }
 
+    /// A socket's peer is the process that connected: the web proxy and firmwarekit's gdbstub client refuse any other.
+    @Test func aSocketsPeerIsTheProcessThatConnected() throws {
+        // short: sun_path holds 104 bytes
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("hs-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("p.sock").path
+        let listener = socket(AF_UNIX, SOCK_STREAM, 0)
+        var address = sockaddr_un()
+        address.sun_family = sa_family_t(AF_UNIX)
+        withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: path.utf8) }
+        let bound = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(listener, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        #expect(bound == 0 && listen(listener, 4) == 0)
+        defer { close(listener) }
+        // another process connects (nc -U), and this one
+        let other = Process()
+        other.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+        other.arguments = ["-U", path]
+        other.standardInput = Pipe()
+        try other.run()
+        defer { other.terminate() }
+        let fromOther = accept(listener, nil, nil)
+        #expect(HelperSandbox.peerPID(fromOther) == other.processIdentifier)
+        close(fromOther)
+        let mine = socket(AF_UNIX, SOCK_STREAM, 0)
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                connect(mine, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        #expect(connected == 0)
+        let fromMe = accept(listener, nil, nil)
+        #expect(HelperSandbox.peerPID(fromMe) == getpid())
+        #expect(HelperSandbox.peerPID(mine) == getpid(), "and from the connecting end, the listener's")
+        close(fromMe)
+        close(mine)
+    }
+
     @Test func anUnsignedOrUnsandboxedHelperIsNotSandboxed() {
         #expect(!HelperSandbox.isSandboxed(URL(fileURLWithPath: "/usr/bin/true")))
         #expect(!HelperSandbox.isSandboxed(URL(fileURLWithPath: "/nonexistent")))

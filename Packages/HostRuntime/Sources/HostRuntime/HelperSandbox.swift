@@ -112,6 +112,53 @@ public nonisolated enum HelperSandbox {
         return removed
     }
 
+    /// The process at the other end of a connected Unix socket. Every sandboxed helper can write the whole group
+    /// container (one app group), so a socket there can be connected to, or unlinked and bound again, by another
+    /// device's helper: an end that knows which process belongs at the other checks it.
+    public static func peerPID(_ fd: Int32) -> pid_t? {
+        var pid: pid_t = 0
+        var size = socklen_t(MemoryLayout<pid_t>.size)
+        return getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &size) == 0 ? pid : nil
+    }
+
+    /// Whether the TCP connection `fd` accepted on 127.0.0.1 was made by this same process: its other end is one of
+    /// this process's own sockets (another process can connect to any loopback port, but can't be this one).
+    public static func isOwnConnection(_ fd: Int32) -> Bool {
+        var local = sockaddr_in()
+        var remote = sockaddr_in()
+        var size = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let named = withUnsafeMutablePointer(to: &local) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(fd, $0, &size) == 0 }
+        }
+        size = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let peered = withUnsafeMutablePointer(to: &remote) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getpeername(fd, $0, &size) == 0 }
+        }
+        guard named, peered, local.sin_family == sa_family_t(AF_INET) else { return false }
+        // the peer's socket here has local port = remote.sin_port and foreign port = local.sin_port
+        let want = (local: Int32(UInt16(bigEndian: remote.sin_port)), foreign: Int32(UInt16(bigEndian: local.sin_port)))
+        let pid = getpid()
+        let count = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0) / Int32(MemoryLayout<proc_fdinfo>.size)
+        guard count > 0 else { return false }
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(count) + 16)
+        let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, Int32(fds.count * MemoryLayout<proc_fdinfo>.size))
+        for entry in fds.prefix(Int(bytes) / MemoryLayout<proc_fdinfo>.size)
+        where entry.proc_fdtype == UInt32(PROX_FDTYPE_SOCKET) && entry.proc_fd != fd {
+            var info = socket_fdinfo()
+            let size = Int32(MemoryLayout<socket_fdinfo>.size)
+            guard proc_pidfdinfo(pid, entry.proc_fd, PROC_PIDFDSOCKETINFO, &info, size) == size,
+                info.psi.soi_kind == Int32(SOCKINFO_TCP)
+            else { continue }
+            let tcp = info.psi.soi_proto.pri_tcp.tcpsi_ini
+            if Int32(UInt16(bigEndian: UInt16(truncatingIfNeeded: tcp.insi_lport))) == want.local
+                && Int32(UInt16(bigEndian: UInt16(truncatingIfNeeded: tcp.insi_fport))) == want.foreign
+            {
+                return true
+            }
+        }
+        return false
+    }
+
     /// The account's home, not a sandboxed process's container.
     static var realHome: String {
         guard let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir else { return NSHomeDirectory() }

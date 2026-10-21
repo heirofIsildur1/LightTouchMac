@@ -114,6 +114,8 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
     private var sandboxed = false
     /// Its audit token, from the rendezvous (its code requirement checked); its grants are bound to it.
     private var audit: audit_token_t?
+    /// The boot's usbmuxd guest socket (its usb-tcp-addr), which the USB bridge connects to for a sandboxed helper.
+    private var usbAddress: String?
     #if DEBUG
         private static let debugBuild = true
     #else
@@ -185,6 +187,19 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         }
         _ = fcntl(sv[0], F_SETFD, FD_CLOEXEC)
         _ = fcntl(sv[1], F_SETFD, FD_CLOEXEC)  // the child gets it via dup2 onto 3
+        // A sandboxed helper's USB bridge (LightTouchDevice USBBridge): fd 4, over which it asks for each connection
+        // to this device's usbmuxd, which this process makes.
+        var bridge: [Int32] = [-1, -1]
+        if sandboxed {
+            guard socketpair(AF_UNIX, SOCK_STREAM, 0, &bridge) == 0 else {
+                let e = errno
+                close(sv[0])
+                close(sv[1])
+                return queue.async { completion(.failure(.spawnFailed(e))) }
+            }
+            _ = fcntl(bridge[0], F_SETFD, FD_CLOEXEC)
+            _ = fcntl(bridge[1], F_SETFD, FD_CLOEXEC)
+        }
         let token = (0..<4).map { _ in String(format: "%08x", arc4random()) }.joined()
         let launch = HelperLaunch(
             .connect(service: server.serviceName, token: token, instance: configuration.instance),
@@ -215,7 +230,8 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
                             cenv,
                             grantPipe[0],
                             configuration.outputDescriptor,
-                            sv[1]
+                            sv[1],
+                            bridge[1]
                         )
                     }
                 }
@@ -224,6 +240,10 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         )
         argv.removeAll()
         close(sv[1])
+        if bridge[1] >= 0 {
+            close(bridge[1])
+            if pid > 0 { serveUSBBridge(bridge[0]) } else { close(bridge[0]) }
+        }
         if grantPipe[0] >= 0 {
             close(grantPipe[0])
             if pid > 0 { sendGrants(emulatorGrants(), to: pid, over: grantPipe[1]) }
@@ -324,7 +344,11 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
 
     /// One request; `reply` runs once on `queue` (a reply, or .timedOut / .closed).
     public func request(_ request: LinkRequest, timeout: TimeInterval = 10, reply: @escaping Reply) {
-        if sandboxed, case .boot(let config) = request { grantBoot(config) }
+        if sandboxed, case .boot(let config) = request {
+            grantBoot(config)
+            let address = BootRecipe.usbAddress(in: config.argv)
+            lock.withLock { usbAddress = address }
+        }
         let (id, channel, dead): (UInt64, LinkChannel<HelperMessage, AppMessage>?, Bool) = lock.withLock {
             let id = nextID
             nextID += 1
@@ -359,6 +383,23 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
             entry.reply(.success(reply))
         case .event(let event):
             onEvent?(event)
+        }
+    }
+
+    // MARK: - USB bridge
+
+    /// Answers the helper's USB bridge until it closes: for each request, a socket connected to the boot's usbmuxd
+    /// guest socket (in the temporary directory, where no sandboxed helper reaches), or none when there isn't one yet.
+    /// The socket is private to this helper: no path in the app group's container that another helper could take.
+    private func serveUSBBridge(_ fd: Int32) {
+        Thread.detachNewThread { [weak self] in
+            defer { close(fd) }
+            while USBBridgeSocket.receive(fd).ok {
+                let address = self?.lock.withLock { self?.usbAddress } ?? nil
+                let host = address.flatMap { USBBridgeSocket.connect($0) } ?? -1
+                _ = USBBridgeSocket.send(fd, descriptor: host)
+                if host >= 0 { close(host) }
+            }
         }
     }
 
@@ -573,6 +614,37 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         lock.withLock { channel }?.drainIncoming()
         invalidate(.closed("helper exited"), kill: false)
         queue.async { [self] in onTerminated?(termination) }
+    }
+}
+
+/// A sandboxed helper's USB bridge socket (fd 4 in the helper): a one-byte request from the helper, a one-byte answer
+/// carrying a connected descriptor (SCM_RIGHTS) or none.
+nonisolated public enum USBBridgeSocket {
+    public static func send(_ socket: Int32, descriptor: Int32 = -1) -> Bool {
+        ltm_send_fd(socket, 85, descriptor) == 0
+    }
+    /// Whether a message came (false at end of file), and its descriptor (-1 without one).
+    public static func receive(_ socket: Int32) -> (ok: Bool, descriptor: Int32) {
+        var byte: CChar = 0
+        var fd: Int32 = -1
+        return (ltm_recv_fd(socket, &byte, &fd) == 1, fd)
+    }
+
+    /// A socket connected to the Unix socket `path`, or nil.
+    public static func connect(_ path: String) -> Int32? {
+        var address = sockaddr_un()
+        guard path.utf8.count < MemoryLayout.size(ofValue: address.sun_path) else { return nil }
+        address.sun_family = sa_family_t(AF_UNIX)
+        withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: path.utf8) }
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
+        let ok = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) == 0
+            }
+        }
+        if !ok { close(fd) }
+        return ok ? fd : nil
     }
 }
 

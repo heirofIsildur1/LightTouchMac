@@ -125,6 +125,7 @@ case .machines:
     let status = StatusBlock.create()
     let host = qemu.map { DeviceHost(qemu: $0, status: status) }
     if let host { installBootStorageAuthority(host) }
+    host?.usbBridge = USBBridge.start()  // a sandboxed helper's (DeviceLink gave it fd 4)
 
     let kr = DeviceRendezvous.sendHello(service: service, token: token, generation: 0, surfaces: [status.surface])
     guard kr == 0 else {
