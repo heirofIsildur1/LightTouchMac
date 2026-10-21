@@ -31,6 +31,14 @@ Catalog availability is distinct from measured acceptance.
 
 The emulator side's own entry point is qemu-ios `README.md`.
 
+## First build
+
+On a fresh Apple Silicon Mac, clone this repository and run `scripts/bootstrap`. It checks Xcode, the Homebrew
+build tools, the qemu-ios and usbmuxd checkouts at their pins, the iPhoneOS 3.1.3 and 3.2 SDKs, the SecureROMs and the
+built-in iPod's IPSW, prints each missing piece and where to get it (Apple's software and firmware are never
+downloaded or copied for you), and then runs `scripts/vendor` (about 15 minutes). After that, build the `LightTouchMac`
+scheme in Xcode. `scripts/bootstrap --check` only checks.
+
 ## Building
 
 Open `LightTouchMac.xcodeproj` in Xcode and build the `LightTouchMac` scheme: the app, the device helper
@@ -237,7 +245,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `Packages/ReleaseChecks/` | The checks of a built app (`Release.xctestplan`): signatures, entitlements, slices and load closure, bundle hygiene, the bundled tools, boots through the bundle |
 | `Packages/DeviceServices/` | One device's stock lockdown services: `HostServiceWire` (the request/event protocol, errors, timeouts, device paths, the Home screen layout) and `HostServiceClient` (the app's `DeviceServices` calls, `HostServiceWorkers`, `NotificationProxy`) |
 | `Packages/FirmwareKit/` | `FirmwareKit` (IPSW → device), `FirmwareSchema` (the wire types, `StorageCapacity`, `DeveloperTools`, `GuestArchive`: what the app links), the `firmwarekit` CLI (`Sources/FirmwareKitCLI`), `CActivation` |
-| `scripts/` | `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `release`, `check-export` |
+| `scripts/` | `bootstrap`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `release`, `check-export` |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
 | `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` |
