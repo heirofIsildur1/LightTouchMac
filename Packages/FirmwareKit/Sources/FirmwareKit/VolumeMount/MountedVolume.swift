@@ -25,7 +25,11 @@ public final class MountedVolume: VolumeFiles {
             uid: st.st_uid,
             gid: st.st_gid,
             mode: UInt16(st.st_mode),
-            size: kind == .folder ? 0 : UInt64(st.st_size)
+            size: kind == .folder ? 0 : UInt64(st.st_size),
+            modified: Date(
+                timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec) + TimeInterval(st.st_mtimespec.tv_nsec)
+                    / 1e9
+            )
         )
     }
 
@@ -69,6 +73,12 @@ public final class MountedVolume: VolumeFiles {
     }
 
     public func remove(_ path: String) throws { try DevicePath.remove(url(path)) }
+
+    public func setModified(_ path: String, _ date: Date) throws {
+        let t = date.timeIntervalSince1970.rounded(.down)
+        let ns = Int((date.timeIntervalSince1970 - t) * 1e9)
+        try DevicePath.setModified(url(path), timespec(tv_sec: Int(t), tv_nsec: ns))
+    }
 
     public func setMode(_ path: String, _ mode: UInt16) throws {
         try DevicePath.setPermissions(url(path), mode_t(mode & 0o7777))

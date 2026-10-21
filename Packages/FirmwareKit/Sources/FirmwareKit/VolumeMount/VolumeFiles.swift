@@ -36,6 +36,8 @@ public protocol VolumeFiles: AnyObject {
     func remove(_ path: String) throws
     /// Sets the permission bits (the file type kept).
     func setMode(_ path: String, _ mode: UInt16) throws
+    /// Sets the modification time (HFS keeps whole seconds).
+    func setModified(_ path: String, _ date: Date) throws
     /// Extracts a tar archive as `/usr/bin/tar -xkf` does (nothing that exists replaced), members at or under an
     /// `excluding` path left out.
     func extract(tar: URL, excluding: [String]) throws
@@ -47,6 +49,8 @@ public struct VolumeItem: Sendable, Equatable {
     public let kind: Kind
     public let uid: UInt32, gid: UInt32, mode: UInt16
     public let size: UInt64
+    /// The content-modification time (st_mtime; the catalog's contentModDate).
+    public let modified: Date
 }
 
 extension VolumeFiles {

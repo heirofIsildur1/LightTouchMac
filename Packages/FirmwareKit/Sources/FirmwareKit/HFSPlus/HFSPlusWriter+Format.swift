@@ -141,7 +141,8 @@ extension HFSPlusWriter {
                 putBE16(&r, 0, fileType)
                 putBE16(&r, 2, threadExists)
                 putBE32(&r, 8, UInt32(id))
-                for i in 0..<4 { putBE32(&r, 12 + 4 * i, date) }
+                // created and modified, as newfs_hfs dates them (attribute-modified and accessed stay 0)
+                for i in 0..<2 { putBE32(&r, 12 + 4 * i, date) }
                 putBE16(&r, 42, 0o100000)
                 putBE32(&r, 44, 1)
                 putBE32(&r, 48, 0x6A72_6E6C)  // 'jrnl'

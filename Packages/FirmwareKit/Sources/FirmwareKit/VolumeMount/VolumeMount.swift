@@ -249,8 +249,18 @@ public enum VolumeMount {
 
     /// A bare (no partition map) case-sensitive journaled HFS+ volume in a sparse raw file of `size` bytes
     /// (rounded down to 4 KiB): newfs_hfs writes only metadata, so a 14.7 GB data volume costs ~40 MB.
-    public static func makeHFS(_ image: URL, size: Int64, name: String = "Data", journaled: Bool = true) async throws {
-        if backend == .writer { return try HFSPlusWriter.makeHFS(image, size: size, name: name, journaled: journaled) }
+    /// `date`: the writer's dates for the volume and its journal files (newfs_hfs dates them "now", which the recipes
+    /// normalize afterwards).
+    public static func makeHFS(
+        _ image: URL,
+        size: Int64,
+        name: String = "Data",
+        journaled: Bool = true,
+        date: UInt32 = 0
+    ) async throws {
+        if backend == .writer {
+            return try HFSPlusWriter.makeHFS(image, size: size, name: name, journaled: journaled, date: date)
+        }
         guard FileManager.default.createFile(atPath: image.path, contents: nil),
             truncate(image.path, off_t(size / 4096 * 4096)) == 0
         else {

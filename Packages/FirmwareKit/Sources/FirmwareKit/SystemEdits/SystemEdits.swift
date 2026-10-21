@@ -405,7 +405,7 @@ public enum SystemEdits {
             log: log
         )
         try? fm.removeItem(at: data)  // host file
-        try await VolumeMount.makeHFS(data, size: dataBytes, journaled: o.dataJournal)
+        try await VolumeMount.makeHFS(data, size: dataBytes, journaled: o.dataJournal, date: newest)
         var byOwner: [[UInt32]: [String]] = [:]
         try await VolumeMount.withVolume(data, at: work.appendingPathComponent("mnt-data"), date: newest) { v in
             // merges into the root, which takes /private/var's mode
@@ -852,7 +852,8 @@ public enum SystemEdits {
     }
 
     /// `copyTree` from `path` on one volume (or host folder) to `destination` on another: symlinks as symlinks,
-    /// file content written plainly, then the permission bits. No owners, dates, xattrs or flags.
+    /// file content written plainly, then the permission bits and the modification time. No owners, xattrs or
+    /// flags.
     static func copyTree(
         _ from: any VolumeFiles,
         _ path: String,
@@ -880,6 +881,7 @@ public enum SystemEdits {
         case .file: try to.put(from.contents(at: path), at: destination)
         }
         try to.setMode(destination, item.mode & 0o7777)
+        try to.setModified(destination, item.modified)
     }
 
     /// shutil.copytree(symlinks=True, dirs_exist_ok=True) with copy2: symlinks as symlinks, file content

@@ -322,6 +322,72 @@ import Testing
         }
     }
 
+    /// A tree copied in and out through VolumeFiles keeps each item's modification time, as the kernel route's copy
+    /// (the data volume seeded from the /private/var skeleton): the writer-built volume's createDate and
+    /// contentModDate of every copied file and folder are the kernel-built one's (a modification before the creation
+    /// moves the creation back), and copied back out they are the originals.
+    @Test func copiedTreesKeepTheirDates() async throws {
+        try await Oracle.withTemp { dir in
+            let fm = FileManager.default
+            let src = try DevicePath.real(dir).appendingPathComponent("src")
+            for rel in ["a/b", "c"] {
+                try fm.createDirectory(at: src.appendingPathComponent(rel), withIntermediateDirectories: true)
+            }
+            for (i, rel) in ["a/b/f", "a/g", "c/h", "top"].enumerated() {
+                try Data(rel.utf8).write(to: src.appendingPathComponent(rel))
+                try fm.setAttributes(
+                    [.modificationDate: Date(timeIntervalSince1970: 1_200_000_000 + Double(i) * 86_400)],
+                    ofItemAtPath: src.appendingPathComponent(rel).path
+                )
+            }
+            try fm.createSymbolicLink(atPath: src.appendingPathComponent("c/l").path, withDestinationPath: "../top")
+            // folders after their contents, as a copy leaves them
+            for (i, rel) in ["a/b", "a", "c"].enumerated() {
+                try fm.setAttributes(
+                    [.modificationDate: Date(timeIntervalSince1970: 1_100_000_000 + Double(i) * 3_600)],
+                    ofItemAtPath: src.appendingPathComponent(rel).path
+                )
+            }
+            let kernel = dir.appendingPathComponent("k.img")
+            try await VolumeMount.makeHFS(kernel, size: 32 << 20, journaled: false)
+            try await VolumeMount.withVolume(kernel, at: dir.appendingPathComponent("mnt"), backend: .kernel) { v in
+                try SystemEdits.copyTree(MountedVolume(root: src), "", to: v, "")
+            }
+            let writer = dir.appendingPathComponent("w.img")
+            try HFSPlusWriter.makeHFS(writer, size: 32 << 20, journaled: false)
+            // the writer dates what it makes as a mount would: now
+            let now = UInt32(Date().timeIntervalSince1970 + HFSPlusWriter.hfsEpoch)
+            try await VolumeMount.withVolume(
+                writer,
+                at: dir.appendingPathComponent("mnt"),
+                date: now,
+                backend: .writer
+            ) { v in
+                try SystemEdits.copyTree(MountedVolume(root: src), "", to: v, "")
+            }
+            let modified = { (img: URL) in
+                Dictionary(
+                    uniqueKeysWithValues: try HFSPlusVolume(img).paths().map { ($0.path, $0.record.dates[0..<2]) }
+                )
+            }
+            let k = try modified(kernel)
+            let w = try modified(writer)
+            for rel in ["a", "a/b", "a/b/f", "a/g", "c", "c/h", "top"] {
+                #expect(w[rel] != nil && w[rel] == k[rel], "\(rel): writer \(w[rel] ?? []), kernel \(k[rel] ?? [])")
+            }
+            let back = try DevicePath.real(dir).appendingPathComponent("back")
+            let wv = try HFSPlusWriter(writer)
+            try SystemEdits.copyTree(wv, "", to: MountedVolume(root: back), "")
+            for rel in ["a", "a/b", "a/b/f", "a/g", "c", "c/h", "top"] {
+                let a =
+                    try fm.attributesOfItem(atPath: src.appendingPathComponent(rel).path)[.modificationDate] as? Date
+                let b =
+                    try fm.attributesOfItem(atPath: back.appendingPathComponent(rel).path)[.modificationDate] as? Date
+                #expect(a == b, "\(rel) copied back out")
+            }
+        }
+    }
+
     /// The same edits give the same image, byte for byte.
     @Test func theSameEditsGiveTheSameBytes() throws {
         try Oracle.withTemp { dir in
@@ -351,6 +417,10 @@ import Testing
             let w = try HFSPlusWriter(img)
             try w.put(Data("x".utf8), at: "caf\u{E9}")
             try w.put(Data("y".utf8), at: "GMT-0:15")
+            // as DevicePath: a path under a missing folder is nothing there, and nothing can be made in it
+            try w.remove("no/such/file")
+            #expect(try w.item(at: "no/such/file") == nil && !w.exists("no/such"))
+            #expect(throws: FirmwareError.self) { try w.put(Data(), at: "no/such/file") }
             try w.setMode("", 0o700)  // the root, keyed by the volume's name
             #expect(try w.item(at: "")?.mode == 0o40700)
             #expect(try w.contents(at: "cafe\u{301}") == Data("x".utf8))

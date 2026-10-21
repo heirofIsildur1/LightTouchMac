@@ -114,7 +114,8 @@ public final class HFSPlusWriter: VolumeFiles {
             uid: be32(c, 32),
             gid: be32(c, 36),
             mode: be16(c, 42),
-            size: kind == .folder ? 0 : try contentSize(c)
+            size: kind == .folder ? 0 : try contentSize(c),
+            modified: Date(timeIntervalSince1970: TimeInterval(be32(c, 16)) - Self.hfsEpoch)
         )
     }
 
@@ -279,6 +280,7 @@ public final class HFSPlusWriter: VolumeFiles {
         guard let r = from.value else { throw FirmwareError(.internal, "\(path) does not exist") }
         let to = try lookup(destination)
         guard to.value == nil else { throw FirmwareError(.internal, "\(destination) exists") }
+        guard to.parent != 0 else { throw FirmwareError(.internal, "\(destination): no folder to hold it") }
         let folder = be16(r, 0) == Self.folderType
         if folder {
             var p = to.parent
@@ -307,6 +309,27 @@ public final class HFSPlusWriter: VolumeFiles {
     }
 
     public func setMode(_ path: String, _ mode: UInt16) throws { try setAttributes(path, mode: mode) }
+
+    /// Seconds from HFS's epoch (1904-01-01 UTC) to the Unix one; catalog dates are UTC seconds from 1904.
+    static let hfsEpoch: TimeInterval = 2_082_844_800
+
+    /// Sets the contentModDate of `path` (a hard link's inode's), as utimes does on a mount.
+    public func setModified(_ path: String, _ date: Date) throws {
+        let at = try lookup(path)
+        guard var r = at.value else { throw FirmwareError(.internal, "\(path) does not exist") }
+        var key = catalogKey(at.parent, at.name)
+        if isHardLink(r), let k = try inodeKey(r), let inode = catalog[k] {
+            key = k
+            r = inode
+        }
+        let seconds = (date.timeIntervalSince1970 + Self.hfsEpoch).rounded(.down)
+        let modified = UInt32(clamping: Int64(seconds))
+        putBE32(&r, 16, modified)
+        // a modification before the creation moves the creation back, as macOS's utimes does (but for the root,
+        // whose creation is the volume's)
+        if modified < be32(r, 12), be32(r, 8) != Self.rootID { putBE32(&r, 12, modified) }
+        catalog[key] = r
+    }
 
     public func extract(tar: URL, excluding: [String]) throws {
         try TarArchive(contentsOf: tar).extract(into: self, excluding: excluding)
@@ -439,8 +462,9 @@ public final class HFSPlusWriter: VolumeFiles {
     }
 
     /// Where `path` is: its parent folder, its catalog name, and its record if there is one.
-    /// Where `path` is: its parent folder, its catalog name, and its record if there is one. No link is followed
-    /// (DevicePath's rule): one on the way throws, as does a "." or ".." component.
+    /// Where `path` is: its parent folder, its catalog name, and its record if there is one (parent 0 when a folder
+    /// on the way is missing). No link is followed (DevicePath's rule): one on the way throws, as does a "." or ".."
+    /// component.
     private func lookup(_ path: String) throws -> (parent: UInt32, name: [UInt16], value: [UInt8]?) {
         let parts = path.split(separator: "/")
         guard !parts.contains(where: { $0 == "." || $0 == ".." }) else {
@@ -456,7 +480,8 @@ public final class HFSPlusWriter: VolumeFiles {
             let name = HFSUnicode.catalogName(HFSPlusVolume.catalogName(String(part)))
             let r = catalog[catalogKey(cur, name)]
             if i == parts.count - 1 { return (cur, name, r) }
-            guard let r else { throw FirmwareError(.internal, "\(path): no \(parts[...i].joined(separator: "/"))") }
+            // a folder on the way is missing: nothing is there (parent 0, which nothing can be created in)
+            guard let r else { return (0, name, nil) }
             guard !isSymlink(r) else {
                 throw FirmwareError(.unsupported, "\(path): a link on the device's volume, not followed")
             }
@@ -505,6 +530,9 @@ public final class HFSPlusWriter: VolumeFiles {
 
     /// Adds record `r` to folder `parent` as `name`, with its thread, counting it in the parent.
     private func insert(_ r: [UInt8], parent: UInt32, name: [UInt16]) throws {
+        guard parent != 0 else {
+            throw FirmwareError(.internal, "no folder to hold \(String(decoding: name, as: UTF16.self))")
+        }
         let folder = be16(r, 0) == Self.folderType
         guard name.count <= 255 else { throw FirmwareError(.internal, "a name longer than 255 characters") }
         catalog[catalogKey(parent, name)] = r
