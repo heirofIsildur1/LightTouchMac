@@ -402,6 +402,20 @@ extension String {
     var services: DeviceServices { DeviceServices(clientSocket: mux.clientSocket, session: serviceSession) }
 
     func brightness() -> Double? { process.link.frontSurface().map { FrameTools.brightness($0.surface) } }
+    /// Home, pressed and released: wakes a display that slept.
+    func home() async {
+        process.link.send(.button(0, down: true))
+        try? await Task.sleep(for: .milliseconds(150))
+        process.link.send(.button(0, down: false))
+    }
+    /// An iPad's lock screen turns its panel off about 7 s after it appears (iPhone OS 3.2, untouched): Home wakes it,
+    /// up to three times while the frame stays dark.
+    func wakeIPad() async {
+        for _ in 0..<3 where (brightness() ?? 1) < 0.05 {
+            await home()
+            try? await Task.sleep(for: .seconds(2))
+        }
+    }
     /// A screenshot as DisplayView takes one: the newest ring surface under a use count.
     @discardableResult
     func screenshot(_ label: String) -> String? {
@@ -744,12 +758,12 @@ func checkPreparedFiles() throws {
     async let s1: Void = waitUSB(ipod, expecting: "iPod2,1", 240)
     async let s2: Void = waitUSB(ipad, expecting: "iPad1,1", 240)
     _ = await (s1, s2)
-    // Wake the iPod (its display may have slept while it booted), then input to each:
-    // the lock screen sliders.
-    ipod.process.link.send(.button(0, down: true))
-    try? await Task.sleep(for: .milliseconds(150))
-    ipod.process.link.send(.button(0, down: false))
+    // Wake the iPod (its display may have slept while it booted) and the iPad (its lock screen sleeps on its own a few
+    // seconds after it appears, so a lockdown slower to answer than that left it dark), then input to each: the lock
+    // screen sliders.
+    await ipod.home()
     try? await Task.sleep(for: .seconds(3))
+    await ipad.wakeIPad()
     ipod.screenshot("ipod-lock")
     ipad.screenshot("ipad-lock")
     async let u1: Void = ipod.drag(0.18, 0.9, 0.92, 0.9)

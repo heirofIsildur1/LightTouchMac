@@ -225,7 +225,7 @@ nonisolated enum WiFiProbe {
                     let copy = Process()
                     copy.executableURL = URL(fileURLWithPath: "/usr/bin/env")
                     copy.arguments = [
-                        "idevicecrashreport", "-e", "-k", d.dir.appendingPathComponent("crash-\(generation)").path,
+                        "idevicecrashreport", "-e", "-k", d.dir.appendingPathComponent("crash-\(generation)").path
                     ]
                     copy.environment = ProcessInfo.processInfo.environment.merging(
                         ["USBMUXD_SOCKET_ADDRESS": d.mux.clientSocket]
@@ -296,7 +296,7 @@ nonisolated enum WiFiProbe {
                 "activationCompleted",
                 [
                     "device": d.name, "generation": generation, "ok": completed,
-                    "error": completed ? "" : lastError,
+                    "error": completed ? "" : lastError
                 ]
             )
             var zone: String?
@@ -336,7 +336,7 @@ nonisolated enum WiFiProbe {
                 ? [("WiFiAddress", "wifi-mac")]
                 : [
                     ("SerialNumber", "serial-number"), ("UniqueDeviceID", "udid"),
-                    ("WiFiAddress", "wifi-mac"), ("BluetoothAddress", "bt-mac"),
+                    ("WiFiAddress", "wifi-mac"), ("BluetoothAddress", "bt-mac")
                 ]
             let expected = Dictionary(
                 uniqueKeysWithValues: keys.compactMap { key, field in
@@ -359,7 +359,7 @@ nonisolated enum WiFiProbe {
                     "device": d.name, "generation": generation,
                     "want": expected["BluetoothAddress"] ?? "", "bt": values["BluetoothAddress"] ?? "",
                     "expected": expected, "values": values, "matches": !expected.isEmpty && values == expected,
-                    "seconds": Date().timeIntervalSince(start),
+                    "seconds": Date().timeIntervalSince(start)
                 ]
             )
         }
@@ -408,22 +408,13 @@ nonisolated enum WiFiProbe {
                 "guestVerdict",
                 [
                     "device": d.name, "generation": generation, "verdict": verdict.map { "\($0)" } ?? "none",
-                    "lastGood": record.lastGood ?? -1,
+                    "lastGood": record.lastGood ?? -1
                 ]
             )
         }
-        func home() async {
-            d.process.link.send(.button(0, down: true))
-            try? await Task.sleep(for: .milliseconds(150))
-            d.process.link.send(.button(0, down: false))
-        }
-        if !ipad { await home() }  // wake: the display may have slept while it booted
+        if !ipad { await d.home() }  // wake: the display may have slept while it booted
         try? await Task.sleep(for: .seconds(3))
-        // an iPad's lock screen turns the panel off ~10 s after it appears; Home wakes it
-        for _ in 0..<3 where ipad && (d.brightness() ?? 1) < 0.05 {
-            await home()
-            try? await Task.sleep(for: .seconds(2))
-        }
+        if ipad { await d.wakeIPad() }
         let lockShot = d.screenshot(generation == 1 ? "lock" : "lock\(generation)")
         // A lock whose guest package carries the agent (framecheck's home judge expects its answer) gets the wait
         // even when this run made no offer (no --ipad-itpack): its seed package starts the agent.
@@ -457,7 +448,7 @@ nonisolated enum WiFiProbe {
                 "setup",
                 [
                     "device": d.name, "generation": generation, "ok": ok && after != Setup5.bundleID, "detail": detail,
-                    "frontmost": after ?? "",
+                    "frontmost": after ?? ""
                 ]
             )
             try? await Task.sleep(for: .seconds(5))
@@ -493,7 +484,7 @@ nonisolated enum WiFiProbe {
             [
                 "device": d.name, "generation": generation, "brightness": d.brightness() ?? -1,
                 "backlight": d.process.status?.backlightLevel ?? -1, "agent": asks, "frontmost": front,
-                "screen": screen, "path": hp ?? "",
+                "screen": screen, "path": hp ?? ""
             ]
         )
         if generation == 1, let httpget = s.httpget {
@@ -515,7 +506,7 @@ nonisolated enum WiFiProbe {
                 "wifi",
                 [
                     "device": d.name, "agent": asks, "output": String(output.prefix(200)),
-                    "ok": output.hasPrefix("HTTP 200") && output.hasSuffix(WiFiProbe.body),
+                    "ok": output.hasPrefix("HTTP 200") && output.hasSuffix(WiFiProbe.body)
                 ]
             )
         }
@@ -533,14 +524,14 @@ nonisolated enum WiFiProbe {
                 [
                     "device": d.name, "language": (global["AppleLanguages"] as? [String])?.first ?? "",
                     "locale": global["AppleLocale"] as? String ?? "",
-                    "keyboards": (global["AppleKeyboards"] as? [String] ?? []).joined(separator: ","),
+                    "keyboards": (global["AppleKeyboards"] as? [String] ?? []).joined(separator: ",")
                 ]
             )
         }
         if s.skipSetup == true, generation == 1 {
             var values: [String: Any] = [
                 "device": d.name, "agent": asks,
-                "firstFront": (setupFront ?? phoneFront).map { "\($0.bundleID) \($0.name)" } ?? "",
+                "firstFront": (setupFront ?? phoneFront).map { "\($0.bundleID) \($0.name)" } ?? ""
             ]
             func plist(_ name: String) async -> [String: Any] {
                 guard asks,
@@ -615,7 +606,7 @@ nonisolated enum WiFiProbe {
                 "fileRead",
                 [
                     "device": d.name, "generation": generation, "path": path, "agent": asks,
-                    "found": data != nil, "content": data.map { String(decoding: $0, as: UTF8.self) } ?? "",
+                    "found": data != nil, "content": data.map { String(decoding: $0, as: UTF8.self) } ?? ""
                 ]
             )
         }
@@ -862,7 +853,7 @@ nonisolated enum WiFiProbe {
                     "hostPowerGesture",
                     [
                         "device": d.name, "generation": generation,
-                        "confirmed": d.process.status?.shutdownConfirmed == true,
+                        "confirmed": d.process.status?.shutdownConfirmed == true
                     ]
                 )
             } catch {
@@ -900,7 +891,7 @@ nonisolated enum WiFiProbe {
             "quit",
             [
                 "device": d.name, "generation": generation, "confirmed": confirmed, "exited": exited,
-                "reason": d.process.deathReason ?? "",
+                "reason": d.process.deathReason ?? ""
             ]
         )
         await d.services.stopWorker()
@@ -922,7 +913,7 @@ nonisolated enum WiFiProbe {
             }
             let answered = Date()
             var race: [String: Any] = [
-                "device": d.name, "generation": g, "lockdown": answered.timeIntervalSince(start),
+                "device": d.name, "generation": g, "lockdown": answered.timeIntervalSince(start)
             ]
             do { race["entries"] = try await d.services.files(in: "").count } catch { race["error"] = "\(error)" }
             race["seconds"] = Date().timeIntervalSince(answered)
@@ -1037,7 +1028,7 @@ nonisolated enum WiFiProbe {
                 "afc",
                 [
                     "device": d.name, "bytes": size, "listed": Int(file.size), "same": same,
-                    "seconds": Date().timeIntervalSince(start),
+                    "seconds": Date().timeIntervalSince(start)
                 ]
             )
         } catch {
@@ -1158,7 +1149,7 @@ nonisolated enum WiFiProbe {
         "resized",
         [
             "device": d.name, "width": surface?.width ?? 0, "height": surface?.height ?? 0,
-            "wantWidth": Int(want.width), "wantHeight": Int(want.height),
+            "wantWidth": Int(want.width), "wantHeight": Int(want.height)
         ]
     )
     // The dock: the bottom fifth of the shipped screen, then and now (the same width, so the same picture).
@@ -1186,7 +1177,7 @@ nonisolated enum WiFiProbe {
         "tapLanded",
         [
             "device": d.name, "x": 1.0 / 8, "y": y, "frontmost": front?.bundleID ?? "", "screen": front?.name ?? "",
-            "changed": tapped.flatMap { DockBand.differs(after, $0, rows: Int(want.height)) } ?? -1,
+            "changed": tapped.flatMap { DockBand.differs(after, $0, rows: Int(want.height)) } ?? -1
         ]
     )
     d.process.link.send(.button(0, down: true))
@@ -1269,7 +1260,7 @@ enum DockBand {
         ("apple id", [(981, 385, 0.2, alert), (585, 450, 0.12, title)]),
         ("terms", [(1002, 32, 0.12, alert), (565, 315, 0.12, title)]),
         ("diagnostics", [(242, 500, 0.12, (150, 150, 265, 620)), (42, 28, 0.12, title)]),
-        ("thank you", [(870, 385, 0.12, title)]),
+        ("thank you", [(870, 385, 0.12, title)])
     ]
 
     /// The box's BGRA bytes from the newest frame (nil without a 1024x768 frame).
@@ -1340,7 +1331,7 @@ enum DockBand {
     /// 5.0 beta 1 to 5.1.1.
     static let printBoxes: [Box] = [
         (795, 170, 830, 600), (860, 170, 895, 600), (840, 170, 852, 600),
-        (180, 300, 230, 450), (255, 300, 285, 450), (330, 300, 560, 450), (100, 150, 135, 700),
+        (180, 300, 230, 450), (255, 300, 285, 450), (330, 300, 560, 450), (100, 150, 135, 700)
     ]
     static func fingerprint(_ d: Device) -> [Double] { printBoxes.map { whiteFraction(d, $0) } }
 
@@ -1722,7 +1713,7 @@ nonisolated enum CydiaSources {
             Data(#"{ Filter = { Bundles = ( "com.apple.springboard" ); }; }"#.utf8)
         )
         try await agent.spawn([
-            "/bin/ln", "-s", "/Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate", probe[1],
+            "/bin/ln", "-s", "/Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate", probe[1]
         ])
         event["extensions"] = String(decoding: try await agent.spawn(["/bin/ls", dir]), as: UTF8.self)
             .split(separator: "\n").map(String.init)
@@ -1854,7 +1845,7 @@ nonisolated enum CydiaSources {
                     "setupLanguages",
                     [
                         "device": d.name, "generation": generation, "shot": shot,
-                        "every": SetupPlan.listsEveryLanguage(read),
+                        "every": SetupPlan.listsEveryLanguage(read)
                     ]
                 )
             }
