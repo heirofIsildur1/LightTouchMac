@@ -5,7 +5,11 @@
 //
 // Routing is CONFIG (web-proxy.conf), read per connection: `direct`, `off`, or
 // `archive` and a yyyyMMdd date. Upstream is URLSession (HTTP/2, the Mac's
-// trust store and proxy settings, a 128 MiB per-device URLCache beside CONFIG);
+// trust store, a 128 MiB per-device URLCache beside CONFIG) whose only way out
+// is this proxy's egress, a CONNECT listener on loopback that connects where
+// HostRuntime's NetworkPolicy allows: never this Mac itself, the local networks
+// only with Attach to Local Network on. A name is resolved once there and
+// connected to as checked; the Mac's own proxy settings are not used;
 // the guest side speaks what a 2009-2010 client does: HTTP/1.0 replies with
 // Connection: close, and TLS 1.0 (GuestTLS.c: SecureTransport, still able to) terminated
 // with a leaf per host from the device's own CA (WebProxyCA).
@@ -21,13 +25,15 @@
 
 import DeviceRuntime
 import Foundation
+import HostRuntime
+import Network
 import Security
 
 final class WebProxy: @unchecked Sendable {
     let config: URL
     let session: URLSession
     let archiveOrigin: String
-    /// Extra upstream roots (tests: a loopback HTTPS origin); the Mac's trust store otherwise.
+    /// Extra upstream roots; the Mac's trust store otherwise.
     let anchors: [SecCertificate]
     private let lock = NSLock()
     private var leafKey: SecKey?
@@ -54,6 +60,7 @@ final class WebProxy: @unchecked Sendable {
     private var _offline = false
     /// The device's Attach to Local Network, as slirp's lan= has it: off, a destination on the Mac's local
     /// networks gets a 502 rather than a connection that would make macOS ask for Local Network access.
+    /// On or off, this Mac's own addresses (loopback) are refused (NetworkPolicy).
     var localNetwork: Bool {
         get {
             lock.lock()
@@ -67,6 +74,8 @@ final class WebProxy: @unchecked Sendable {
         }
     }
     private var _localNetwork = true
+    /// The egress is listening; without it URLSession has no way out and nothing is fetched.
+    private let egressReady: Bool
 
     /// LTM_WEB_PROXY_TRACE set: one stderr line per request (`sessions proxy-trust`: did Safari's page come here).
     static let trace = ProcessInfo.processInfo.environment["LTM_WEB_PROXY_TRACE"] != nil
@@ -86,6 +95,14 @@ final class WebProxy: @unchecked Sendable {
         configuration.httpShouldSetCookies = false
         configuration.urlCredentialStorage = nil
         configuration.timeoutIntervalForRequest = 60
+        // Every request URLSession makes, plain HTTP too, is a CONNECT to the egress. Without one it makes none.
+        let (egress, port) = Self.egressSocket()
+        if let port = NWEndpoint.Port(rawValue: port) {
+            configuration.proxyConfigurations = [
+                ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port))
+            ]
+        }
+        egressReady = egress >= 0
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
         session = URLSession(configuration: configuration, delegate: nil, delegateQueue: queue)
@@ -95,6 +112,7 @@ final class WebProxy: @unchecked Sendable {
         where name.hasPrefix(config.lastPathComponent + ".archive-") {
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
         }
+        if egress >= 0 { accepting(egress, name: "web-proxy-egress") { self.egress($0) } }
     }
 
     /// Serves `path` (a Unix socket, owner-only) on a thread of its own; one thread per connection.
@@ -116,15 +134,20 @@ final class WebProxy: @unchecked Sendable {
             close(fd)
             throw Reply(503, "Can't listen on \(path): \(String(cString: strerror(errno)))")
         }
-        let accepting = Thread { [self] in
+        accepting(fd, name: "web-proxy") { self.serve($0) }
+    }
+
+    /// One thread accepting on `fd`, one more per connection.
+    private func accepting(_ fd: Int32, name: String, _ serve: @escaping @Sendable (Int32) -> Void) {
+        let thread = Thread {
             while true {
                 let connection = accept(fd, nil, nil)
                 if connection < 0 { if errno == EINTR || errno == ECONNABORTED { continue } else { return } }
-                Thread.detachNewThread { self.serve(connection) }
+                Thread.detachNewThread { serve(connection) }
             }
         }
-        accepting.name = "web-proxy"
-        accepting.start()
+        thread.name = name
+        thread.start()
     }
 
     // MARK: - One connection
@@ -192,21 +215,11 @@ final class WebProxy: @unchecked Sendable {
             }
             if method == "CONNECT" {
                 guard tunnel == nil else { throw Reply(400, "Nested TLS tunnels are unsupported") }
-                guard target.utf8.count < 300 else { throw Reply(400, "Tunnel destination too long") }
-                guard let colon = target.lastIndex(of: ":"), colon != target.startIndex else {
-                    throw Reply(400, "Invalid tunnel destination")
-                }
-                guard let port = Int(target[target.index(after: colon)...]), (1...65535).contains(port) else {
-                    throw Reply(400, "Invalid tunnel port")
-                }
-                var host = String(target[..<colon])
-                if host.count > 2, host.hasPrefix("["), host.hasSuffix("]") {
-                    host = String(host.dropFirst().dropLast())
-                }
+                let (host, port) = try Self.authority(target)
                 if mode == .direct, WebProxyAdapters.retired(host: host) {
                     throw Reply(410, "This online service has been retired")
                 }
-                if !localNetwork, Self.isLocalNetwork(host: host) { throw Reply(502, "Local network access is off") }
+                try screen(host)
                 if mode != .off, FileManager.default.fileExists(atPath: config.path + ".ca.pem") {
                     guard let identity = try? leaf(host) else { throw Reply(503, "Local TLS certificate unavailable") }
                     guard guest.write("HTTP/1.0 200 Connection established\r\n\r\n"), guest.startTLS(identity) else {
@@ -216,7 +229,9 @@ final class WebProxy: @unchecked Sendable {
                     continue
                 }
                 if case .archive = mode { throw Reply(405, "Dated HTTPS needs the local TLS bridge") }
-                guard let remote = Self.connect(host, port) else { throw Reply(502, "Destination unavailable") }
+                guard let remote = NetworkPolicy.connect(try resolve(host, port)) else {
+                    throw Reply(502, "Destination unavailable")
+                }
                 if guest.write("HTTP/1.0 200 Connection established\r\n\r\n") { Self.relay(guest.fd, remote) }
                 close(remote)
                 return
@@ -243,9 +258,8 @@ final class WebProxy: @unchecked Sendable {
             if mode == .direct, WebProxyAdapters.retired(host: host) {
                 throw Reply(410, "This online service has been retired")
             }
-            if !localLocation, !localNetwork, Self.isLocalNetwork(host: host) {
-                throw Reply(502, "Local network access is off")
-            }
+            // URLSession goes past its proxy to a loopback or link-local literal, so those are refused here.
+            if !localLocation { try screen(host) }
             if case .archive(let date) = mode, !localLocation {
                 guard components.user == nil, components.password == nil else {
                     throw Reply(400, "Archive URLs cannot contain credentials")
@@ -369,6 +383,7 @@ final class WebProxy: @unchecked Sendable {
     /// The origin's response, streamed as it arrives; its status and headers as they were, less the hop-by-hop
     /// ones and what URLSession consumed (Content-Encoding it decoded, with that length; Set-Cookie re-split).
     private func stream(_ request: URLRequest, store: Bool, to guest: Guest) throws {
+        guard egressReady else { throw Reply(503, "Proxy egress unavailable") }
         let upstream = Upstream(anchors: anchors, store: store)
         let task = session.dataTask(with: request)
         upstream.task = task
@@ -426,6 +441,7 @@ final class WebProxy: @unchecked Sendable {
 
     /// A whole response, at most `limit` bytes (nil past it or on an error).
     private func fetch(_ request: URLRequest, limit: Int) -> (HTTPURLResponse, Data)? {
+        guard egressReady else { return nil }
         let upstream = Upstream(anchors: anchors, store: false)
         let task = session.dataTask(with: request)
         upstream.task = task
@@ -573,54 +589,87 @@ final class WebProxy: @unchecked Sendable {
         return identity
     }
 
-    /// A .local name (resolving it would itself be a local-network operation), or a host any of whose
-    /// addresses is private, link-local or multicast: the ranges slirp's lan=off refuses.
-    static func isLocalNetwork(host: String) -> Bool {
-        let name = host.lowercased()
-        if name.hasSuffix(".local") || name.hasSuffix(".local.") { return true }
-        var hints = addrinfo()
-        var list: UnsafeMutablePointer<addrinfo>?
-        hints.ai_socktype = SOCK_STREAM
-        guard getaddrinfo(host, nil, &hints, &list) == 0 else { return false }
-        defer { freeaddrinfo(list) }
-        for entry in sequence(first: list, next: { $0?.pointee.ai_next }) {
-            guard let a = entry?.pointee.ai_addr else { continue }
-            if a.pointee.sa_family == AF_INET {
-                let ip = UInt32(bigEndian: UnsafeRawPointer(a).load(as: sockaddr_in.self).sin_addr.s_addr)
-                if ip >> 24 == 10 || ip >> 20 == 0xac1 || ip >> 16 == 0xc0a8 || ip >> 16 == 0xa9fe || ip >> 28 == 0xe
-                    || ip == .max
-                {
-                    return true
-                }
-            } else if a.pointee.sa_family == AF_INET6 {
-                let b = UnsafeRawPointer(a).load(as: sockaddr_in6.self).sin6_addr.__u6_addr.__u6_addr8
-                if b.0 & 0xfe == 0xfc || (b.0 == 0xfe && b.1 & 0xc0 == 0x80) || b.0 == 0xff { return true }
-            }
+    // MARK: - Where requests may go (NetworkPolicy)
+
+    /// `host:port` or `[v6]:port`.
+    static func authority(_ target: String) throws -> (String, Int) {
+        guard target.utf8.count < 300 else { throw Reply(400, "Tunnel destination too long") }
+        guard let colon = target.lastIndex(of: ":"), colon != target.startIndex else {
+            throw Reply(400, "Invalid tunnel destination")
         }
-        return false
+        guard let port = Int(target[target.index(after: colon)...]), (1...65535).contains(port) else {
+            throw Reply(400, "Invalid tunnel port")
+        }
+        var host = String(target[..<colon])
+        if host.count > 2, host.hasPrefix("["), host.hasSuffix("]") {
+            host = String(host.dropFirst().dropLast())
+        }
+        return (host, port)
     }
 
-    // MARK: - Raw tunnel (off, or no CA)
-
-    static func connect(_ host: String, _ port: Int) -> Int32? {
-        var hints = addrinfo()
-        var list: UnsafeMutablePointer<addrinfo>?
-        hints.ai_socktype = SOCK_STREAM
-        guard getaddrinfo(host, String(port), &hints, &list) == 0 else { return nil }
-        defer { freeaddrinfo(list) }
-        var entry = list
-        while let a = entry?.pointee {
-            entry = a.ai_next
-            let fd = socket(a.ai_family, a.ai_socktype, a.ai_protocol)
-            guard fd >= 0 else { continue }
-            var timeout = timeval(tv_sec: 10, tv_usec: 0)
-            var on: Int32 = 1
-            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
-            setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
-            if Darwin.connect(fd, a.ai_addr, a.ai_addrlen) == 0 { return fd }
-            close(fd)
+    static func reply(_ refusal: NetworkPolicy.Refusal) -> Reply {
+        switch refusal {
+        case .host: Reply(403, "This Mac's own services are not reachable from the device")
+        case .localNetwork: Reply(502, "Local network access is off")
+        case .unresolved: Reply(502, "Destination unavailable")
         }
-        return nil
+    }
+
+    /// What can be refused before resolving (an address, localhost, .local); a name is judged as it resolves.
+    private func screen(_ host: String) throws {
+        do { try NetworkPolicy.screen(host, localNetwork: localNetwork) } catch { throw Self.reply(error) }
+    }
+
+    private func resolve(_ host: String, _ port: Int) throws -> [NetworkPolicy.Endpoint] {
+        do { return try NetworkPolicy.resolve(host, port: port, localNetwork: localNetwork) } catch {
+            throw Self.reply(error)
+        }
+    }
+
+    // MARK: - Egress (URLSession's way out) and the raw tunnel (off, or no CA)
+
+    /// A listening TCP socket on 127.0.0.1 and its port; -1 and 0 if none could be made.
+    private static func egressSocket() -> (Int32, UInt16) {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var size = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, size) == 0 && Darwin.listen(fd, 64) == 0 && getsockname(fd, $0, &size) == 0
+            }
+        }
+        guard fd >= 0, bound else {
+            close(fd)
+            return (-1, 0)
+        }
+        return (fd, UInt16(bigEndian: address.sin_port))
+    }
+
+    /// One CONNECT from URLSession: to the destination's addresses as NetworkPolicy checked them, then both ways.
+    private func egress(_ fd: Int32) {
+        var timeout = timeval(tv_sec: 60, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        let client = Guest(fd: fd)
+        defer { client.finish() }
+        do {
+            let (method, target, _) = try readHead(client)
+            guard method == "CONNECT" else { throw Reply(405, "CONNECT only") }
+            let (host, port) = try Self.authority(target)
+            guard let remote = NetworkPolicy.connect(try resolve(host, port)) else {
+                throw Reply(502, "Destination unavailable")
+            }
+            if client.write("HTTP/1.1 200 Connection established\r\n\r\n") { Self.relay(fd, remote) }
+            close(remote)
+        } catch {
+            let reply = error as? Reply ?? Reply(502, "Destination unavailable")
+            if Self.trace { writeStandardError("web-proxy egress: \(reply.status) \(reply.message)\n") }
+            _ = client.write("HTTP/1.1 \(reply.status) \(reply.message)\r\nContent-Length: 0\r\n\r\n")
+        }
     }
 
     /// Both directions until the remote closes; the guest's end of input is passed on as a half-close.

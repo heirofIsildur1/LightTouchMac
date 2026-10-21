@@ -27,6 +27,9 @@ struct ProxyConfig: Decodable {
     /// LAN address) with Attach to Local Network off, then `lan` again once `.netLocalNetwork(true)` opens it; then stop.
     var lan: String?
     var internet: String?
+    /// Pages on a listener on this Mac's loopback, asked for every way a guest could (10.0.2.2 through slirp,
+    /// addresses and a name through the proxy): fetched with the LAN off and again once it is on.
+    var loopback: [String]?
     /// A plain host name's page, fetched DIRECT (the PAC) while the LAN is off: the guest's own DNS through slirp,
     /// with the netdev's `domainname` completing the name.
     var dns: String?
@@ -234,10 +237,12 @@ nonisolated enum ProxyProbe {
         if let internet = p.internet { await get("internet", internet) }
         if let dns = p.dns { await get("dns", dns) }
         await get("lan-off", lan)
+        for (i, url) in (p.loopback ?? []).enumerated() { await get("loopback-off-\(i)", url) }
         emit("lan-on", ["at": Date().timeIntervalSince1970])
         d.process.link.send(.netLocalNetwork(true))
         try? await Task.sleep(for: .seconds(1))
         await get("lan-on", lan)
+        for (i, url) in (p.loopback ?? []).enumerated() { await get("loopback-on-\(i)", url) }
         d.process.terminate()
         _ = await d.process.waitForExit(timeout: 30)
         d.mux.stop()

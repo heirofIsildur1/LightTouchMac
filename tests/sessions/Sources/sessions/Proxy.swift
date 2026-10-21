@@ -1,4 +1,5 @@
 import Foundation
+import HostRuntime
 import SessionKit
 
 /// contrib/it-proxy/httpget of the pinned qemu-ios checkout (armv6; the guest's own CFNetwork client), or --httpget.
@@ -146,32 +147,13 @@ let socketShim = #"""
     INTERPOSE(c, connect) INTERPOSE(st, sendto) INTERPOSE(sm, sendmsg) INTERPOSE(cx, connectx)
     """#
 
-/// A destination macOS counts as the local network (and asks the user about): private, link-local, multicast or
-/// broadcast, or one of this Mac's DNS servers. Loopback is not.
+/// A destination macOS counts as the local network (and asks the user about): one of this Mac's DNS servers, or
+/// an address NetworkPolicy, the rule the helper's proxy and slirp apply, puts on the local network. This Mac's own
+/// addresses (loopback: the proxy's egress among them) are not.
 func localNetwork(_ host: String, dnsServers: Set<String>) -> Bool {
     let host = String(host.split(separator: "%").first ?? "")
     if dnsServers.contains(host) { return true }
-    var v4 = in_addr()
-    var v6 = in6_addr()
-    var bytes: [UInt8]
-    if inet_pton(AF_INET, host, &v4) == 1 {
-        bytes = withUnsafeBytes(of: v4) { Array($0) }
-    } else if inet_pton(AF_INET6, host, &v6) == 1 {
-        let b6 = withUnsafeBytes(of: v6) { Array($0) }
-        if b6[0..<10].allSatisfy({ $0 == 0 }) && b6[10] == 0xff && b6[11] == 0xff {
-            bytes = Array(b6[12...])
-        }  // v4-mapped
-        else {
-            if b6 == [UInt8](repeating: 0, count: 15) + [1] { return false }  // ::1
-            return b6[0] & 0xfe == 0xfc || (b6[0] == 0xfe && b6[1] & 0xc0 == 0x80) || b6[0] == 0xff
-        }
-    } else {
-        return false
-    }
-    let (a, b) = (bytes[0], bytes[1])
-    if a == 127 { return false }
-    return a == 0 || a == 10 || (a == 100 && b & 0xc0 == 64) || (a == 169 && b == 254) || (a == 172 && b & 0xf0 == 16)
-        || (a == 192 && b == 168) || (a == 198 && b & 0xfe == 18) || a >= 224
+    return NetworkPolicy.address(host).map { NetworkPolicy.reach($0) == .localNetwork } ?? false
 }
 
 /// A one-page HTTP listener on `address` standing in for a host on the Mac's LAN: the paths it was asked for.
@@ -251,6 +233,13 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
     let tools = Tools.resolve(args.inputs, work: work)
     guard let probe = LANProbe(address: lanIP) else { die("could not listen on \(lanIP)") }
     let lanURL = "http://\(lanIP):\(probe.port)/lan-probe"
+    // This Mac's own services, never the device's: through slirp's gateway, and through the proxy (the PAC sends
+    // these there) by the unspecified address, a v4-mapped one, and a public name that resolves to loopback.
+    guard let loopback = LANProbe(address: "127.0.0.1") else { die("could not listen on 127.0.0.1") }
+    let loopbackURLs = [
+        "10.0.2.2:\(loopback.port)/nat", "0.0.0.0:\(loopback.port)/zero",
+        "[::ffff:127.0.0.1]:\(loopback.port)/mapped", "localtest.me:\(loopback.port)/name",
+    ].map { "http://" + $0 }
 
     // The shim, for every architecture a child may be (system tools are arm64e), and a helper copy it can load into.
     let source = work.appendingPathComponent("socket-log.c")
@@ -295,7 +284,8 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
     config["proxy"] = [
         "board": base.driverBoard, "base": base.url.path, "restricted": restricted,
         "itpack": tools.guest.appendingPathComponent("guest-tools/armv6.itpack").path,
-        "httpget": httpget(args.inputs).path, "url": "", "lan": lanURL, "internet": args.internet,
+        "httpget": httpget(args.inputs).path, "url": "", "lan": lanURL, "loopback": loopbackURLs,
+        "internet": args.internet,
         "dns": args.dns, "domain": args.domain,
     ]
     let sockets = work.appendingPathComponent("sockets.log")
@@ -307,6 +297,7 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
             ["DYLD_INSERT_LIBRARIES": shim.path, "LTM_SOCKET_LOG": sockets.path]) { $1 }
     )
     probe.stop()
+    loopback.stop()
 
     func got(_ label: String) -> String { e.find("get", ["label": label]).first?.string("output") ?? "" }
     let r = Report()
@@ -321,6 +312,13 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
         restricted
             ? on.hasPrefix("ERROR") && probe.hits.isEmpty : on.hasPrefix("HTTP 200") && probe.hits == ["/lan-probe"],
         "the LAN \(restricted ? "still refused" : "reached") once turned on: \(clip(on, 60)), the listener saw \(probe.hits)"
+    )
+    let asked = loopbackURLs.indices.flatMap { i in
+        ["off", "on"].map { "\(loopbackURLs[i]) (LAN \($0)): \(clip(got("loopback-\($0)-\(i)"), 40))" }
+    }
+    r.check(
+        loopback.hits.isEmpty && asked.count == 2 * loopbackURLs.count,
+        "this Mac's loopback never reached, the LAN off or on: the listener saw \(loopback.hits); \(asked.joined(separator: "; "))"
     )
     r.check(
         got("dns").hasPrefix(restricted ? "ERROR" : "HTTP "),
