@@ -95,7 +95,7 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    Copy Files phases bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity
    and the hardened runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`: allow-jit, library validation on; a Debug build uses `LightTouchDevice-Debug.entitlements`, which also disables library validation for a development dylib).
    Archiving takes only Xcode's own time.
-3. **Test the archive**: `TEST_RUNNER_LTM_RELEASE_ARCHIVE=path/to/X.xcarchive xcodebuild test -workspace
+3. **Test the archive**: `TEST_RUNNER_LTM_RELEASE_ARCHIVE=path/to/X.xcarchive xcodebuild test -skipMacroValidation -workspace
    LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Release` (`TEST_RUNNER_LTM_RELEASE_APP` takes an app
    instead). `Packages/ReleaseChecks` checks the archived app: it is built from the current pins; every Mach-O
    signed, hardened, universal, with the declared entitlements and an in-bundle load closure at the app's minimum
@@ -160,8 +160,9 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
 Three commands, no runner around them:
 
 ```sh
-# no emulator: every package's Swift Testing suites (the list is Unit.xctestplan)
-xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit
+# no emulator: every package's Swift Testing suites (the list is Unit.xctestplan); -skipMacroValidation for
+# swift-binary-parsing's macro target, which Xcode itself asks once to trust
+xcodebuild test -skipMacroValidation -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit
 # emulator sessions on prepared bases (firmwarekit create output), one boot at a time; `sessions --help` for the rest
 swift run --package-path tests/sessions sessions single BASE [--launch] [--reboot]
 # as a device the user already has, through the app's boot admission; an old device must take its admission steps
@@ -171,7 +172,7 @@ swift run --package-path tests/sessions sessions single OLD_DEVICE --expect-admi
 swift run --package-path tests/sessions sessions phone N90_BASE --only carrier --overlay PAST_SETUP_OVERLAY
 swift run --package-path tests/sessions sessions local-network N72_BASE
 # a built app (Releases, step 3)
-TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -workspace LightTouchMac.xcworkspace \
+TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -skipMacroValidation -workspace LightTouchMac.xcworkspace \
     -scheme LightTouchMac -testPlan Release
 ```
 

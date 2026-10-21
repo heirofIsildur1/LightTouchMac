@@ -40,8 +40,13 @@ struct ReleaseAppStaticTests {
                 try run(["codesign", "-dv", binary.path]).error.contains("(runtime)"),
                 "\(name): no hardened runtime"
             )
-            // both host slices; the toolchain's Swift compatibility libraries carry arm64e besides
-            #expect(Self.archs.isSubset(of: try MachOClosure.architectures(binary)), "\(name): slices")
+            // exactly the host slices, but the toolchain's Swift compatibility libraries, which carry arm64e besides
+            let slices = Set(try MachOClosure.architectures(binary))
+            if binary.lastPathComponent.hasPrefix("libswiftCompatibility") {
+                #expect(Self.archs.isSubset(of: slices), "\(name): slices")
+            } else {
+                #expect(slices == Self.archs, "\(name): slices")
+            }
             let dump = try run(["codesign", "-d", "--entitlements", "-", "--xml", binary.path]).output
             let granted =
                 dump.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
