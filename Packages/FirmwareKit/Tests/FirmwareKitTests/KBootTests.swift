@@ -74,7 +74,7 @@ struct KBootTests {
         k += Data(count: 0x2000 - k.count) + Data(repeating: 0x44, count: 16)
         return k
     }
-    static func u32(_ d: Data, _ at: Int) -> UInt32 { MachO.u32(d, at) }
+    static func u32(_ d: Data, _ at: Int) -> UInt32 { (try? MachO.u32(d, at)) ?? 0 }
 
     /// N81: the board comes from the DT's compatible; its NOR is grafted in and boot-from-nand renamed away.
     @Test func n81Board() throws {

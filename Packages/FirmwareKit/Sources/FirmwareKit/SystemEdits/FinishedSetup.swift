@@ -106,17 +106,17 @@ extension SystemEdits {
                 .first(where: { $0.hasPrefix("icudt") && $0.hasSuffix("l.dat") }),
             let data = try? Data(contentsOf: icu.appendingPathComponent(name), options: .alwaysMapped)
         else { return nil }
-        return data.withUnsafeBytes { b -> Set<String>? in
+        return try? data.withUnsafeBytes { b throws -> Set<String>? in
             // ICU's common data: a header (its size, magic DA 27, format "CmnD"), then the entry count and each
             // entry's name and data offsets, both from the header's end.
             guard b.count > 24, b[2] == 0xDA, b[3] == 0x27, Array(b[12..<16]) == Array("CmnD".utf8) else { return nil }
-            let toc = Int(b.u16le(0))
+            let toc = Int(try b.u16le(0))
             guard toc + 4 <= b.count else { return nil }
-            let count = Int(b.u32le(toc))
+            let count = Int(try b.u32le(toc))
             guard toc + 4 + count * 8 <= b.count else { return nil }
             var out = Set<String>()
             for i in 0..<count {
-                let at = toc + Int(b.u32le(toc + 4 + i * 8))
+                let at = toc + Int(try b.u32le(toc + 4 + i * 8))
                 guard at < b.count, let end = b[at...].firstIndex(of: 0) else { return nil }
                 // a locale is a top-level .res ("icudt42l/uk_UA.res"); coll/ and the like are not region formats
                 let path = String(decoding: b[at..<end], as: UTF8.self).split(separator: "/")

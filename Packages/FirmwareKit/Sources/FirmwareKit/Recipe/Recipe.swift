@@ -57,7 +57,9 @@ public enum Recipe {
         let o: Preparer.Options, e: FirmwareEntry, recipe: FirmwareEntry.Recipe
         let emit: (PrepareEvent) -> Void
         let work: URL, nand: URL
-        var ipsw: IPSWArchive { IPSWArchive(o.ipsw) }
+        /// The verify step's private copy of the IPSW (Preparer.pinnedCopy), the only one read after it.
+        var source: URL?
+        var ipsw: IPSWArchive { IPSWArchive(source ?? work.appendingPathComponent("unverified.ipsw")) }
         /// Filled by the verify, decrypt and identity steps.
         var sha1 = "", restore: RestoreInfo?, dec: URL?, seed = "", ident: UnitIdentity?
         /// The Cydia bootstrap (recipe option jailbreak), fetched by the decrypt step.
@@ -109,7 +111,9 @@ public enum Recipe {
         }
         try board.check(c)
         if e.estimates.peakBytes > 0 {
-            try StorageCapacity.require(e.estimates.peakBytes - (e.source.bytes ?? 0), at: o.out)
+            // The verify step's copy is a clone on the IPSW's own volume and a full copy from another.
+            let cloned = Preparer.sameVolume(o.ipsw.resolvingSymlinksInPath(), o.out)
+            try StorageCapacity.require(e.estimates.peakBytes - (cloned ? e.source.bytes ?? 0 : 0), at: o.out)
         }
         let steps =
             ["Verifying the IPSW", "Decrypting the firmware", board.bootStep, board.volumesStep, "Writing the NAND"]
@@ -133,10 +137,8 @@ public enum Recipe {
             total: (try? fm.attributesOfItem(atPath: o.ipsw.resolvingSymlinksInPath().path)[.size] as? Int) ?? 0
         )
         progress.measure = { ipswBytes.fraction }
-        c.sha1 = try Preparer.digest(o.ipsw, Insecure.SHA1(), count: ipswBytes.add)
-        guard c.sha1 == sha1.lowercased() else {
-            throw FirmwareError(.shaMismatch, "\(o.ipsw.lastPathComponent): sha1 \(c.sha1), \(e.id) pins \(sha1)")
-        }
+        c.source = try Preparer.pinnedCopy(o.ipsw, sha1: sha1, entry: e.id, into: c.work, count: ipswBytes.add)
+        c.sha1 = sha1.lowercased()
         let restore = try RestoreInfo(c.ipsw)
         c.restore = restore
         try restore.verify(against: e)
@@ -151,7 +153,7 @@ public enum Recipe {
             root: cacheRoot,
             identity: .init(ipsw: sha1, entry: e),
             produce: { tmp in
-                try FirmwareDecryptor.decrypt(ipsw: o.ipsw, entry: e, into: tmp).files
+                try FirmwareDecryptor.decrypt(ipsw: c.source.filled("the verified IPSW"), entry: e, into: tmp).files
             },
             reused: {
                 c.log("reusing verified decrypt-cache manifest for \(e.id)")
@@ -309,7 +311,12 @@ public enum Recipe {
                 "\(c.e.id): the keybag ramdisk comes from \(from); pass --sibling-entry/--sibling-ipsw for it"
             )
         }
-        let rd = try Preparer.siblingRamdisk(sib.entry, ipsw: sib.ipsw, work: c.work)
+        guard let sibSHA1 = sib.entry.source.sha1 else {
+            throw FirmwareError(.unsupported, "\(sib.entry.id) pins no IPSW sha1")
+        }
+        let sibIPSW = try Preparer.pinnedCopy(sib.ipsw, sha1: sibSHA1, entry: sib.entry.id, into: c.work)
+        defer { try? FileManager.default.removeItem(at: sibIPSW) }
+        let rd = try Preparer.siblingRamdisk(sib.entry, ipsw: sibIPSW, work: c.work)
         c.log("keybag ramdisk: \(from):\(rd.lastPathComponent) (this build has no ramdisk key)")
         return (rd, "\(from):\(rd.lastPathComponent)")
     }

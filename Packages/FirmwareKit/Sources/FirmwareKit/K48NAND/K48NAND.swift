@@ -477,11 +477,11 @@ public enum K48NAND {
             }
             let pool = ((i - 4) & ~3) + 4 + Int(d[i - 4]) * 4
             guard pool + 4 <= d.count else { continue }
-            let target = MachO.u32(d, pool) & ~1
-            guard let seg = m.segments.first(where: { $0.vmaddr <= target && target < $0.vmaddr + $0.vmsize }) else {
+            let target = try MachO.u32(d, pool) & ~1
+            guard let seg = m.segments.first(where: { $0.vmaddr <= target && target - $0.vmaddr < $0.vmsize }) else {
                 continue
             }
-            let o = Int(seg.fileoff + (target - seg.vmaddr))
+            let o = Int(seg.fileoff) + Int(target - seg.vmaddr)
             guard o + 2 <= d.count, d[o + 1] == 0x20 else { continue }  // movs r0, #N
             return d[o]
         }

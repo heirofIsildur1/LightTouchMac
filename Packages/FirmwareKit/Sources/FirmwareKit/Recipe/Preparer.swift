@@ -332,6 +332,36 @@ public enum Preparer {
         return h.finalize().hexString
     }
 
+    /// A private copy of an IPSW in `work`, checked against the sha1 its entry pins, and the only file read after:
+    /// the bytes hashed are the bytes parsed, whatever happens to the user's file (on another volume, or changed
+    /// after the check). On the same APFS volume the copy is a clone, which takes no space and which a later write
+    /// to the original doesn't reach.
+    static func pinnedCopy(
+        _ ipsw: URL,
+        sha1: String,
+        entry: String,
+        into work: URL,
+        count: ((Int) -> Void)? = nil
+    ) throws -> URL {
+        let fm = FileManager.default
+        try fm.createDirectory(at: work, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let copy = work.appendingPathComponent("\(sha1.lowercased()).ipsw")
+        try? fm.removeItem(at: copy)
+        try fm.copyItem(at: ipsw.resolvingSymlinksInPath(), to: copy)
+        let actual = try digest(copy, Insecure.SHA1(), count: count)
+        guard actual == sha1.lowercased() else {
+            try? fm.removeItem(at: copy)
+            throw FirmwareError(.shaMismatch, "\(ipsw.lastPathComponent): sha1 \(actual), \(entry) pins \(sha1)")
+        }
+        return copy
+    }
+
+    static func sameVolume(_ a: URL, _ b: URL) -> Bool {
+        var sa = stat()
+        var sb = stat()
+        return stat(a.path, &sa) == 0 && stat(b.path, &sb) == 0 && sa.st_dev == sb.st_dev
+    }
+
     static func sha256(_ d: Data) -> String { SHA256.hash(data: d).hexString }
 
     /// fit.json's bytes (DeviceLock writes device.lock.json's). A value JSONSerialization cannot write (a Swift box, an Optional) is an error

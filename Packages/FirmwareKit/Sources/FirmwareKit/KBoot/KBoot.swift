@@ -293,7 +293,7 @@ public enum KBoot {
     static func landingMap(_ dt: inout DeviceTree) throws {
         let disk = "arm-io/flash-controller0/disk"
         guard dt.props[disk]?["landing-map"] != nil, let reg = dt.value(disk, "reg"), reg.count >= 4 else { return }
-        let ces = MachO.u32(reg, 0)
+        let ces = try MachO.u32(reg, 0)
         let words = (0..<4).map { ces & (0xFF << (8 * UInt32($0))) }.filter { $0 != 0 }
         try dt.rename(disk, "landing-map", "landing-map-dt")
         try dt.add(disk, "landing-map", DeviceTree.Value.le(words))
@@ -652,26 +652,26 @@ public struct MachO: Sendable {
 
     public init(_ data: Data) throws {
         self.data = data
-        guard data.count >= 28, Self.u32(data, 0) == 0xFEED_FACE else {
+        guard data.count >= 28, try Self.u32(data, 0) == 0xFEED_FACE else {
             throw FirmwareError(.unsupported, "not a 32-bit Mach-O")
         }
         var segs: [Segment] = []
         var off = 28
-        for _ in 0..<Self.u32(data, 16) {
+        for _ in 0..<(try Self.u32(data, 16)) {
             guard off + 8 <= data.count else {
                 throw FirmwareError(.unsupported, "Mach-O load commands run past the file")
             }
-            let cmd = Self.u32(data, off)
-            let size = Int(Self.u32(data, off + 4))
+            let cmd = try Self.u32(data, off)
+            let size = Int(try Self.u32(data, off + 4))
             if cmd == 1 {  // LC_SEGMENT
-                let nameBytes = data[data.startIndex + off + 8..<data.startIndex + off + 24].prefix { $0 != 0 }
+                let nameBytes = try data.withUnsafeBytes { [UInt8](try $0.bytes(off + 8, 16)) }.prefix { $0 != 0 }
                 segs.append(
                     Segment(
                         name: String(decoding: nameBytes, as: UTF8.self),
-                        vmaddr: Self.u32(data, off + 24),
-                        vmsize: Self.u32(data, off + 28),
-                        fileoff: Self.u32(data, off + 32),
-                        filesize: Self.u32(data, off + 36)
+                        vmaddr: try Self.u32(data, off + 24),
+                        vmsize: try Self.u32(data, off + 28),
+                        fileoff: try Self.u32(data, off + 32),
+                        filesize: try Self.u32(data, off + 36)
                     )
                 )
             }
@@ -741,15 +741,15 @@ public struct MachO: Sendable {
     /// LC_UNIXTHREAD's ARM_THREAD_STATE pc (r15).
     public func entry() throws -> UInt32 {
         var off = 28
-        for _ in 0..<Self.u32(data, 16) {
-            let cmd = Self.u32(data, off)
-            let size = Int(Self.u32(data, off + 4))
-            if cmd == 5 { return Self.u32(data, off + 16 + 15 * 4) }
+        for _ in 0..<(try Self.u32(data, 16)) {
+            let cmd = try Self.u32(data, off)
+            let size = Int(try Self.u32(data, off + 4))
+            if cmd == 5 { return try Self.u32(data, off + 16 + 15 * 4) }
             guard size > 0 else { break }
             off += size
         }
         throw FirmwareError(.unsupported, "no LC_UNIXTHREAD")
     }
 
-    static func u32(_ d: Data, _ at: Int) -> UInt32 { d.withUnsafeBytes { $0.u32le(at) } }
+    static func u32(_ d: Data, _ at: Int) throws -> UInt32 { try d.u32le(at) }
 }

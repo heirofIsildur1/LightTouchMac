@@ -359,7 +359,7 @@ extension FitCheck {
     static func names(_ fw: Firmware, _ install: String, _ s: String) -> Bool {
         if let cache = fw.cache, let img = cache.image("/" + install) {
             return ["__objc_methname", "__cstring", "__objc_methtype"].contains {
-                cache.cStrings(in: img, section: $0).contains(s)
+                (try? cache.cStrings(in: img, section: $0))?.contains(s) == true
             }
         }
         return fw.data(install).map { contains($0, cString(s)) } ?? false
@@ -370,7 +370,7 @@ extension FitCheck {
     static func string(_ fw: Firmware, _ install: String, prefix: String) -> String? {
         if let cache = fw.cache, let img = cache.image("/" + install) {
             for sec in ["__cstring", "__objc_methtype"] {
-                if let hit = cache.cStrings(in: img, section: sec).first(where: { $0.contains(prefix) }),
+                if let hit = (try? cache.cStrings(in: img, section: sec))?.first(where: { $0.contains(prefix) }),
                     let r = hit.range(of: prefix)
                 {
                     return String(hit[r.lowerBound...])

@@ -772,6 +772,7 @@ enum FitFixture {
                 if id.hasPrefix("k48") { entry.recipe?.boot = "kboot" }
                 let o = Preparer.Options(entry: entry, ipsw: ipsw, out: dir, helper: nil, guestTools: dir)
                 let c = Recipe.Context(o, recipe: try #require(entry.recipe)) { _ in }
+                c.source = ipsw  // the verify step's copy, which these steps read
                 c.restore = try RestoreInfo(c.ipsw)
                 c.dec = cache
                 let board: Board = id.hasPrefix("k48") ? try K48Board(o) : try N72Board(o)
@@ -875,6 +876,7 @@ enum FitFixture {
                 guestTools: dir
             )
             let c = Recipe.Context(o, recipe: try #require(entry.recipe)) { _ in }
+            c.source = ipsw  // the verify step's copy, which these steps read
             c.restore = try RestoreInfo(c.ipsw)
             c.dec = cache
             let board = try K48Board(o)

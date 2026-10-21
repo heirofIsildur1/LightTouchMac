@@ -35,9 +35,9 @@ struct MachOKitProbeTests {
         let img = try #require(ours.image(ogl))
         let file = try #require(theirs.machOFiles().first { $0.imagePath == ogl })
         #expect(file.headerStartOffsetInCache == img.headerOffset)
-        #expect(file.symbols32.map { $0.map(\.name) } == ours.symbolNames(in: img))
+        #expect(file.symbols32.map { $0.map(\.name) } == (try ours.symbolNames(in: img)))
         let sections = file.cStrings?.map(\.string) ?? []
-        let mine = ours.cStrings(in: img, section: "__cstring")
+        let mine = try ours.cStrings(in: img, section: "__cstring")
         print(
             "\(build): OpenGLES __cstring: MachOKit \(sections.count) strings vs ours \(mine.count); agree: \(sections == mine)"
         )

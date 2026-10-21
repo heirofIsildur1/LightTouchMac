@@ -149,9 +149,14 @@ public enum FitCheck {
             var out: [String] = []
             let (followed, onDisk) = follow(install)
             if let cache, let img = cache.image(install) ?? cache.image("/" + followed) {
-                cache.loadCommands(img) { cmd, off, b in
-                    if MachO32.linkCommands.contains(cmd) { out.append(b.latin1(off + Int(b.u32le(off + 8)))) }
-                }
+                // An image whose load commands don't read links nothing.
+                do {
+                    try cache.loadCommands(img) { cmd, off, b in
+                        if MachO32.linkCommands.contains(cmd) {
+                            out.append(try b.latin1(off + Int(try b.u32le(off + 8))))
+                        }
+                    }
+                } catch { out = [] }
             } else if onDisk, let d = data(followed), let m = MachO32.slice(d, arch: arch)?.image {
                 out = m.dylibs().map(\.name)
             }
@@ -182,11 +187,12 @@ public enum FitCheck {
             var found: Set<String>?
             if let cache, let img = cache.image(install) ?? cache.image("/" + followed) {
                 var out = Set<String>()
-                cache.forEachSymbol(in: img) { s in
+                // An image whose symbol table doesn't read is not there to import from.
+                let read: Void? = try? cache.forEachSymbol(in: img) { s in
                     if MachO32.isImport(s.type) { out.insert(s.name) }
                     return true
                 }
-                found = out
+                found = read.map { out }
             } else if onDisk, let d = data(followed), let m = MachO32.slice(d, arch: arch)?.image {
                 found = FitCheck.imports(m)
             }
@@ -199,19 +205,28 @@ public enum FitCheck {
             if let cache, let img = cache.image(install) ?? cache.image("/" + followed) {
                 var out = Set<String>()
                 var reexports: [String] = []
-                cache.forEachSymbol(in: img) { s in
-                    if MachO32.isExport(s.type) { out.insert(s.name) }
-                    return true
-                }
-                cache.loadCommands(img) { cmd, off, b in
-                    if cmd == MachO32.lcReexportDylib { reexports.append(b.latin1(off + Int(b.u32le(off + 8)))) }
-                    // a cache image's export trie offset is a cache file offset
-                    if cmd == MachO32.lcDyldInfo || cmd == MachO32.lcDyldInfoOnly {
-                        out.formUnion(
-                            MachO32.trieReexports(b, at: Int(b.u32le(off + 40)), size: Int(b.u32le(off + 44)))
-                        )
+                // An image whose symbols or load commands don't read exports nothing.
+                do {
+                    try cache.forEachSymbol(in: img) { s in
+                        if MachO32.isExport(s.type) { out.insert(s.name) }
+                        return true
                     }
-                }
+                    try cache.loadCommands(img) { cmd, off, b in
+                        if cmd == MachO32.lcReexportDylib {
+                            reexports.append(try b.latin1(off + Int(try b.u32le(off + 8))))
+                        }
+                        // a cache image's export trie offset is a cache file offset
+                        if cmd == MachO32.lcDyldInfo || cmd == MachO32.lcDyldInfoOnly {
+                            out.formUnion(
+                                MachO32.trieReexports(
+                                    b,
+                                    at: Int(try b.u32le(off + 40)),
+                                    size: Int(try b.u32le(off + 44))
+                                )
+                            )
+                        }
+                    }
+                } catch { return nil }
                 for r in reexports { out.formUnion(exports(r) ?? []) }
                 return out
             }

@@ -149,16 +149,14 @@ enum N72Keybag {
         _ = try gdb.command(String(format: "z0,%x,4", entry))
         let ba = regs[0]
         var args = try gdb.read(ba, 0x138)
-        func u32(_ o: Int) -> UInt32 {
-            args.withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: o, as: UInt32.self)) }
-        }
+        func u32(_ o: Int) throws -> UInt32 { try args.u32le(o) }
         let rev = UInt16(args[0]) | UInt16(args[1]) << 8
-        let virt = u32(4)
-        let phys = u32(8)
-        let mem = u32(12)
-        let top = u32(16)
-        let dtp = u32(0x30)
-        let dtlen = u32(0x34)
+        let virt = try u32(4)
+        let phys = try u32(8)
+        let mem = try u32(12)
+        let top = try u32(16)
+        let dtp = try u32(0x30)
+        let dtlen = try u32(0x34)
         guard rev == 1, phys == physBase, virt == base else {
             throw FirmwareError(.oneshotFailed, "unexpected boot_args at 0x\(String(ba, radix: 16))")
         }

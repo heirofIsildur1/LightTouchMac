@@ -76,7 +76,7 @@ public struct DeviceTree: Sendable {
         var rec = Self.name32(prop) + Value.le([UInt32(value.count)]) + value
         rec += Data(count: ((value.count + 3) & ~3) - value.count)
         data.insert(contentsOf: rec, at: node.propsEnd)
-        data.replaceSubrange(node.start..<node.start + 4, with: Value.le([u32(node.start) + 1]))
+        data.replaceSubrange(node.start..<node.start + 4, with: Value.le([try u32(node.start) + 1]))
         try reparse()
     }
 
@@ -91,7 +91,7 @@ public struct DeviceTree: Sendable {
             rec += Self.name32(k) + Value.le([UInt32(e.count)]) + e + Data(count: ((e.count + 3) & ~3) - e.count)
         }
         data.insert(contentsOf: rec, at: end)
-        data.replaceSubrange(node.start + 4..<node.start + 8, with: Value.le([u32(node.start + 4) + 1]))
+        data.replaceSubrange(node.start + 4..<node.start + 8, with: Value.le([try u32(node.start + 4) + 1]))
         try reparse()
     }
 
@@ -105,7 +105,7 @@ public struct DeviceTree: Sendable {
 
     static func name32(_ s: String) -> Data { Data(Array(s.utf8).prefix(32)) + Data(count: max(0, 32 - s.utf8.count)) }
 
-    private func u32(_ at: Int) -> UInt32 { data.withUnsafeBytes { $0.u32le(at) } }
+    private func u32(_ at: Int) throws -> UInt32 { try data.u32le(at) }
 
     private mutating func reparse() throws {
         props = [:]
@@ -119,14 +119,14 @@ public struct DeviceTree: Sendable {
 
     private mutating func node(at start: Int, parent: String?) throws -> Int {
         guard start + 8 <= data.count else { throw FirmwareError(.unsupported, "DeviceTree: truncated") }
-        let nprops = Int(u32(start))
-        let nchildren = Int(u32(start + 4))
+        let nprops = Int(try u32(start))
+        let nchildren = Int(try u32(start + 4))
         var off = start + 8
         var mine: [String: Slot] = [:]
         for _ in 0..<nprops {
             guard off + 36 <= data.count else { throw FirmwareError(.unsupported, "DeviceTree: truncated") }
             let name = String(decoding: data[off..<off + 32].prefix { $0 != 0 }, as: UTF8.self)
-            let len = Int(u32(off + 32) & 0x7FFF_FFFF)
+            let len = Int(try u32(off + 32) & 0x7FFF_FFFF)
             guard off + 36 + len <= data.count else { throw FirmwareError(.unsupported, "DeviceTree: truncated") }
             mine[name] = Slot(offset: off, length: len)
             off += 36 + ((len + 3) & ~3)
