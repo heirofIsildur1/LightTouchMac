@@ -312,6 +312,7 @@ extension DisplayView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        emulator?.userInteracted()
         if pressModelControl(event) { return }
         if panelResize(event) { return }
         guard touchInteractionEnabled else { return }
@@ -344,6 +345,7 @@ extension DisplayView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        emulator?.userInteracted()
         if panelResize(event) { return }
         if tilting {
             endTilt()

@@ -126,6 +126,8 @@ extension SharedState {
             v.keyDown(with: key(0, "a"))
             v.keyUp(with: key(0, "a", false))
             #expect(e.log == ["0v", "0^"], "\(e.log)")
+            // A key is the user at the device (ClipboardSharing takes its next copy for theirs).
+            #expect(e.interactions == 1)
             e.log = []
             // Another layout: AZERTY's q (US a key) becomes text, and its key-up sends nothing.
             v.keyDown(with: key(0, "q"))
@@ -233,6 +235,8 @@ extension SharedState {
                 ["1:0@30,40", "1:1@20,30", "1:2@20,30"],
                 "plain drag is one finger"
             )
+            // Pressing and lifting are the user at the device.
+            #expect(emulator.interactions == 2)
             expect(
                 drag(.option, [(30, 40), (20, 30)]),
                 ["1:0@30,40", "2:0@70,60", "1:1@20,30", "2:1@80,70", "1:2@20,30", "2:2@80,70"],

@@ -89,6 +89,9 @@ enum WindowRestorationPolicy { static func configure(_ window: NSWindow) {} }
     func shake() { shakeGeneration &+= 1 }
     func setTilt(angle: CGFloat, pitch: CGFloat) { attitude = (angle, pitch) }
     func pressHome() { homeCount += 1 }
+    /// The user's touches and keys on the screen (what lets a device's copy reach the Mac's pasteboard).
+    var interactions = 0
+    func userInteracted() { interactions += 1 }
     func sendKey(macKeyCode: UInt16, down: Bool) { log.append("\(macKeyCode)\(down ? "v" : "^")") }
     func typeText(_ text: String, shiftHeld: Bool) { log.append("type:\(text)\(shiftHeld ? "+shift" : "")") }
 }

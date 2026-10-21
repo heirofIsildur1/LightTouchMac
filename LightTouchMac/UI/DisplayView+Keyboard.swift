@@ -60,6 +60,7 @@ extension DisplayView {
 
     // MARK: - Keyboard passthrough
     override func keyDown(with event: NSEvent) {
+        emulator?.userInteracted()
         if event.keyCode == 49, event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
             consumedWakeSpace || (emulator?.isSleeping == true && emulator?.acceptsInput == true)
         {
