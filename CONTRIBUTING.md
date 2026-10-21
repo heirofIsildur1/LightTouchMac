@@ -93,7 +93,7 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    is held to the current pins the same way.
 2. **Xcode ▸ Product ▸ Archive** (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID). The archive's
    Copy Files phases bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity
-   and the hardened runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`).
+   and the hardened runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`: allow-jit, library validation on; a Debug build uses `LightTouchDevice-Debug.entitlements`, which also disables library validation for a development dylib).
    Archiving takes only Xcode's own time.
 3. **Test the archive**: `TEST_RUNNER_LTM_RELEASE_ARCHIVE=path/to/X.xcarchive xcodebuild test -workspace
    LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Release` (`TEST_RUNNER_LTM_RELEASE_APP` takes an app
@@ -256,7 +256,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `scripts/` | `bootstrap`, `clean`, `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `release`, `check-export` |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
-| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` |
+| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
 | `Models/` | The 3D device models and their lighting (`Resources/Models/` in the app) |
 | `LightTouchServices/` | The services helper: `Engine/` (libimobiledevice: installation_proxy, AFC, springboardservices, notification_proxy and lockdown on one `run` kernel, the serial gate and deadlines), and the lockdown writes (`Lockdown/`) it runs as child processes |
 | `tools/activation/` | Sam's activation tool (its `build/` output is ignored) |

@@ -419,7 +419,7 @@
 		A1D0C0DE3100000000000010 /* Debug configuration for PBXNativeTarget "LightTouchDevice" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Configuration/LightTouchDevice.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Configuration/LightTouchDevice-Debug.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				DEVELOPMENT_TEAM = SM75355Y6R;
