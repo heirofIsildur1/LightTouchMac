@@ -33,7 +33,7 @@
 //   let file = try SystemEdits.Cydia.bootstrap(in: caches.appendingPathComponent("Jailbreak"), log: log)
 //   let (line, root, mobile) = try SystemEdits.installCydia(m, bootstrap: file)
 
-import CryptoKit
+import Crypto
 import Foundation
 
 extension SystemEdits {

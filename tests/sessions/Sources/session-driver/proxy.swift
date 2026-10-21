@@ -60,9 +60,7 @@ nonisolated enum ProxyProbe {
     do { try routing.save(in: proxyDir) } catch { fail("routing: \(error)") }
     let der: Data
     do {
-        der =
-            SecCertificateCopyData(try WebProxyCA.prepare(config: WebProxyConfiguration.file(in: proxyDir)).certificate)
-            as Data
+        der = try WebProxyCA.prepare(config: WebProxyConfiguration.file(in: proxyDir)).certificate
     } catch { fail("proxy CA: \(error)") }
     let endpoint = WebProxyConfiguration.endpoint(directory: proxyDir)
     d.webProxy = endpoint

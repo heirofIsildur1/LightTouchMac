@@ -5,10 +5,10 @@
 // subdirectory of Sources/FirmwareKit so agents can add modules without editing this file.
 //
 // Dependencies are pinned to exact versions and recorded with their licenses in build-support/dependencies.json
-// (BuildTools' dependency sources manifest): ZIPFoundation (IPSW members), MachOKit (Mach-O headers, fat
-// files, code signatures), swift-subprocess (`diskutil image` / `hdiutil` through DiskImage), Unrar.swift (a "rar"
+// (BuildTools' dependency sources manifest): ZIPFoundation (IPSW members), swift-subprocess (`diskutil image` / `hdiutil` through DiskImage), Unrar.swift (a "rar"
 // source's IPSW: RARLAB's UnRAR, extraction only), swift-argument-parser (the firmwarekit command
-// lines, FirmwareSchema's FirmwareCommand).
+// lines, FirmwareSchema's FirmwareCommand), swift-crypto (digests and HMAC, CryptoKit itself on Apple platforms;
+// AES-CBC through CryptoExtras).
 import PackageDescription
 
 let package = Package(
@@ -22,15 +22,18 @@ let package = Package(
     dependencies: [
         .package(path: "../HostRuntime"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
-        .package(url: "https://github.com/p-x9/MachOKit.git", exact: "0.53.0"),
-        .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.2"),
         .package(url: "https://github.com/mtgto/Unrar.swift.git", exact: "0.5.4"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2"),
+        .package(url: "https://github.com/apple/swift-crypto.git", exact: "5.0.3"),
     ],
     targets: [
         .target(
             name: "FirmwareSchema",
-            dependencies: [.product(name: "ArgumentParser", package: "swift-argument-parser")]
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Crypto", package: "swift-crypto"),
+            ]
         ),
         .target(name: "CActivation", cSettings: [.define("LT_ACTIVATION_LIBRARY")]),
         .target(
@@ -39,9 +42,10 @@ let package = Package(
                 "CActivation", "FirmwareSchema",
                 .product(name: "HostRuntime", package: "HostRuntime"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
-                .product(name: "MachOKit", package: "MachOKit"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
                 .product(name: "Unrar", package: "Unrar.swift"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "CryptoExtras", package: "swift-crypto"),
             ]
         ),
         .executableTarget(
@@ -54,7 +58,11 @@ let package = Package(
         ),
         .testTarget(
             name: "FirmwareKitTests",
-            dependencies: ["FirmwareKit", "FirmwareSchema", .product(name: "HostRuntime", package: "HostRuntime")],
+            dependencies: [
+                "FirmwareKit", "FirmwareSchema", .product(name: "HostRuntime", package: "HostRuntime"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "CryptoExtras", package: "swift-crypto"),
+            ],
             exclude: ["iboot-trees"]  // KBootIBootTests reads them from the source tree
         ),
     ]

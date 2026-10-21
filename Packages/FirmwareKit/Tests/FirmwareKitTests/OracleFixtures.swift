@@ -6,7 +6,7 @@
 // the retired Python oracle's outputs (qemu-ios imgtools: ipad1_fw.py at ipod-ipsw e6de24c7fa, ipad1_kboot.py and
 // ipad1_rootfs.extract_rootfs at ipad1 5f365778a4), never the Apple-derived bytes themselves.
 
-import CryptoKit
+import Crypto
 import Foundation
 import Testing
 

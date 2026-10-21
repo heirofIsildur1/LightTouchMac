@@ -18,7 +18,7 @@
 // (data protection). With gles_shim the front end replaces OpenGLES once FitCheck.glesFrontEnd fits (else the prepare
 // fails) and SpringBoard gets CA_ENABLE_OGL=1.
 
-import CryptoKit
+import Crypto
 import Foundation
 
 final class N72Board: Board {

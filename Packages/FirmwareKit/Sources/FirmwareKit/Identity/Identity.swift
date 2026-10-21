@@ -13,7 +13,7 @@
 // Fields keep Python's insertion order, which is what makes json() match. A value is a string or a list
 // of strings (die-id).
 
-import CryptoKit
+import Crypto
 import Foundation
 import HostRuntime
 

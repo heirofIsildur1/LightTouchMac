@@ -4,7 +4,7 @@
 // An import from another volume isn't copied: State/IPSW holds a symbolic
 // link to the user's file instead, read in place.
 
-import CryptoKit
+import Crypto
 import FirmwareSchema
 import Foundation
 

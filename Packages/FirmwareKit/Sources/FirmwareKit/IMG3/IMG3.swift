@@ -1,4 +1,4 @@
-// IMG3: tag parsing and AES-CBC payload decryption (CommonCrypto), ported from ipad1_fw.py.
+// IMG3: tag parsing and AES-CBC payload decryption, ported from ipad1_fw.py.
 //
 //   try IMG3.tags(data)["DATA"]                            // (offset, dataLength) per tag, last wins
 //   try IMG3.decrypt(data, iv: iv, key: key)               // 3.x+: the final partial block is encrypted
@@ -10,7 +10,8 @@
 // Which tail convention a firmware uses is decided once, on the kernelcache (the one component with a
 // checksum): see FirmwareDecryptor.
 
-import CommonCrypto
+import Crypto
+import CryptoExtras
 import Foundation
 
 public enum IMG3 {
@@ -72,33 +73,12 @@ public enum AESCBC {
         guard [16, 24, 32].contains(key.count), iv.count == 16, buf.count % 16 == 0 else {
             throw FirmwareError(.unsupported, "AES: key \(key.count) B, iv \(iv.count) B, data \(buf.count) B")
         }
-        var out = Data(count: buf.count)
-        var moved = 0
-        let status = out.withUnsafeMutableBytes { o in
-            buf.withUnsafeBytes { i in
-                key.withUnsafeBytes { k in
-                    iv.withUnsafeBytes { v in
-                        CCCrypt(
-                            CCOperation(decrypt ? kCCDecrypt : kCCEncrypt),
-                            CCAlgorithm(kCCAlgorithmAES),
-                            0,
-                            k.baseAddress,
-                            key.count,
-                            v.baseAddress,
-                            i.baseAddress,
-                            buf.count,
-                            o.baseAddress,
-                            buf.count,
-                            &moved
-                        )
-                    }
-                }
-            }
-        }
-        guard status == kCCSuccess, moved == buf.count else {
-            throw FirmwareError(.internal, "CCCrypt failed (\(status))")
-        }
-        return out
+        guard !buf.isEmpty else { return Data() }
+        let key = SymmetricKey(data: key)
+        let iv = try AES._CBC.IV(ivBytes: iv)
+        return decrypt
+            ? try AES._CBC.decrypt(buf, using: key, iv: iv, noPadding: true)
+            : try AES._CBC.encrypt(buf, using: key, iv: iv, noPadding: true)
     }
 }
 

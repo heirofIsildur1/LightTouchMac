@@ -21,8 +21,9 @@ let package = Package(
         .package(path: "../FirmwareKit"),
         .package(path: "../DeviceServices"),
         .package(path: "../DeviceRuntime"),
-        .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "1.0.2"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
+        .package(url: "https://github.com/apple/swift-crypto.git", exact: "5.0.3"),
     ],
     targets: [
         .target(
@@ -35,6 +36,7 @@ let package = Package(
                 .product(name: "DeviceRuntime", package: "DeviceRuntime"),
                 .product(name: "Subprocess", package: "swift-subprocess"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ],
             swiftSettings: settings
         ),
@@ -43,7 +45,7 @@ let package = Package(
         // The tests stay in the Swift 5 language mode for now (their fixtures share state across threads by design).
         .testTarget(
             name: "LightTouchCoreTests",
-            dependencies: ["LightTouchCore", "TestIsolation"],
+            dependencies: ["LightTouchCore", "TestIsolation", .product(name: "Crypto", package: "swift-crypto")],
             swiftSettings: settings + [.swiftLanguageMode(.v5)]
         ),
     ],

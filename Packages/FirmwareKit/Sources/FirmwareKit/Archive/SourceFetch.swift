@@ -5,7 +5,7 @@
 //
 // `download(url, file)` puts one URL's bytes at `file` or throws. Nothing but a checked IPSW is ever left at `out`.
 
-import CryptoKit
+import Crypto
 import FirmwareSchema
 import Foundation
 

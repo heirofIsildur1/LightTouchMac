@@ -13,7 +13,7 @@
 // Paths are volume-relative, "/"-separated, no leading slash ("" is the root folder).
 
 import Compression
-import CryptoKit
+import Crypto
 import Foundation
 
 public final class HFSPlusVolume {

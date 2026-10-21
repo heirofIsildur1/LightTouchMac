@@ -6,7 +6,7 @@
 // DER. Checked on M68 1A543a: with the row, SecTrustEvaluate gives 4 (unspecified) for a WebProxyCA-shaped
 // chain and Safari opens HTTPS through a TLS 1.0 relay; without it, 3 (deny).
 
-import CryptoKit
+import Crypto
 import FirmwareSchema
 import Foundation
 import HostRuntime

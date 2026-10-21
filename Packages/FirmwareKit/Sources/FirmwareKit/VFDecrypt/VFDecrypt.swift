@@ -8,7 +8,7 @@
 // Streams in fixed-size chunks; the input is read once, front to back, so it can come straight off
 // `unzip -p` without a temporary copy of the encrypted image.
 
-import CommonCrypto
+import Crypto
 import Foundation
 
 public enum VFDecrypt {
@@ -23,8 +23,9 @@ public enum VFDecrypt {
         guard key.count == 36 else {
             throw FirmwareError(.keyMissing, "vfdecrypt key must be 36 bytes, got \(key.count)")
         }
-        let aesKey = [UInt8](key.prefix(16))
-        let hmacKey = [UInt8](key.dropFirst(16))
+        let aesKey = key.prefix(16)
+        // Keyed once; each chunk's IV copies the keyed state rather than hashing the key again.
+        let keyed = HMAC<Insecure.SHA1>(key: SymmetricKey(data: key.dropFirst(16)))
         var header = [UInt8](repeating: 0, count: 0x100)
         guard readFully(fd, &header, 0, 0x100) == 0x100, header[0..<8].elementsEqual("encrcdsa".utf8) else {
             throw FirmwareError(.unsupported, "not encrcdsa")
@@ -37,9 +38,13 @@ public enum VFDecrypt {
             throw FirmwareError(.unsupported, "encrcdsa block size \(bs)")
         }
 
+        // Chunks are decrypted a batch at a time, one AES-CBC call per 64 KiB: CBC across a batch chains each chunk's
+        // first block to the previous chunk's last ciphertext block instead of the chunk's own IV, so that block is
+        // corrected afterwards (xor both). 64 KiB is a pipe's worth: the IPSW's unzip keeps writing while a batch
+        // decrypts (a 1 MiB batch stalled it, 7% slower end to end than one chunk at a time).
+        let batch = max(1, (1 << 16) / bs)
         // Position at the data: header bytes already read count toward it; skip forward, never back.
-        var ct = [UInt8](repeating: 0, count: bs)
-        var pt = [UInt8](repeating: 0, count: bs)
+        var ct = [UInt8](repeating: 0, count: bs * batch)
         var carried = 0
         if dataOffset < 0x100 {
             carried = 0x100 - dataOffset
@@ -59,43 +64,37 @@ public enum VFDecrypt {
             throw FirmwareError(.internal, "cannot create \(output.path)")
         }
         defer { try? out.close() }
-        var pending = Data(capacity: 1 << 22)
         var n: UInt32 = 0
         while left > 0 {
-            let r = carried + readFully(fd, &ct, carried, bs - carried)
+            // Whole chunks up to the batch, never past the chunk holding the last byte (as one chunk at a time read).
+            let want = min(batch, Int((left + UInt64(bs) - 1) / UInt64(bs))) * bs
+            let r = carried + readFully(fd, &ct, carried, want - carried)
             carried = 0
             guard r > 0 else { throw FirmwareError(.unsupported, "short image") }
             guard r % 16 == 0 else {
-                throw FirmwareError(.unsupported, "encrcdsa chunk \(n) is \(r) bytes, not whole AES blocks")
+                throw FirmwareError(
+                    .unsupported,
+                    "encrcdsa chunk \(n + UInt32(r / bs)) is \(r % bs) bytes, not whole AES blocks"
+                )
             }
-            var nb = [UInt8(n >> 24 & 0xFF), UInt8(n >> 16 & 0xFF), UInt8(n >> 8 & 0xFF), UInt8(n & 0xFF)]
-            var iv = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
-            CCHmac(CCHmacAlgorithm(kCCHmacAlgSHA1), hmacKey, hmacKey.count, &nb, 4, &iv)
-            var got = 0
-            let status = CCCrypt(
-                CCOperation(kCCDecrypt),
-                CCAlgorithm(kCCAlgorithmAES),
-                0,
-                aesKey,
-                16,
-                iv,
-                ct,
-                r,
-                &pt,
-                bs,
-                &got
-            )
-            guard status == kCCSuccess else { throw FirmwareError(.internal, "CCCrypt failed (\(status))") }
-            let take = min(UInt64(got), left)
-            pending.append(contentsOf: pt[0..<Int(take)])
+            let chunks = (r + bs - 1) / bs
+            let ivs = (0..<chunks).map { i -> [UInt8] in
+                let c = n + UInt32(i)
+                var mac = keyed
+                mac.update(data: [UInt8(c >> 24 & 0xFF), UInt8(c >> 16 & 0xFF), UInt8(c >> 8 & 0xFF), UInt8(c & 0xFF)])
+                return Array(Data(mac.finalize()).prefix(16))
+            }
+            var pt = try AESCBC.crypt(Data(ct[0..<r]), iv: Data(ivs[0]), key: aesKey)
+            pt.withUnsafeMutableBytes { p in
+                for i in 1..<max(chunks, 1) {
+                    for j in 0..<16 { p[i * bs + j] ^= ct[i * bs - 16 + j] ^ ivs[i][j] }
+                }
+            }
+            let take = min(UInt64(r), left)
+            try out.write(contentsOf: pt.prefix(Int(take)))
             left -= take
-            if pending.count >= 1 << 22 {
-                try out.write(contentsOf: pending)
-                pending.removeAll(keepingCapacity: true)
-            }
-            n += 1
+            n += UInt32(chunks)
         }
-        try out.write(contentsOf: pending)
     }
 
     /// Reads until `count` bytes or EOF; returns the bytes read.

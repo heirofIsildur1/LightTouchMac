@@ -1,8 +1,6 @@
 import CActivation
-import CryptoKit
+import Crypto
 import Foundation
-import MachO
-import MachOKit
 
 public struct ActivationFailure: Error, CustomStringConvertible, Sendable {
     public let code = "activation_failed"
@@ -176,75 +174,103 @@ private func putBE32(_ b: inout [UInt8], _ offset: Int, _ value: UInt32) {
     for i in 0..<4 { b[offset + i] = UInt8(truncatingIfNeeded: value >> (24 - i * 8)) }
 }
 
-/// Mach-O header checks for the guest helpers, through MachOKit: thin/fat files, their slices' cpu, load
-/// commands and LC_CODE_SIGNATURE.
+/// Mach-O header checks for the guest helpers: thin/fat files, their slices' cpu, load commands and
+/// LC_CODE_SIGNATURE.
 enum MachOSignature {
     static let armCPU: Int32 = 12, armv7: Int32 = 9  // CPU_TYPE_ARM, CPU_SUBTYPE_ARM_V7
+    static let lcCodeSignature: UInt32 = 0x1D, lcVersionMinIphoneos: UInt32 = 0x25, lcBuildVersion: UInt32 = 0x32
+    static let lcMain: UInt32 = 0x8000_0028, lcDyldInfoOnly: UInt32 = 0x8000_0022
 
-    static func codeSignature(_ cmds: some Sequence<LoadCommand>) -> LoadCommandInfo<linkedit_data_command>? {
-        for lc in cmds { if case .codeSignature(let info) = lc { return info } }
-        return nil
+    /// One thin image: its cpu, and each load command's cmd and offset in the file.
+    struct Image {
+        var cputype: Int32, cpusubtype: Int32, is64Bit: Bool
+        var commands: [(cmd: UInt32, offset: Int)]
     }
+
+    /// The images of a thin or fat Mach-O (nil for anything else), and whether it was fat.
+    static func images(_ data: Data) -> (images: [Image], fat: Bool)? {
+        let b = [UInt8](data)
+        func le(_ o: Int) -> UInt32? { o + 4 <= b.count ? b.u32(o) : nil }
+        func be(_ o: Int) -> UInt32? { le(o)?.byteSwapped }
+        func thin(_ start: Int, _ end: Int) -> Image? {
+            guard let magic = le(start), magic == 0xFEED_FACE || magic == 0xFEED_FACF, let cpu = le(start + 4),
+                let sub = le(start + 8), let ncmds = le(start + 16)
+            else { return nil }
+            var offset = start + (magic == 0xFEED_FACF ? 32 : 28)
+            var commands: [(UInt32, Int)] = []
+            for _ in 0..<ncmds {
+                guard let cmd = le(offset), let size = le(offset + 4), size >= 8, offset + Int(size) <= end else {
+                    return nil
+                }
+                commands.append((cmd, offset))
+                offset += Int(size)
+            }
+            return Image(
+                cputype: Int32(bitPattern: cpu),
+                cpusubtype: Int32(bitPattern: sub),
+                is64Bit: magic == 0xFEED_FACF,
+                commands: commands
+            )
+        }
+        if let image = thin(0, b.count) { return ([image], false) }
+        guard be(0) == 0xCAFE_BABE, let count = be(4), count > 0, count < 32 else { return nil }
+        var slices: [Image] = []
+        for i in 0..<Int(count) {
+            guard let offset = be(8 + i * 20 + 8), let size = be(8 + i * 20 + 12),
+                Int(offset) + Int(size) <= b.count, let image = thin(Int(offset), Int(offset) + Int(size))
+            else { return nil }
+            slices.append(image)
+        }
+        return (slices, true)
+    }
+
+    static func isSigned(_ image: Image) -> Bool { image.commands.contains { $0.cmd == lcCodeSignature } }
 
     /// ipad1_rootfs.guest_tool_problem: nil for a thin armv7 Mach-O that 3.2's dyld takes (no LC_MAIN, no
     /// LC_VERSION_MIN_IPHONEOS) and that is signed; else why not.
     static func guestToolProblem(_ url: URL) -> String? {
-        guard case .machO(let m)? = try? MachOKit.loadFromFile(url: url), !m.is64Bit else {
-            return "not a thin 32-bit Mach-O"
+        guard let data = try? Data(contentsOf: url), let (images, fat) = images(data), !fat, let m = images.first,
+            !m.is64Bit
+        else { return "not a thin 32-bit Mach-O" }
+        guard m.cputype == armCPU, m.cpusubtype == armv7 else { return "cpu \(m.cputype)/\(m.cpusubtype), not armv7" }
+        if m.commands.contains(where: { [lcMain, lcVersionMinIphoneos].contains($0.cmd) }) {
+            return "carries LC_MAIN/LC_VERSION_MIN (not run through machotool mkold)"
         }
-        let h = m.header.layout
-        guard h.cputype == armCPU, h.cpusubtype == armv7 else { return "cpu \(h.cputype)/\(h.cpusubtype), not armv7" }
-        for lc in m.loadCommands {
-            switch lc {
-            case .main, .versionMinIphoneos: return "carries LC_MAIN/LC_VERSION_MIN (not run through machotool mkold)"
-            default: continue
-            }
-        }
-        return codeSignature(m.loadCommands) != nil ? nil : "unsigned (ldid -S)"
+        return isSigned(m) ? nil : "unsigned (ldid -S)"
     }
 
     /// ipad1_rootfs.appsync_problem: nil for a fat Mach-O with an armv7 slice and a signature per slice.
     static func appSyncProblem(_ url: URL) -> String? {
-        guard case .fat(let f)? = try? MachOKit.loadFromFile(url: url), let slices = try? f.machOFiles() else {
+        guard let data = try? Data(contentsOf: url), let (slices, fat) = images(data), fat else {
             return "not a fat Mach-O (expected armv6+armv7)"
         }
-        for (i, s) in slices.enumerated() where codeSignature(s.loadCommands) == nil {
-            return "slice \(i) (cpu \(s.header.layout.cputype)/\(s.header.layout.cpusubtype)) is not ldid-signed"
+        for (i, s) in slices.enumerated() where !isSigned(s) {
+            return "slice \(i) (cpu \(s.cputype)/\(s.cpusubtype)) is not ldid-signed"
         }
-        return slices.contains { $0.header.layout.cputype == armCPU && $0.header.layout.cpusubtype == armv7 }
-            ? nil : "no armv7 slice"
+        return slices.contains { $0.cputype == armCPU && $0.cpusubtype == armv7 } ? nil : "no armv7 slice"
     }
 
     /// 2.x/3.0 dyld needs classic relocations and an ARMv6 slice; fail before baking a modern helper.
     static func earlyARMProblem(_ url: URL) -> String? {
-        guard let file = try? MachOKit.loadFromFile(url: url) else { return "not a Mach-O" }
-        let images: [MachOFile]
-        switch file {
-        case .machO(let image): images = [image]
-        case .fat(let fat):
-            guard let slices = try? fat.machOFiles() else { return "unreadable slices" }
-            images = slices
+        guard let data = try? Data(contentsOf: url), let (images, _) = images(data) else { return "not a Mach-O" }
+        guard let image = images.first(where: { $0.cputype == armCPU && $0.cpusubtype == 6 }) else {
+            return "no armv6 slice"
         }
-        guard
-            let image = images.first(where: { $0.header.layout.cputype == armCPU && $0.header.layout.cpusubtype == 6 })
-        else { return "no armv6 slice" }
-        for command in image.loadCommands {
-            switch command {
-            case .dyldInfoOnly, .main, .versionMinIphoneos, .buildVersion:
-                return "requires a newer dyld; rebuild with LEGACY_LINK=1"
-            default: continue
-            }
+        if image.commands.contains(where: {
+            [lcDyldInfoOnly, lcMain, lcVersionMinIphoneos, lcBuildVersion].contains($0.cmd)
+        }) {
+            return "requires a newer dyld; rebuild with LEGACY_LINK=1"
         }
-        return codeSignature(image.loadCommands) == nil ? "unsigned armv6 slice" : nil
+        return isSigned(image) ? nil : "unsigned armv6 slice"
     }
 
     /// LC_CODE_SIGNATURE's (dataoff, datasize) of a thin 32-bit Mach-O in memory (Activation.signed patches the buffer).
     static func codeSignature(in data: Data) -> (offset: Int, size: Int)? {
-        data.withUnsafeBytes { b -> (Int, Int)? in
-            guard b.count >= 28, let base = b.baseAddress, b.loadUnaligned(as: UInt32.self) == 0xFEED_FACE,
-                let cs = codeSignature(MachOImage(ptr: base.assumingMemoryBound(to: mach_header.self)).loadCommands)
-            else { return nil }
-            return (Int(cs.dataoff), Int(cs.datasize))
-        }
+        guard data.count >= 28, data.withUnsafeBytes({ $0.loadUnaligned(as: UInt32.self) }) == 0xFEED_FACE,
+            let (images, _) = images(data), let cs = images.first?.commands.first(where: { $0.cmd == lcCodeSignature })
+        else { return nil }
+        let b = [UInt8](data)
+        guard cs.offset + 16 <= b.count else { return nil }
+        return (Int(b.u32(cs.offset + 8)), Int(b.u32(cs.offset + 12)))
     }
 }

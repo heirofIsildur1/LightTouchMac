@@ -11,7 +11,7 @@
 // to STAGING_DIR/work and is removed before `done`. Decrypted components are cached as CACHE/<ipsw sha1>/ (a
 // version/key-specific manifest makes an entry valid).
 
-import CryptoKit
+import Crypto
 import Foundation
 import HostRuntime
 

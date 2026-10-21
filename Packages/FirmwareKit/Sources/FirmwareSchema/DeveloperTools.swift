@@ -1,4 +1,4 @@
-import CryptoKit
+import Crypto
 import Foundation
 
 /// Optional developer access is installed by the existing guest package loader,

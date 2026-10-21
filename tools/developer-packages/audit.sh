@@ -19,5 +19,7 @@ import Foundation
     }
 }
 SWIFT
-swiftc -module-cache-path "$TMP/modules" "$ROOT/Packages/FirmwareKit/Sources/FirmwareSchema/DeveloperTools.swift" "$TMP/Audit.swift" -o "$TMP/audit"
+# Outside SwiftPM there is no swift-crypto: its Crypto on Apple platforms is CryptoKit, which this build uses directly.
+sed 's/^import Crypto$/import CryptoKit/' "$ROOT/Packages/FirmwareKit/Sources/FirmwareSchema/DeveloperTools.swift" > "$TMP/DeveloperTools.swift"
+swiftc -module-cache-path "$TMP/modules" "$TMP/DeveloperTools.swift" "$TMP/Audit.swift" -o "$TMP/audit"
 "$TMP/audit" "$PAYLOAD"

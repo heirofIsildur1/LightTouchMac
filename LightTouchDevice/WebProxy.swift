@@ -36,7 +36,7 @@ final class WebProxy: @unchecked Sendable {
     /// Extra upstream roots; the Mac's trust store otherwise.
     let anchors: [SecCertificate]
     private let lock = NSLock()
-    private var leafKey: SecKey?
+    private var leafKey: WebProxyCA.Key?
     private var leaves: [String: (identity: SecIdentity, made: Date)] = [:]
     /// One archive fetch at a time, a second apart, none while the archive asked us to wait.
     private let archiveGate = NSLock()
