@@ -8,9 +8,11 @@ let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().app
     .standardized
 let home = FileManager.default.homeDirectoryForCurrentUser
 
-func die(_ message: String) -> Never {
-    FileHandle.standardError.write(Data("sessions: \(message)\n".utf8))
-    exit(2)
+/// Ends a run that couldn't be judged with its verdict line: exit 2 for a refused or stale input (the default), 3 for
+/// the infrastructure (a build, a tool that won't start).
+func die(_ message: String, code: Int32 = 2) -> Never {
+    print("FAIL sessions: \(message) -")
+    exit(code)
 }
 
 /// The emulator slot this run boots in (EmulatorSlot), held until it exits; a run this one starts shares it.
@@ -117,7 +119,7 @@ struct Tools {
             ],
             log: log
         )
-        if status != 0 { die("xcodebuild failed; see \(log.path)") }
+        if status != 0 { die("xcodebuild failed; see \(log.path)", code: 3) }
         return symroot.appendingPathComponent("Debug")
     }
 
@@ -131,7 +133,7 @@ struct Tools {
                 ["extract", "-i", archive.path, "-d", dir.path],
                 log: work.appendingPathComponent("aa.log")
             ) == 0
-        else { die("could not unpack \(archive.path)") }
+        else { die("could not unpack \(archive.path)", code: 3) }
         return dir
     }
 }

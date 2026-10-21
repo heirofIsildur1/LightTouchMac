@@ -42,6 +42,7 @@ public final class Report {
     @discardableResult
     public func check(_ ok: Bool, _ what: @autoclosure () -> String) -> Bool {
         if ok { passed += 1 } else { failed += 1 }
+        if !ok, firstFailure == nil { firstFailure = what() }
         lines.append("  \(ok ? "ok  " : "FAIL") \(what())")
         print(lines.last!)
         fflush(stdout)
@@ -54,6 +55,13 @@ public final class Report {
     }
     public var allPassed: Bool { failed == 0 && passed > 0 }
     public var summary: String { "\(passed)/\(passed + failed) passed" }
+    /// The first check that failed.
+    public private(set) var firstFailure: String?
+    /// The run's last line: `PASS <summary> <log>` or `FAIL <first failure> (<summary>) <log>`.
+    public func verdict(log: String) -> String {
+        allPassed
+            ? "PASS \(summary) \(log)" : "FAIL \(firstFailure ?? "no check ran") (\(summary)) \(log)"
+    }
 }
 
 /// The checks' own verdicts over a prepared base and its boot.

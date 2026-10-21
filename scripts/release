@@ -20,14 +20,15 @@ DRY=0; [[ "${2:-}" == "--dry-run" ]] && DRY=1
 AMORE=0; [[ "${2:-}" == "--amore" ]] && AMORE=1
 SKIP_PREPARE="${LTM_RELEASE_SKIP_PREPARE:-0}"
 if [[ "$SKIP_PREPARE" == 1 ]] && (( ! DRY )); then
-    echo "FAILED: LTM_RELEASE_SKIP_PREPARE=1 is for --dry-run only; a release runs the prepare matrix" >&2; exit 1
+    echo "FAIL LTM_RELEASE_SKIP_PREPARE=1 is for --dry-run only; a release runs the prepare matrix -"; exit 2
 fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVE="$(cd "$(dirname "$ARCHIVE")" && pwd)/$(basename "$ARCHIVE")"
 OUT="$(dirname "$ARCHIVE")/$(basename "$ARCHIVE" .xcarchive)-export"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ltm-release.XXXXXX")"
-trap 'rm -rf "$WORK"' EXIT
-fail() { echo "FAILED: $*" >&2; exit 1; }
+# The last line is the verdict: PASS with the zip (exit 0), or FAIL with the first failure and the kept logs (exit 1).
+trap '(( $? )) || rm -rf "$WORK"' EXIT
+fail() { echo "FAIL $* $WORK"; exit 1; }
 step() { echo "== $*"; }
 
 step "export"
@@ -95,5 +96,5 @@ if (( AMORE )); then
     amore release "$APP" --draft --non-interactive || fail "amore release"
 fi
 
-echo "$ZIP"
 cat "$OUT/SHA256SUMS"
+echo "PASS release$( (( DRY )) && echo " (dry run)") $ZIP"

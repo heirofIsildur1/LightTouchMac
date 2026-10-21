@@ -39,7 +39,8 @@ func upToDate(_ tool: String) {
     guard run("/usr/bin/xcrun", ["swift"] + arguments, log: log) == 0 else {
         die(
             "\(tool) may be older than these sources and building it failed (see \(log.path)): swift "
-                + arguments.joined(separator: " ")
+                + arguments.joined(separator: " "),
+            code: 3
         )
     }
     builtDrivers.insert(tool)
@@ -60,7 +61,7 @@ final class DriverProcess {
         process.standardOutput = h
         process.standardError = h
         process.standardInput = FileHandle.nullDevice
-        do { try process.run() } catch { die("could not start \(tool): \(error)") }
+        do { try process.run() } catch { die("could not start \(tool): \(error)", code: 3) }
     }
 
     var pid: pid_t { process.processIdentifier }
@@ -99,7 +100,7 @@ func sessionDriver(_ config: [String: Any], work: URL, timeout: Double, environm
     let file = work.appendingPathComponent("config.json")
     do {
         try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]).write(to: file)
-    } catch { die("config: \(error)") }
+    } catch { die("config: \(error)", code: 3) }
     let d = DriverProcess(
         "session-driver",
         [file.path],
@@ -154,7 +155,8 @@ func finish(_ report: Report, work: URL) -> Never {
     try? (report.lines + ["", verdict, ""]).joined(separator: "\n")
         .write(to: work.appendingPathComponent("summary.txt"), atomically: true, encoding: .utf8)
     let pruned = report.allPassed && work == prunedWork && prune(work)
-    print("\n\(verdict); \(pruned ? "logs" : "everything") in \(work.path)")
+    print("\n\(pruned ? "logs" : "everything") kept in \(work.path)")
+    print(report.verdict(log: work.path))
     exit(report.allPassed ? 0 : 1)
 }
 
