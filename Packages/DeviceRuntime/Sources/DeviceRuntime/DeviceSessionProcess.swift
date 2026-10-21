@@ -11,12 +11,16 @@ public enum DeviceProcessDeath: Equatable {
         startFailure: DeviceLinkError?,
         qemuExitCode: Int32?,
         stopRequested: Bool,
+        killRequested: Bool,
         termination: DeviceTermination
     ) -> Self {
         if let startFailure { return .startFailed(startFailure) }
         if qemuExitCode == 0 || (qemuExitCode == nil && stopRequested && termination == .exited(0)) {
             return .stopped
         }
+        // The app's own SIGKILL (a release before the storage changes, a halt past its budget); a SIGKILL nobody
+        // here sent (the kernel's, another process's) stays unexpected.
+        if killRequested && termination == .signaled(SIGKILL) { return .stopped }
         return .unexpected
     }
 }
@@ -37,6 +41,7 @@ public enum DeviceProcessDeath: Equatable {
     private var qemuExitCode: Int32?
     private var startFailure: DeviceLinkError?
     private var stopRequested = false
+    private var killRequested = false
     private var helperPID: pid_t = 0
     private var startRequested = false
     private var preparationTask: Task<Void, Never>?
@@ -144,6 +149,7 @@ public enum DeviceProcessDeath: Equatable {
     }
     public func kill() {
         if !isDead {
+            killRequested = true
             if startRequested && !bootRequested {
                 stopRequested = true
                 cancelledBeforeBoot = true
@@ -194,6 +200,7 @@ public enum DeviceProcessDeath: Equatable {
                     startFailure: startFailure,
                     qemuExitCode: qemuExitCode,
                     stopRequested: stopRequested,
+                    killRequested: killRequested,
                     termination: termination
                 )
         )

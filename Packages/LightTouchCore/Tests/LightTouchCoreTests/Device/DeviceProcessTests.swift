@@ -10,27 +10,37 @@ import Testing
 /// boot's storage admission (preparation) with its lease, cancellation and exactly-once completion.
 struct DeviceProcessTests {
     @Test func exitsAreClassifiedByWhatWasAsked() {
-        let cases: [(DeviceLinkError?, Int32?, Bool, DeviceTermination, DeviceProcessDeath)] = [
-            (nil, 0, true, .exited(0), .stopped),
-            (nil, nil, true, .exited(0), .stopped),
-            (nil, nil, false, .exited(0), .unexpected),
-            (nil, nil, false, .signaled(11), .unexpected),
-            (nil, nil, false, .exited(70), .unexpected),
-            (nil, 1, false, .exited(1), .unexpected),
-            (nil, nil, false, .signaled(9), .unexpected),
-            (.helperFailure("not booted"), 0, true, .exited(0), .startFailed(.helperFailure("not booted"))),
-            (nil, nil, true, .signaled(9), .unexpected),
-            (nil, nil, true, .unknown, .unexpected),
+        // (start failure, QEMU's exit, stop asked, the app sent SIGKILL, termination) -> death
+        let cases: [(DeviceLinkError?, Int32?, Bool, Bool, DeviceTermination, DeviceProcessDeath)] = [
+            (nil, 0, true, false, .exited(0), .stopped),
+            (nil, nil, true, false, .exited(0), .stopped),
+            (nil, nil, false, false, .exited(0), .unexpected),
+            (nil, nil, false, false, .signaled(11), .unexpected),
+            (nil, nil, false, false, .exited(70), .unexpected),
+            (nil, 1, false, false, .exited(1), .unexpected),
+            (nil, nil, false, false, .signaled(9), .unexpected),
+            (.helperFailure("not booted"), 0, true, false, .exited(0), .startFailed(.helperFailure("not booted"))),
+            (nil, nil, true, false, .signaled(9), .unexpected),
+            (nil, nil, true, false, .unknown, .unexpected),
+            // The app's own SIGKILL (release() before storage changes, a halt past its budget) is a stop, with or
+            // without the SIGTERM before it; anything else after it is still what it was.
+            (nil, nil, true, true, .signaled(9), .stopped),
+            (nil, nil, false, true, .signaled(9), .stopped),
+            (nil, nil, true, true, .signaled(11), .unexpected),
+            (nil, nil, true, true, .exited(70), .unexpected),
+            (nil, nil, true, true, .unknown, .unexpected),
+            (.helperFailure("not booted"), nil, true, true, .signaled(9), .startFailed(.helperFailure("not booted"))),
         ]
-        for (failure, code, requested, termination, expected) in cases {
+        for (failure, code, requested, killed, termination, expected) in cases {
             #expect(
                 DeviceProcessDeath.classify(
                     startFailure: failure,
                     qemuExitCode: code,
                     stopRequested: requested,
+                    killRequested: killed,
                     termination: termination
                 ) == expected,
-                "\(termination) requested=\(requested)"
+                "\(termination) requested=\(requested) killed=\(killed)"
             )
         }
     }

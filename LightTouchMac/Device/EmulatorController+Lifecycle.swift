@@ -40,8 +40,10 @@ extension EmulatorController {
         set { hostPower.screenVisible = newValue }
     }
 
-    /// For a restart: stop this device's tasks and usbmuxd, kill its helper if
-    /// it is still running, and wait until it is gone. False if it would not exit.
+    /// Restart, Delete, Prepare Again and file system edits: stop this device's tasks and usbmuxd, halt its helper
+    /// (stop()'s SIGTERM: a guest that powered off quits at once, a running one is paused, flushed and quit), kill it
+    /// if it outlives the halt budget, and wait until it is gone. False if it would not exit. Both signals are the
+    /// app's, so the exit reads as stopped, not as a crash (issue 109's Recent errors).
     func release() async -> Bool {
         releasing = true
         stop()
@@ -49,8 +51,12 @@ extension EmulatorController {
             await workers.awaitTeardown(budget: ladder.budgets.serviceTeardown)
             return true
         }
-        if !process.isDead { process.kill() }
-        let exited = await process.waitForExit(timeout: 10)
+        var exited = await process.waitForExit(timeout: ladder.budgets.halt)
+        if !exited {
+            logEvent("release: the device helper did not exit in \(Int(ladder.budgets.halt)) s; killing it")
+            process.kill()
+            exited = await process.waitForExit(timeout: ladder.budgets.kill)
+        }
         await workers.awaitTeardown(budget: ladder.budgets.serviceTeardown)
         return exited
     }
