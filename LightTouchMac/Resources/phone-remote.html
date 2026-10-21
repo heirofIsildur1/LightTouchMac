@@ -47,7 +47,8 @@ const iOS = typeof DeviceMotionEvent?.requestPermission === "function";
 // Only iOS Safari has navigator.standalone: false in the browser, true once opened from the Home Screen.
 if (navigator.standalone === false) document.getElementById("hint").hidden = false;
 
-// The Home Screen may open the page without its fragment; the token from the scan is remembered.
+// The Home Screen may open the page without its fragment; the token from the scan is remembered. It opens the socket
+// only while the session whose code was scanned lasts.
 const token = location.hash.slice(1) || localStorage.getItem("token");
 if (token) localStorage.setItem("token", token);
 
@@ -79,7 +80,11 @@ document.getElementById("start").onclick = async () => {
   socket = new WebSocket(`wss://${location.host}/ws`, [token]);
   socket.binaryType = "blob";
   // Ready for the first frame (and the Mac's sign that this socket is the phone).
-  socket.onopen = () => send({ drawn: true });
+  let opened = false;
+  socket.onopen = () => {
+    opened = true;
+    send({ drawn: true });
+  };
   // The Mac sends the next frame once this one is drawn: none wait in the network, none draw out of order.
   socket.onmessage = async (event) => {
     try {
@@ -97,7 +102,8 @@ document.getElementById("start").onclick = async () => {
       send({ drawn: true });
     }
   };
-  socket.onclose = () => show("Disconnected.", "Reconnect");
+  // Refused before it opened: an earlier session's token. A new code is on the Mac.
+  socket.onclose = () => opened ? show("Disconnected.", "Reconnect") : show("Scan the code on the Mac again.");
   addEventListener("devicemotion", ({ accelerationIncludingGravity: a }) => {
     // iOS reports the pull of gravity (flat, face up: z < 0); others the push against it, the other way.
     if (a?.x != null) send({ gravity: iOS ? [a.x, a.y, a.z] : [-a.x, -a.y, -a.z] });

@@ -55,6 +55,49 @@ struct PhoneRemoteRequestTests {
         #expect(PhoneRemoteRequest(upgrade(path: "/ws/"), token: Self.token, page: Self.page) == .refused)
     }
 
+    /// Stopped, the framer's token is empty: a socket offering none opens nothing.
+    @Test func anEmptyTokenOpensNothing() {
+        #expect(PhoneRemoteRequest(upgrade(protocol: ""), token: "", page: Self.page) == .refused)
+    }
+
+    /// Each session's token is new and kept nowhere.
+    @Test func eachSessionHasItsOwnToken() {
+        let first = PhoneRemoteRequest.newToken()
+        let second = PhoneRemoteRequest.newToken()
+        #expect(first != second && first.count == 32 && second.count == 32)
+        #expect(UserDefaults.standard.object(forKey: PhoneRemoteRequest.storedTokenKey) == nil)
+    }
+
+    /// The fingerprint the sheet shows is the certificate's SHA-256, as openssl gives it.
+    @Test func theFingerprintIsTheCertificatesSHA256() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ltm-fp-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        func openssl(_ arguments: [String]) throws -> String {
+            let process = Process()
+            let out = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/openssl")
+            process.arguments = arguments
+            process.standardOutput = out
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            process.waitUntilExit()
+            return text
+        }
+        let der = dir.appendingPathComponent("certificate.der").path
+        _ = try openssl([
+            "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=mac.local", "-keyout",
+            dir.appendingPathComponent("key.pem").path, "-outform", "DER", "-out", der,
+        ])
+        let printed = try openssl(["x509", "-inform", "DER", "-in", der, "-noout", "-fingerprint", "-sha256"])
+        let expected = try #require(printed.split(separator: "=").last).trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(
+            PhoneRemoteRequest.fingerprint(certificate: try Data(contentsOf: URL(fileURLWithPath: der)))
+                == expected.replacingOccurrences(of: ":", with: " ")
+        )
+    }
+
     @Test func anOversizedHeadIsRefusedAndAPartialOneWaits() {
         let partial = upgrade().prefix(40)
         #expect(PhoneRemoteRequest(Data(partial), token: Self.token, page: Self.page) == .incomplete)

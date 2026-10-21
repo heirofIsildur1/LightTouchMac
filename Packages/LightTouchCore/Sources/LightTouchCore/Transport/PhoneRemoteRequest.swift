@@ -42,7 +42,7 @@ public nonisolated enum PhoneRemoteRequest: Equatable {
                 + "Connection: close\r\n\r\n"
             self = .page(response: Data(head.utf8) + page)
         } else if request[1] == "/ws", let key = fields["sec-websocket-key"],
-            let offered = fields["sec-websocket-protocol"], Self.matches(offered, token)
+            let offered = fields["sec-websocket-protocol"], !token.isEmpty, Self.matches(offered, token)
         {
             let response =
                 "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
@@ -66,19 +66,22 @@ public nonisolated enum PhoneRemoteRequest: Equatable {
         return HMAC<SHA256>.isValidAuthenticationCode(code, authenticating: Data(offered.utf8), using: key)
     }
 
-    // MARK: - The token
+    // MARK: - The token and the certificate
 
-    private static let tokenKey = "phoneRemoteToken"
-
-    /// What a phone's page offers to open the socket: 128 random bits, kept across launches so the page on a phone's
-    /// Home Screen keeps connecting until `resetToken` revokes every phone.
-    public static var token: String { UserDefaults.standard.string(forKey: tokenKey) ?? resetToken() }
-
-    @discardableResult public static func resetToken() -> String {
+    /// What a phone's page offers to open the socket: 128 random bits, made for one Play on Phone session and kept
+    /// only in memory, so stopping revokes every phone that scanned its code.
+    public static func newToken() -> String {
         var bytes = [UInt8](repeating: 0, count: 16)
         precondition(SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess)
-        let token = bytes.map { String(format: "%02x", $0) }.joined()
-        UserDefaults.standard.set(token, forKey: tokenKey)
-        return token
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Where builds before per-session tokens kept theirs; Play on Phone removes it.
+    public static let storedTokenKey = "phoneRemoteToken"
+
+    /// The certificate's SHA-256 fingerprint as Safari's certificate details show it (uppercase pairs), to compare
+    /// before continuing past the warning.
+    public static func fingerprint(certificate der: Data) -> String {
+        SHA256.hash(data: der).map { String(format: "%02X", $0) }.joined(separator: " ")
     }
 }

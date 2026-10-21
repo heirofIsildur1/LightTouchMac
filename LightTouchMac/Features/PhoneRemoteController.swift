@@ -10,6 +10,7 @@ import DeviceRuntime
 import LightTouchCore
 import Network
 import SystemConfiguration
+import os
 
 @MainActor final class PhoneRemoteController {
     /// The device window; the QR code and errors go on it as sheets.
@@ -20,8 +21,6 @@ import SystemConfiguration
     /// More than a phone and its page loads ever need at once.
     private static let maxConnections = 8
     private weak var device: DeviceSession?
-    /// The token the QR code showed: Settings' Reset Phone Access changes it, which stops serving.
-    private var token = ""
     private var starting = false
     private var listener: NWListener?
     private var connections = 0
@@ -44,19 +43,26 @@ import SystemConfiguration
         Task { @MainActor in
             defer { starting = false }
             do {
-                let url = try await start(session)
-                if let window { makeAlert(url: url).beginSheetModal(for: window, completionHandler: nil) }
+                let (url, fingerprint) = try await start(session)
+                if let window {
+                    makeAlert(url: url, fingerprint: fingerprint).beginSheetModal(for: window, completionHandler: nil)
+                }
             } catch {
                 show(error)
             }
         }
     }
 
-    private func start(_ session: DeviceSession?) async throws -> URL {
+    /// The QR code's address (this session's token in its fragment) and the certificate's fingerprint.
+    private func start(_ session: DeviceSession?) async throws -> (URL, String) {
+        // Each session has its own token; builds before kept one across launches.
+        UserDefaults.standard.removeObject(forKey: PhoneRemoteRequest.storedTokenKey)
+        let token = PhoneRemoteRequest.newToken()
         guard let name = SCDynamicStoreCopyLocalHostName(nil) as String?,
-            let url = URL(string: "https://\(name).local:\(Self.port)/#\(PhoneRemoteRequest.token)")
+            let url = URL(string: "https://\(name).local:\(Self.port)/#\(token)")
         else { throw PhoneRemoteError.noNetwork }
-        let parameters = NWParameters(tls: try await Self.tlsOptions(host: "\(name).local"))
+        let (tls, fingerprint) = try await Self.tlsOptions(host: "\(name).local")
+        let parameters = NWParameters(tls: tls)
         // The WebSocket above the framer, its handshake skipped: the framer answers the request.
         let webSocket = NWProtocolWebSocket.Options()
         webSocket.skipHandshake = true
@@ -84,17 +90,18 @@ import SystemConfiguration
         listener.start(queue: .main)
         self.listener = listener
         device = session
-        token = PhoneRemoteRequest.token
+        PhoneRemoteFramer.token.withLock { $0 = token }
         // In the common modes, so an open menu or a live resize doesn't freeze the phone's picture.
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        return url
+        return (url, fingerprint)
     }
 
     func stop() {
+        PhoneRemoteFramer.token.withLock { $0 = "" }
         disconnect()
         timer?.invalidate()
         timer = nil
@@ -192,12 +199,10 @@ import SystemConfiguration
         }
     }
 
-    /// Stops with the device or a reset token; otherwise sends the phone the newest frame, turned the way the device
-    /// is held, when it changed and the phone has drawn the last one.
+    /// Stops with the device; otherwise sends the phone the newest frame, turned the way the device is held, when it
+    /// changed and the phone has drawn the last one.
     private func tick() {
-        guard let emulator = device?.emulator, !emulator.isDead, emulator.state != .poweredOff,
-            token == PhoneRemoteRequest.token
-        else { return stop() }
+        guard let emulator = device?.emulator, !emulator.isDead, emulator.state != .poweredOff else { return stop() }
         guard let client, !sending, let screen, let surface = screen.currentFrame() else { return }
         turns = PhoneRemote.quarterTurns(guestTurn: screen.guestTurn)
         guard sent?.serial != screen.shownSerial || sent?.turns != turns,
@@ -243,7 +248,7 @@ import SystemConfiguration
     // MARK: - Setup
 
     /// The sheet: the QR code on a white tile (scannable in Dark Mode too) above the steps, centered in the alert.
-    private func makeAlert(url: URL) -> NSAlert {
+    private func makeAlert(url: URL, fingerprint: String) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = "Play on Your Phone"
         alert.informativeText = "Use a phone on the same network as this Mac."
@@ -271,15 +276,31 @@ import SystemConfiguration
         paragraph.tabStops = [NSTextTab(textAlignment: .left, location: 16)]
         paragraph.headIndent = 16
         paragraph.paragraphSpacing = 4
-        let steps = NSTextField(
-            labelWithAttributedString: NSAttributedString(
-                string: "1.\tScan the code with the phone’s camera.\n"
-                    + "2.\tContinue past the warning that the connection isn’t private.\n"
-                    + "3.\tTap Start.",
-                attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .paragraphStyle: paragraph]
+        let small = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        let text = NSMutableAttributedString(
+            string: "1.\tScan the code with the phone’s camera.\n"
+                + "2.\tIn the warning that the connection isn’t private, check that the certificate’s SHA-256 "
+                + "fingerprint is\n",
+            attributes: [.font: small, .paragraphStyle: paragraph]
+        )
+        text.append(
+            NSAttributedString(
+                string: "\t\(fingerprint)\n",
+                attributes: [
+                    .font: NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular),
+                    .paragraphStyle: paragraph,
+                ]
             )
         )
+        text.append(
+            NSAttributedString(
+                string: "\tthen continue past it.\n3.\tTap Start.",
+                attributes: [.font: small, .paragraphStyle: paragraph]
+            )
+        )
+        let steps = NSTextField(labelWithAttributedString: text)
         steps.maximumNumberOfLines = 0
+        steps.isSelectable = true
 
         // As wide as the alert, so what it centers is centered in the alert.
         let stack = NSStackView(views: [tile, steps])
@@ -300,8 +321,8 @@ import SystemConfiguration
 
     /// TLS with this Mac's self-signed identity for `host`, made with the system's openssl (off the main thread) the
     /// first time and again before it runs out: Apple's rules for server certificates (at most 825 days, serverAuth)
-    /// are why it says what it says.
-    private static func tlsOptions(host: String) async throws -> NWProtocolTLS.Options {
+    /// are why it says what it says. With the certificate's fingerprint (PhoneRemoteRequest.fingerprint).
+    private static func tlsOptions(host: String) async throws -> (NWProtocolTLS.Options, String) {
         let folder = Bundled.stateDirectory.appendingPathComponent("phone-remote", isDirectory: true)
         let p12 = folder.appendingPathComponent("identity.p12")
         let created = try? p12.resourceValues(forKeys: [.creationDateKey]).creationDate
@@ -312,14 +333,21 @@ import SystemConfiguration
         // Before macOS 15 SecPKCS12Import can only add the identity to the login keychain.
         if #available(macOS 15, *) { options[kSecImportToMemoryOnly as String] = true }
         var items: CFArray?
-        // The identity is always a SecIdentity; Swift can't check a CF type conditionally.
+        // Swift can't cast to a CF type conditionally: its type ID says it is a SecIdentity.
         guard SecPKCS12Import(try Data(contentsOf: p12) as CFData, options as CFDictionary, &items) == errSecSuccess,
-            let found = (items as? [[String: Any]])?.first?[kSecImportItemIdentity as String],
-            let identity = sec_identity_create(found as! SecIdentity)
+            let found = (items as? [[String: Any]])?.first?[kSecImportItemIdentity as String] as CFTypeRef?,
+            CFGetTypeID(found) == SecIdentityGetTypeID(),
+            let identity = sec_identity_create(unsafeDowncast(found, to: SecIdentity.self))
         else { throw PhoneRemoteError.noCertificate }
+        var certificate: SecCertificate?
+        guard SecIdentityCopyCertificate(unsafeDowncast(found, to: SecIdentity.self), &certificate) == errSecSuccess,
+            let certificate
+        else {
+            throw PhoneRemoteError.noCertificate
+        }
         let tls = NWProtocolTLS.Options()
         sec_protocol_options_set_local_identity(tls.securityProtocolOptions, identity)
-        return tls
+        return (tls, PhoneRemoteRequest.fingerprint(certificate: SecCertificateCopyData(certificate) as Data))
     }
 
     /// RSA, not EC: macOS 27's SecPKCS12Import raises an exception (a NULL key in SecIdentityCreate) on LibreSSL's EC
@@ -360,6 +388,8 @@ nonisolated final class PhoneRemoteFramer: NWProtocolFramerImplementation {
     static let label = "PhoneRemote"
     // nonisolated(unsafe): made once, then only read; Network.framework holds definitions across its own queues.
     nonisolated(unsafe) static let definition = NWProtocolFramer.Definition(implementation: PhoneRemoteFramer.self)
+    /// The running session's token (PhoneRemoteController.start); empty, which opens nothing, while stopped.
+    static let token = OSAllocatedUnfairLock(initialState: "")
     static let page =
         Bundle.main.url(forResource: "phone-remote", withExtension: "html").flatMap { try? Data(contentsOf: $0) }
         ?? Data()
@@ -377,7 +407,7 @@ nonisolated final class PhoneRemoteFramer: NWProtocolFramerImplementation {
         _ = framer.parseInput(minimumIncompleteLength: 1, maximumLength: PhoneRemoteRequest.maxLength) { buffer, _ in
             if let buffer {
                 available = buffer.count
-                request = PhoneRemoteRequest(Data(buffer), token: PhoneRemoteRequest.token, page: Self.page)
+                request = PhoneRemoteRequest(Data(buffer), token: Self.token.withLock { $0 }, page: Self.page)
             }
             return 0
         }
