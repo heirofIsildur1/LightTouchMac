@@ -1,7 +1,7 @@
 #!/bin/bash
 # The vendor directory for the current pins, found without Configuration/Vendor.xcconfig:
 #
-#     scripts/vendor-check --key     the pin key (scripts/vendor's directory name; Vendor.pinKey runs this)
+#     scripts/vendor-check --key [CHECKOUT]   the pin key of this checkout or another (scripts/vendor's directory name)
 #     scripts/vendor-check --print   the current pins' vendor directory, or one line saying to run scripts/vendor
 #     scripts/vendor-check           Xcode's first phase (LightTouchServices): with VENDOR_DIR at its default,
 #                                    $(SRCROOT)/build/vendor, point that link at the current pins' directory; with
@@ -49,7 +49,7 @@ stale() {
 
 default_root="$HOME/Developer/ltm-vendor.noindex"
 case "${1:-}" in
-    --key) pin_key; exit ;;
+    --key) [[ -z "${2:-}" ]] || ROOT="$(cd "$2" && pwd)"; pin_key; exit ;;
     --print)
         dir="${LTM_VENDOR_ROOT:-$default_root}/$(pin_key)"
         [[ -f "$dir/vendor.json" ]] || stale "$dir"

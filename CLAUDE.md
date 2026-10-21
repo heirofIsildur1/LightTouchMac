@@ -6,7 +6,7 @@ what to do and not do on a shared Mac.
 ## Files and processes
 
 - Scratch goes under one root: `~/Developer/ltm-scratch.noindex/<task>/`. Never `/tmp/<name>`. Delete your task's
-  directory when you are done; `scripts/clean` sweeps what is left.
+  directory when you are done; `scripts/clean` (a dry run; `--yes` acts) sweeps what is left.
 - Never modify a shared base, vendor directory or another checkout in place. Copy it into your scratch directory (or
   boot it with an overlay) and work on the copy.
 - Kill by PID only: the PID you started, or one read from a pid file. No `pkill`, `killall` or `pgrep -f` patterns;
@@ -25,7 +25,7 @@ what to do and not do on a shared Mac.
   sessions …`.
 - Unit tests: `xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit`, or
   `swift test --package-path Packages/<Package>` for one package. Tests live in `Packages/*/Tests`, `tests/offline`
-  and `tests/sessions` (CONTRIBUTING.md, Gates).
+  and `tests/sessions` (CONTRIBUTING.md, Gates); the scripts' shell tests in `tests/scripts`.
 - A new test must fail with the fix reverted; say so in the commit.
 - Before committing Swift: `swift-format lint -r <changed paths>` stays quiet.
 
