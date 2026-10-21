@@ -3,9 +3,8 @@
 // nothing for anything else. The connection's framer answers with this before NWProtocolWebSocket, its handshake
 // skipped, takes the stream.
 
-import CryptoKit
+import Crypto
 import Foundation
-import Security
 
 public nonisolated enum PhoneRemoteRequest: Equatable {
     /// The head hasn't all arrived.
@@ -71,8 +70,8 @@ public nonisolated enum PhoneRemoteRequest: Equatable {
     /// What a phone's page offers to open the socket: 128 random bits, made for one Play on Phone session and kept
     /// only in memory, so stopping revokes every phone that scanned its code.
     public static func newToken() -> String {
-        var bytes = [UInt8](repeating: 0, count: 16)
-        precondition(SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess)
+        // SystemRandomNumberGenerator: the platform's cryptographically secure generator.
+        let bytes = (0..<16).map { _ in UInt8.random(in: 0...255) }
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
 

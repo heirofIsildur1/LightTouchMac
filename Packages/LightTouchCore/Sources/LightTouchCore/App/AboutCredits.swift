@@ -53,18 +53,14 @@ public enum AboutCredits {
         Project("Unrar.swift", "https://github.com/mtgto/Unrar.swift", "MIT", "swift/Unrar.swift"),
         Project("UnRAR", "https://www.rarlab.com/rar_add.htm", "UnRAR license", "swift/Unrar.swift"),
         Project("ZIPFoundation", "https://github.com/weichsel/ZIPFoundation", "MIT", "swift/ZIPFoundation"),
-        Project("MachOKit", "https://github.com/p-x9/MachOKit", "MIT", "swift/MachOKit"),
-        Project("ObjectArchiveKit", "https://github.com/p-x9/ObjectArchiveKit", "MIT", "swift/ObjectArchiveKit"),
-        Project("swift-fileio", "https://github.com/p-x9/swift-fileio", "MIT", "swift/swift-fileio"),
-        Project("swift-fileio-extra", "https://github.com/p-x9/swift-fileio-extra", "MIT", "swift/swift-fileio-extra"),
-        Project(
-            "swift-binary-parse-support",
-            "https://github.com/p-x9/swift-binary-parse-support",
-            "MIT",
-            "swift/swift-binary-parse-support"
-        ),
         Project("Swift Crypto", "https://github.com/apple/swift-crypto", "Apache-2.0", "swift/swift-crypto"),
         Project("SwiftASN1", "https://github.com/apple/swift-asn1", "Apache-2.0", "swift/swift-asn1"),
+        Project(
+            "Swift Certificates",
+            "https://github.com/apple/swift-certificates",
+            "Apache-2.0",
+            "swift/swift-certificates"
+        ),
         Project("Swift System", "https://github.com/apple/swift-system", "Apache-2.0", "swift/swift-system"),
         Project("Subprocess", "https://github.com/swiftlang/swift-subprocess", "Apache-2.0", "swift/swift-subprocess"),
         Project("Sparkle", "https://github.com/sparkle-project/Sparkle", "MIT", "swift/Sparkle"),

@@ -1,22 +1,23 @@
-import CryptoKit
+import Crypto
 import Foundation
 import Testing
 
 @testable import FirmwareKit
 
 @Suite(.serialized) struct VFDecryptTests {
-    /// A two-chunk encrcdsa v2 image whose plaintext ends inside the second chunk.
-    @Test(arguments: [0x100, 0x2000]) func synthetic(dataOffset: Int) throws {
+    /// An encrcdsa v2 image whose plaintext ends inside its last chunk: two chunks, and 600 (three of
+    /// VFDecrypt's batches, the last one short).
+    @Test(arguments: [(0x100, 2), (0x2000, 2), (0x100, 600)]) func synthetic(dataOffset: Int, chunks: Int) throws {
         let key = Data((0..<36).map { UInt8($0 * 7 & 0xFF) })
         let bs = 4096
-        let size = bs + 100
-        let plain = Data((0..<2 * bs).map { UInt8($0 * 31 & 0xFF) })
+        let size = (chunks - 1) * bs + 100
+        let plain = Data((0..<chunks * bs).map { UInt8(truncatingIfNeeded: $0 &* 31 ^ $0 >> 12) })
         let be = { (v: UInt64, n: Int) in Data((0..<n).reversed().map { UInt8(v >> (8 * UInt64($0)) & 0xFF) }) }
         var img =
             Data("encrcdsa".utf8) + Data(count: 44) + be(UInt64(bs), 4) + be(UInt64(size), 8)
             + be(UInt64(dataOffset), 8)
         img += Data(count: dataOffset - img.count)
-        for n in 0..<2 {
+        for n in 0..<chunks {
             let mac = HMAC<Insecure.SHA1>.authenticationCode(
                 for: be(UInt64(n), 4),
                 using: SymmetricKey(data: key.suffix(20))
@@ -34,6 +35,18 @@ import Testing
             try img.write(to: src)
             try VFDecrypt.decrypt(input: src, output: out, key: key)
             #expect(try Data(contentsOf: out) == plain.prefix(size))
+        }
+    }
+
+    /// The chunk IVs' HMAC-SHA1, against RFC 2202's test cases 1 and 2.
+    @Test func hmacSHA1MatchesRFC2202() throws {
+        let cases: [(key: Data, data: String, mac: String)] = [
+            (Data(repeating: 0x0b, count: 20), "Hi There", "b617318655057264e28bc0b6fb378c8ef146be00"),
+            (Data("Jefe".utf8), "what do ya want for nothing?", "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79"),
+        ]
+        for c in cases {
+            let mac = HMAC<Insecure.SHA1>.authenticationCode(for: Data(c.data.utf8), using: SymmetricKey(data: c.key))
+            #expect(Data(mac) == Data(hex: c.mac))
         }
     }
 

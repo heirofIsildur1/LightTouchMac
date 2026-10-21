@@ -25,7 +25,7 @@
 // create's output. seedLanguage then gives its volume the language, region and keyboards create seeds from the Mac: the
 // release packs a base prepared in en-US whatever the building Mac's.
 
-import CryptoKit
+import Crypto
 import Darwin
 import Foundation
 import HostRuntime

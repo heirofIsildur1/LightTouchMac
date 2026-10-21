@@ -227,30 +227,17 @@
       "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-09-28. Pinned exact in Packages/FirmwareKit/Package.swift (SwiftPM fetches it; this record is the license and provenance ledger). FirmwareKit's IPSWArchive reads IPSW members through it."
     },
     {
-      "name": "MachOKit",
-      "version": "0.53.0",
-      "groups": [
-        "swiftpm"
-      ],
-      "archive": "MachOKit-0.53.0.tar.gz",
-      "directory": "MachOKit-0.53.0",
-      "url": "https://github.com/p-x9/MachOKit/archive/refs/tags/0.53.0.tar.gz",
-      "sha256": "f99e68647cd65664740780e6777441c3cd55ff434bbf5bfdde5dfc33132f9aed",
-      "license": "MIT",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-09-28. Pinned exact in Packages/FirmwareKit/Package.swift. FirmwareKit's guest-helper checks (MachOSignature: thin/fat headers, load commands, LC_CODE_SIGNATURE) go through it; the dyld_v1 shared-cache reader stays FirmwareKit's own (MachOKitProbeTests says why), and so do the in-memory readers (FitCheck's MachO32, KBoot's MachO): MachOKit 0.53 reads only a file by URL, with try! on unchecked ranges."
-    },
-    {
       "name": "swift-subprocess",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "groups": [
         "swiftpm"
       ],
-      "archive": "swift-subprocess-1.0.0.tar.gz",
-      "directory": "swift-subprocess-1.0.0",
-      "url": "https://github.com/swiftlang/swift-subprocess/archive/refs/tags/1.0.0.tar.gz",
-      "sha256": "16dccc16e162f043999078fc8be36938ef723188518d3d4d9f734775bb593c8d",
+      "archive": "swift-subprocess-1.0.2.tar.gz",
+      "directory": "swift-subprocess-1.0.2",
+      "url": "https://github.com/swiftlang/swift-subprocess/archive/refs/tags/1.0.2.tar.gz",
+      "sha256": "72a948b2a43cada28c34bd03bdf1b989f1a516f225d571bfe27909c7a3ef0323",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-09-28. Pinned exact in Packages/FirmwareKit/Package.swift (the app pins the same version through Xcode). FirmwareKit's DiskImage runs diskutil/hdiutil through it."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit/Package.swift (the app pins the same version through Xcode). FirmwareKit's DiskImage runs diskutil/hdiutil through it."
     },
     {
       "name": "Sparkle",
@@ -316,6 +303,45 @@
       "sha256": "4858b54834fae301e36ea63529302d51ce0b4de9da48a465ebab6f6f3d096cf2",
       "license": "Apache-2.0 WITH Swift-exception",
       "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-21. Build time only: swift-binary-parsing's macro target takes it (from 603.0.0, so SwiftPM resolves the 603 releases, not 604; Package.resolved pins the version), and SwiftPM uses its prebuilt MacroSupport where the toolchain has one. The macro runs in the compiler; nothing of swift-syntax is linked or ships, so scripts/vendor (SwiftPackageLinks) copies no license of it and records it in build-inputs.json's swift_packages_unlinked."
+    },
+    {
+      "name": "swift-crypto",
+      "version": "5.0.3",
+      "groups": [
+        "swiftpm"
+      ],
+      "archive": "swift-crypto-5.0.3.tar.gz",
+      "directory": "swift-crypto-5.0.3",
+      "url": "https://github.com/apple/swift-crypto/archive/refs/tags/5.0.3.tar.gz",
+      "sha256": "ab84654f5e7746b67bcaa44562ff442882e31bab573f0a1fed4c69bc54849443",
+      "license": "Apache-2.0",
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/HostRuntime, FirmwareKit, LightTouchCore and DeviceRuntime. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras for FirmwareKit's AES-CBC (BoringSSL's AES_cbc_encrypt over the whole buffer) and the web proxy CA's RSA keys."
+    },
+    {
+      "name": "swift-certificates",
+      "version": "1.21.0",
+      "groups": [
+        "swiftpm"
+      ],
+      "archive": "swift-certificates-1.21.0.tar.gz",
+      "directory": "swift-certificates-1.21.0",
+      "url": "https://github.com/apple/swift-certificates/archive/refs/tags/1.21.0.tar.gz",
+      "sha256": "fc2d2590562f7bad16f6d9c41b9745a3d80981a4d2d0492cf89abf6e743a3161",
+      "license": "Apache-2.0",
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/DeviceRuntime. WebProxyCA builds and reads the web proxy's certificates with it (X509)."
+    },
+    {
+      "name": "swift-asn1",
+      "version": "1.7.3",
+      "groups": [
+        "swiftpm"
+      ],
+      "archive": "swift-asn1-1.7.3.tar.gz",
+      "directory": "swift-asn1-1.7.3",
+      "url": "https://github.com/apple/swift-asn1/archive/refs/tags/1.7.3.tar.gz",
+      "sha256": "77add3684fd75a586529893288af51ed092c565ec0c154d2b4eedb3a6bdc294c",
+      "license": "Apache-2.0",
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/DeviceRuntime (swift-certificates' DER, which WebProxyCA serializes through)."
     }
   ]
 }

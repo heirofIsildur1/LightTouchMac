@@ -5,7 +5,7 @@
 // difference not listed fails, as does a listed one that no longer occurs, so the list can only shrink. Properties
 // neither side changes are not recorded: the test fills them and expects them back untouched.
 
-import CryptoKit
+import Crypto
 import Foundation
 import Testing
 

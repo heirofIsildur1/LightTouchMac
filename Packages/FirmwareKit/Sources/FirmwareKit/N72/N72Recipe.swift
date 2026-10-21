@@ -19,7 +19,7 @@
 // fails) and SpringBoard gets CA_ENABLE_OGL=1.
 
 import BinaryParsing
-import CryptoKit
+import Crypto
 import Foundation
 
 final class N72Board: Board {

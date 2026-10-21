@@ -8,7 +8,6 @@
 // `frameSerial` (seq-cst). The reader stores `held` and re-reads the serial.
 // A stalled heartbeat means the helper is wedged; stalled frames, the guest.
 
-import Accelerate
 import CoreGraphics
 import Foundation
 import IOSurface
@@ -271,20 +270,12 @@ nonisolated public final class FrameRingWriter: @unchecked Sendable {
         } else {
             for y in 0..<height { memcpy(dst + y * surface.bytesPerRow, pixels + y * rowBytes, rowBytes) }
         }
-        var buffer = vImage_Buffer(
-            data: dst,
-            height: vImagePixelCount(height),
-            width: vImagePixelCount(width),
-            rowBytes: surface.bytesPerRow
-        )
-        _ = vImageOverwriteChannelsWithScalar_ARGB8888(
-            255,
-            &buffer,
-            &buffer,
-            // The 4th byte.
-            0x1,
-            vImage_Flags(kvImageNoFlags)
-        )
+        // The 4th byte of each pixel.
+        let alpha = UInt32(0xFF00_0000).littleEndian
+        for y in 0..<height {
+            let row = (dst + y * surface.bytesPerRow).bindMemory(to: UInt32.self, capacity: width)
+            for x in 0..<width { row[x] |= alpha }
+        }
     }
 }
 

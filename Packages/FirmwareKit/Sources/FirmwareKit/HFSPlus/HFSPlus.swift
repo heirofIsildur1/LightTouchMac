@@ -14,7 +14,7 @@
 
 import BinaryParsing
 import Compression
-import CryptoKit
+import Crypto
 import Foundation
 
 public final class HFSPlusVolume {

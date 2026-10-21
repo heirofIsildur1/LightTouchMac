@@ -148,10 +148,7 @@ nonisolated enum WiFiProbe {
         let proxyDir = d.dir.appendingPathComponent("proxy")
         do {
             try WebProxyConfiguration(mode: .direct).save(in: proxyDir)
-            proxyCA =
-                SecCertificateCopyData(
-                    try WebProxyCA.prepare(config: WebProxyConfiguration.file(in: proxyDir)).certificate
-                ) as Data
+            proxyCA = try WebProxyCA.prepare(config: WebProxyConfiguration.file(in: proxyDir)).certificate
         } catch { fail("web proxy: \(error)") }
         let endpoint = WebProxyConfiguration.endpoint(directory: proxyDir)
         d.webProxy = endpoint

@@ -7,7 +7,7 @@
 // nothing references it and Settings ▸ Storage removes it. The collection
 // is the point of this program.
 
-import CryptoKit
+import Crypto
 import Darwin
 import Foundation
 import HostRuntime

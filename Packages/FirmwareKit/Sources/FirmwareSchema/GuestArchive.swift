@@ -1,5 +1,5 @@
 import AppleArchive
-import CryptoKit
+import Crypto
 import Foundation
 import System
 

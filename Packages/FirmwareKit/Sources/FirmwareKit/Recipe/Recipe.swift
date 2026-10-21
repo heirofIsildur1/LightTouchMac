@@ -11,7 +11,7 @@
 // board-specific keys are merged in from `board.lock`. Helper file names and cache paths derive from
 // `board.arch` (SystemEdits.Helpers.name, SystemEdits.dyldCache).
 
-import CryptoKit
+import Crypto
 import FirmwareSchema
 import Foundation
 import HostRuntime

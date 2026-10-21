@@ -3,13 +3,12 @@
 // PAC) and the trust; lockdown's MCInstall profile only for a guest without an
 // agent (LockdownTools).
 
-import CryptoKit
+import Crypto
 import DeviceRuntime
 import FirmwareSchema
 import Foundation
 import HostRuntime
 import HostServiceWire
-import Security
 
 public struct WebProxySetup: Sendable {
     public init(
@@ -45,10 +44,7 @@ public struct WebProxySetup: Sendable {
         let config = URL(fileURLWithPath: proxyFile)
         let der: Data
         do {
-            der =
-                SecCertificateCopyData(
-                    try await Task.detached { try WebProxyCA.prepare(config: config) }.value.certificate
-                ) as Data
+            der = try await Task.detached { try WebProxyCA.prepare(config: config) }.value.certificate
         } catch {
             logEvent("proxy: certificate preparation failed: \(error)")
             throw DeviceToolsError.failed("Couldn’t prepare the proxy certificate.")

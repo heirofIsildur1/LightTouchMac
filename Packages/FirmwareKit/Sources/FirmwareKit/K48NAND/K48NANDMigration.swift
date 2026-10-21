@@ -18,7 +18,7 @@
 // next start tries again. An interrupted run is recovered from the intent at the next admission: before the record
 // swap the renames are reversed, after it they are finished.
 
-import CryptoKit
+import Crypto
 import Darwin
 import FirmwareSchema
 import Foundation

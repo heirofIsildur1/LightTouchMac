@@ -3,7 +3,7 @@
 // N45Board.springBoardUser), where SpringBoard and MobileSafari read them as they start. A new file takes its
 // folder's owner (the stopped edit's commit), as the agent's chown does on 2.x and later.
 
-import CryptoKit
+import Crypto
 import Foundation
 import HostRuntime
 

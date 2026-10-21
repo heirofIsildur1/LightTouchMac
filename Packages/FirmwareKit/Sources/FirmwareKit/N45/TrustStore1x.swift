@@ -7,7 +7,7 @@
 // chain and Safari opens HTTPS through a TLS 1.0 relay; without it, 3 (deny).
 
 import BinaryParsing
-import CryptoKit
+import Crypto
 import FirmwareSchema
 import Foundation
 import HostRuntime

@@ -4,7 +4,7 @@
 //   let (written, record) = try GuestPackage.seed(volume: mnt, itpack: helpers/armv7.itpack, gles: true)
 //   // written: volume-relative paths to make root-owned; record: the lock's guest_package
 
-import CryptoKit
+import Crypto
 import Foundation
 import HostRuntime
 

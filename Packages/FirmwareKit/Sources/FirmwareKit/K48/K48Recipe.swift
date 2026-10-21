@@ -12,7 +12,7 @@
 // Volumes: SystemEdits.buildK48 (system + data, the shared bake). Store: K48NAND. The keybag one-shot (4.x)
 // is retried from copies; the seal is one clean halt and a check boot on a throwaway overlay.
 
-import CryptoKit
+import Crypto
 import Foundation
 import HostRuntime
 
