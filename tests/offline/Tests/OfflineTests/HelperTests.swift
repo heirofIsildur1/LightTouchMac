@@ -127,5 +127,40 @@ extension SharedState {
                 "pure red on a P3 screen: (\(r0), \(g0), \(b0)); (255, 0, 0) is oversaturated"
             )
         }
+
+        /// The web proxy serves at most its capacity of connections at once: the next is closed unanswered (its
+        /// peer reads end of file) while they last, and taken again once one finishes.
+        @Test func connectionsPastTheCapAreClosed() throws {
+            let limit = ConnectionLimit(capacity: 2)
+            let release = DispatchSemaphore(value: 0)
+            let finished = DispatchSemaphore(value: 0)
+            func pair() -> (ours: Int32, peer: Int32) {
+                var fds: [Int32] = [0, 0]
+                precondition(socketpair(AF_UNIX, SOCK_STREAM, 0, &fds) == 0)
+                return (fds[0], fds[1])
+            }
+            let serve: @Sendable (Int32) -> Void = { fd in
+                release.wait()
+                close(fd)
+                finished.signal()
+            }
+            let held = [pair(), pair()]
+            for connection in held { #expect(limit.start(connection.ours, serve)) }
+            let extra = pair()
+            defer { close(extra.peer) }
+            #expect(!limit.start(extra.ours, serve))
+            var wait = timeval(tv_sec: 2, tv_usec: 0)
+            setsockopt(extra.peer, SOL_SOCKET, SO_RCVTIMEO, &wait, socklen_t(MemoryLayout<timeval>.size))
+            var byte: UInt8 = 0
+            #expect(read(extra.peer, &byte, 1) == 0, "the connection past the cap is closed")
+            release.signal()
+            finished.wait()
+            let next = pair()
+            #expect(limit.start(next.ours, serve), "a finished connection frees its place")
+            release.signal()
+            release.signal()
+            for _ in 0..<2 { finished.wait() }
+            for connection in held + [next] { close(connection.peer) }
+        }
     }
 }

@@ -115,7 +115,8 @@ final class WebProxy: @unchecked Sendable {
         if egress >= 0 { accepting(egress, name: "web-proxy-egress") { self.egress($0) } }
     }
 
-    /// Serves `path` (a Unix socket, owner-only) on a thread of its own; one thread per connection.
+    /// Serves `path` (a Unix socket, owner-only) on a thread of its own; one thread per connection, at most 48
+    /// (ConnectionLimit).
     func listen(socket path: String) throws {
         var address = sockaddr_un()
         guard path.utf8.count < MemoryLayout.size(ofValue: address.sun_path) else {
@@ -134,16 +135,22 @@ final class WebProxy: @unchecked Sendable {
             close(fd)
             throw Reply(503, "Can't listen on \(path): \(String(cString: strerror(errno)))")
         }
-        accepting(fd, name: "web-proxy") { self.serve($0) }
+        // A period browser opens a handful per host; past 48 at once a guest connection is closed unanswered.
+        accepting(fd, name: "web-proxy", limit: ConnectionLimit(capacity: 48)) { self.serve($0) }
     }
 
-    /// One thread accepting on `fd`, one more per connection.
-    private func accepting(_ fd: Int32, name: String, _ serve: @escaping @Sendable (Int32) -> Void) {
+    /// One thread accepting on `fd`, one more per connection (with `limit`, only as many as it admits).
+    private func accepting(
+        _ fd: Int32,
+        name: String,
+        limit: ConnectionLimit? = nil,
+        _ serve: @escaping @Sendable (Int32) -> Void
+    ) {
         let thread = Thread {
             while true {
                 let connection = accept(fd, nil, nil)
                 if connection < 0 { if errno == EINTR || errno == ECONNABORTED { continue } else { return } }
-                Thread.detachNewThread { serve(connection) }
+                if let limit { limit.start(connection, serve) } else { Thread.detachNewThread { serve(connection) } }
             }
         }
         thread.name = name
