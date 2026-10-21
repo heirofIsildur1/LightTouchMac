@@ -55,13 +55,14 @@ import System
 
     /// The fork ships in the bundle; a dev build falls back to the checkout
     /// (see qemu-ios' usbmuxd-qemu). LTM_USBMUXD names another build for a Debug
-    /// run.
-    private static let root = "\(NSHomeDirectory())/Developer/usbmuxd-qemu"
+    /// run. A Release build runs only the bundled one.
     private static var binary: String {
         #if DEBUG
             if let override = ProcessInfo.processInfo.environment["LTM_USBMUXD"] { return override }
+            return Bundled.tool("usbmuxd") ?? "\(NSHomeDirectory())/Developer/usbmuxd-qemu/usbmuxd/src/usbmuxd"
+        #else
+            return Bundled.tool("usbmuxd") ?? "usbmuxd (not in the bundle)"
         #endif
-        return Bundled.tool("usbmuxd") ?? "\(root)/usbmuxd/src/usbmuxd"
     }
     /// The daemon's config dir: bundled first (scripts/vendor stages it), else the
     /// dev checkout. Was hardcoded to the checkout with no bundle fallback, so

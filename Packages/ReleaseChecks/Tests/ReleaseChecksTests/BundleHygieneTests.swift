@@ -125,6 +125,20 @@ struct BundleHygieneTests {
 
     /// Every build copies the guest tools (guest.aar), not only Archive: without them a Debug build couldn't prepare
     /// any device ("guest helper it_agent missing from …/Resources/guest-tools").
+    /// ReleaseAppStaticTests.noBinaryNamesADebugOverride's scan: a binary naming an override is reported with it.
+    @Test func theOverrideScanNamesABinaryThatHonorsOne() throws {
+        try withScratch { root in
+            let clean = root.appendingPathComponent("clean")
+            let named = root.appendingPathComponent("named")
+            try Data("LTM_SERVICE_UDID\0bundled only\0".utf8).write(to: clean)
+            try Data("\0LTM_HOST_SERVICE_WORKER\0LTM_STATE_DIR\0".utf8).write(to: named)
+            #expect(
+                try ReleaseApp.overrideNames(in: [clean, named])
+                    == ["named": ["LTM_HOST_SERVICE_WORKER", "LTM_STATE_DIR"]]
+            )
+        }
+    }
+
     @Test func everyBuildCopiesTheGuestTools() throws {
         let project = try String(
             contentsOf: repository.appendingPathComponent("LightTouchMac.xcodeproj/project.pbxproj"),

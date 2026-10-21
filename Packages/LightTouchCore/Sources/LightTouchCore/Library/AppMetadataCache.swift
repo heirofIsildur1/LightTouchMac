@@ -35,7 +35,7 @@ public final class AppMetadataCache {
             directory: StorageLocations.appMetadataDirectory(
                 state: Bundled.stateDirectory,
                 caches: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0],
-                isolated: ProcessInfo.processInfo.environment["LTM_STATE_DIR"] != nil
+                isolated: Bundled.stateOverride != nil
             )
         )
     }

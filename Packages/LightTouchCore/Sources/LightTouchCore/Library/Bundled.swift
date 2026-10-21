@@ -47,19 +47,23 @@ public nonisolated enum Bundled {
     public static let frameworksDirectory = Bundle.main.privateFrameworksPath
 
     /// The device assets (the iPod SecureROMs): LTM_FILES,
-    /// then the bundle's Resources/Device, then the dev checkout's qemu-ios-files.
+    /// then the bundle's Resources/Device, then the dev checkout's qemu-ios-files (LTM_FILES and the checkout: Debug
+    /// only).
     public static let filesRoot: String = filesRoot(
         environment: ProcessInfo.processInfo.environment,
         resources: Bundle.main.resourceURL
     )
     public static func filesRoot(environment: [String: String], resources: URL?) -> String {
-        if let env = environment["LTM_FILES"] { return env }
-        if let bundled = resources?.appendingPathComponent("Device").path,
-            FileManager.default.fileExists(atPath: bundled)
-        {
-            return bundled
-        }
-        return "\(NSHomeDirectory())/Developer/qemu-ios-files"
+        #if DEBUG
+            if let env = environment["LTM_FILES"] { return env }
+        #endif
+        let bundled = resources?.appendingPathComponent("Device").path
+        #if DEBUG
+            if let bundled, FileManager.default.fileExists(atPath: bundled) { return bundled }
+            return "\(NSHomeDirectory())/Developer/qemu-ios-files"
+        #else
+            return bundled ?? "Resources/Device"
+        #endif
     }
 
     /// Prepare once before the app constructs controllers or opens any device
@@ -70,10 +74,19 @@ public nonisolated enum Bundled {
         return try StorageLocations.prepare(
             applicationSupport: fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
             library: fm.urls(for: .libraryDirectory, in: .userDomainMask)[0],
-            override: ProcessInfo.processInfo.environment["LTM_STATE_DIR"].map {
-                URL(fileURLWithPath: $0, isDirectory: true)
-            }
+            override: stateOverride
         )
+    }
+
+    /// Debug only (tests, the sessions drivers, development runs): LTM_STATE_DIR keeps all writable state and the
+    /// logs in one directory. A Release build has no environment overrides: the bundle's tools and files and the
+    /// user's own library, always.
+    public static var stateOverride: URL? {
+        #if DEBUG
+            ProcessInfo.processInfo.environment["LTM_STATE_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        #else
+            nil
+        #endif
     }
 
     /// One app per library: State/.app-lock, held (flock) for the process's
@@ -96,9 +109,7 @@ public nonisolated enum Bundled {
     /// writable root. App startup requires the successful layout above.
     public static var stateDirectory: URL {
         if case .success(let value) = layout { return value.state }
-        return ProcessInfo.processInfo.environment["LTM_STATE_DIR"].map {
-            URL(fileURLWithPath: $0, isDirectory: true)
-        }
+        return stateOverride
             ?? StorageLocations.stateRoot(
                 applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             )
@@ -111,9 +122,7 @@ public nonisolated enum Bundled {
 
     public static var logsDirectory: URL {
         if let ready = preparedLogsDirectory { return ready }
-        return ProcessInfo.processInfo.environment["LTM_STATE_DIR"].map {
-            URL(fileURLWithPath: $0, isDirectory: true).appendingPathComponent("Logs", isDirectory: true)
-        }
+        return stateOverride?.appendingPathComponent("Logs", isDirectory: true)
             ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Logs/\(StorageLocations.bundleIdentifier)", isDirectory: true)
     }

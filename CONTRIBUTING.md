@@ -62,9 +62,14 @@ To produce the dylib, build `qemu-system-arm` in that checkout and run `contrib/
 The services helper links libimobiledevice and libplist: from the vendor directory (below) when there is one,
 else Homebrew's. Put local overrides of any of these in `Configuration/Local.xcconfig` (gitignored).
 
-Debug-only knobs (compiled out of Release): `LTM_FIRMWAREKIT=/path/to/firmwarekit` (another preparer),
-`LTM_QEMU_DYLIB` (another emulator library), `LTM_USBMUXD` (another usbmuxd). `LTM_STATE_DIR=/dir` keeps all
-writable state and logs inside one directory.
+Debug-only knobs (compiled out of Release, which runs only what its bundle holds; the Release plan's
+`noBinaryNamesADebugOverride` fails on any of these names in a shipped binary, `ReleaseApp.debugOverrides`):
+`LTM_FIRMWAREKIT=/path/to/firmwarekit` (another preparer), `LTM_QEMU_DYLIB` (another emulator library),
+`LTM_USBMUXD` (another usbmuxd), `LTM_HOST_SERVICE_WORKER` (another services worker), `LTM_FILES` (another device
+files root), `LTM_GUEST_PACKAGE` (another guest package), `LTM_DEV_BASE` (a `firmwarekit create` output run as a
+device), `FIRMWAREKIT_IBOOT_PATCHER`/`IBOOT32PATCHER` (another iBoot32Patcher; Debug also finds one on PATH),
+`FIRMWAREKIT_DISK_IMAGE` (hdiutil or diskutil) and `LTM_TEST_MIGRATION_KILL` (the migration kill tests).
+`LTM_STATE_DIR=/dir` keeps all writable state and logs inside one directory.
 
 ## Releases
 

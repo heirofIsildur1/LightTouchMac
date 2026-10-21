@@ -59,6 +59,12 @@ struct ReleaseAppStaticTests {
         }
     }
 
+    /// Release honors no environment override: none of their names is in a shipped binary.
+    @Test func noBinaryNamesADebugOverride() throws {
+        let found = try ReleaseApp.overrideNames(in: ReleaseApp.binaries(in: app))
+        #expect(found.isEmpty, "\(found)")
+    }
+
     @Test func hostCodeLoadsOnlyFromTheBundleAtTheAppsMinimum() throws {
         let info =
             try PropertyListSerialization.propertyList(

@@ -28,11 +28,13 @@ public enum K48NANDMigration {
     /// The record format of a device whose NAND is an image store.
     public static let recordFormat = DeviceRecord.imageFormat
 
-    /// The kill-at-each-step proofs' hook: LTM_TEST_MIGRATION_KILL=<checkpoint> SIGKILLs the process there.
+    /// The kill-at-each-step proofs' hook: LTM_TEST_MIGRATION_KILL=<checkpoint> SIGKILLs the process there (Debug only).
     static func killHook(_ checkpoint: Checkpoint) {
-        if ProcessInfo.processInfo.environment["LTM_TEST_MIGRATION_KILL"] == checkpoint.description {
-            kill(getpid(), SIGKILL)
-        }
+        #if DEBUG
+            if ProcessInfo.processInfo.environment["LTM_TEST_MIGRATION_KILL"] == checkpoint.description {
+                kill(getpid(), SIGKILL)
+            }
+        #endif
     }
 
     /// Where a run can be cut short.

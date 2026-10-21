@@ -26,9 +26,13 @@ public enum DiskImage {
     /// diskutil first: its attach presents the image as a solid-state device ("Solid State: Yes" in diskutil info,
     /// hdiutil's says "Info not available"), and the HFS+ driver lays a volume out differently on one (no metadata
     /// zone), so a store edited through a diskutil attach differs from the golden hashes; resize and convert are
-    /// byte-identical on both. FIRMWAREKIT_DISK_IMAGE=hdiutil|diskutil overrides.
+    /// byte-identical on both. FIRMWAREKIT_DISK_IMAGE=hdiutil|diskutil overrides (Debug only).
     public static let backend: Backend = {
-        if let b = ProcessInfo.processInfo.environment["FIRMWAREKIT_DISK_IMAGE"].flatMap(Backend.init) { return b }
+        #if DEBUG
+            if let b = ProcessInfo.processInfo.environment["FIRMWAREKIT_DISK_IMAGE"].flatMap(Backend.init) {
+                return b
+            }
+        #endif
         return FileManager.default.isExecutableFile(atPath: "/usr/bin/hdiutil") ? .hdiutil : .diskutil
     }()
 

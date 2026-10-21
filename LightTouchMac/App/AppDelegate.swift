@@ -193,7 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // runs off the main actor behind a progress window; a launch after a quit midway resumes without asking.
         if let legacy = LegacyState.find(
             state: Bundled.stateDirectory,
-            applicationSupport: ProcessInfo.processInfo.environment["LTM_STATE_DIR"] == nil
+            applicationSupport: Bundled.stateOverride == nil
                 ? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0] : nil
         ) {
             if !legacy.resuming {
@@ -246,7 +246,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // The network question belongs to the device being started (DeviceSessionHost.start), not to the app.
         let host = DeviceSessionHost()
         Self.sweepStorage()
-        Self.adoptDevelopmentBase(catalog: host.catalog)
+        #if DEBUG
+            Self.adoptDevelopmentBase(catalog: host.catalog)
+        #endif
         // A fresh install starts unpacking the built-in iPod and selects it (it starts once published).
         if let bundled = FirmwareJobs.shared.prepareBundledIfFresh(
             sidebarSaved: UserDefaults.standard.object(forKey: SidebarList.entriesKey) != nil
@@ -271,25 +273,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Development runs: LTM_DEV_BASE names a `firmwarekit create` output directory to run as a
     /// device; a record naming it (kept in place, never locked) is written once, for the entry its
-    /// lock names. The app has no other way to boot anything but a prepared base.
-    private static func adoptDevelopmentBase(catalog: FirmwareCatalog) {
-        guard let path = ProcessInfo.processInfo.environment["LTM_DEV_BASE"] else { return }
-        let base = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        let state = Bundled.stateDirectory
-        guard
-            !DeviceInstance.all(state: state).contains(where: {
-                DeviceInstance.url($0.base.path, state: state).standardizedFileURL == base
-            })
-        else { return }
-        guard let id = (try? DeviceLock.read(base: base))??.entryID, let entry = catalog.entry(id: id) else {
-            return logEvent("LTM_DEV_BASE: \(path) has no device.lock.json naming a catalog entry")
+    /// lock names. The app has no other way to boot anything but a prepared base. Debug only.
+    #if DEBUG
+        private static func adoptDevelopmentBase(catalog: FirmwareCatalog) {
+            guard let path = ProcessInfo.processInfo.environment["LTM_DEV_BASE"] else { return }
+            let base = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+            let state = Bundled.stateDirectory
+            guard
+                !DeviceInstance.all(state: state).contains(where: {
+                    DeviceInstance.url($0.base.path, state: state).standardizedFileURL == base
+                })
+            else { return }
+            guard let id = (try? DeviceLock.read(base: base))??.entryID, let entry = catalog.entry(id: id) else {
+                return logEvent("LTM_DEV_BASE: \(path) has no device.lock.json naming a catalog entry")
+            }
+            do {
+                let instance = try PreparationJob.publish(
+                    staging: base,
+                    entry: entry,
+                    id: UUID(),
+                    state: state,
+                    keep: true
+                )
+                DeviceLibrary.shared.reload()
+                logEvent("LTM_DEV_BASE: \(path) is device \(instance.id.uuidString) (\(entry.id))")
+            } catch { logEvent("LTM_DEV_BASE: \(error.localizedDescription)") }
         }
-        do {
-            let instance = try PreparationJob.publish(staging: base, entry: entry, id: UUID(), state: state, keep: true)
-            DeviceLibrary.shared.reload()
-            logEvent("LTM_DEV_BASE: \(path) is device \(instance.id.uuidString) (\(entry.id))")
-        } catch { logEvent("LTM_DEV_BASE: \(error.localizedDescription)") }
-    }
+    #endif
 
     /// Launch, with the library's lock held: finish what a crash or an older
     /// build left. FirmwareJobs' own init sweeps Preparing/ and the IPSW stores.

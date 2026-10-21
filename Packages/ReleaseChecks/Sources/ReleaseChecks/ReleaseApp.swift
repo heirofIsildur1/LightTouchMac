@@ -52,6 +52,26 @@ public enum ReleaseApp {
         }.sorted { $0.path < $1.path }
     }
 
+    /// The environment variables a Debug build reads to run other code or data than the bundle's (another services
+    /// worker, emulator, usbmuxd, preparer or iBoot32Patcher, other device files, guest package or state, a test's
+    /// kill hook). Each is compiled out of Release: a name in a shipped binary is an override the app still honors.
+    public static let debugOverrides = [
+        "LTM_HOST_SERVICE_WORKER", "LTM_QEMU_DYLIB", "LTM_USBMUXD", "LTM_FIRMWAREKIT", "LTM_FILES",
+        "LTM_GUEST_PACKAGE", "LTM_STATE_DIR", "LTM_DEV_BASE", "LTM_TEST_MIGRATION_KILL", "FIRMWAREKIT_IBOOT_PATCHER",
+        "IBOOT32PATCHER", "FIRMWAREKIT_DISK_IMAGE",
+    ]
+
+    /// Each of `binaries` that names a Debug override, with the names it holds.
+    public static func overrideNames(in binaries: [URL]) throws -> [String: [String]] {
+        var found: [String: [String]] = [:]
+        for binary in binaries {
+            let data = try Data(contentsOf: binary, options: .alwaysMapped)
+            let names = debugOverrides.filter { data.range(of: Data($0.utf8)) != nil }
+            if !names.isEmpty { found[binary.lastPathComponent] = names }
+        }
+        return found
+    }
+
     /// The environment the bundle's tools run in: the user's basics, no LTM_ overrides (the bundle must stand alone).
     public static var cleanEnvironment: [String: String] {
         var clean = environment.filter {

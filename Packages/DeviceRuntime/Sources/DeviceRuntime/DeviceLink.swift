@@ -163,7 +163,10 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         )
         var argv = [configuration.helper.path] + launch.arguments
         var environment = ProcessInfo.processInfo.environment.merging(configuration.environment) { $1 }
-        if let dylib = configuration.dylib { environment["LTM_QEMU_DYLIB"] = dylib }
+        #if DEBUG
+            // A Release helper loads only its bundle's emulator (LightTouchDevice/Qemu.swift).
+            if let dylib = configuration.dylib { environment["LTM_QEMU_DYLIB"] = dylib }
+        #endif
         let envp = environment.map { "\($0)=\($1)" }
         lock.withLock { startCompletion = completion }
 

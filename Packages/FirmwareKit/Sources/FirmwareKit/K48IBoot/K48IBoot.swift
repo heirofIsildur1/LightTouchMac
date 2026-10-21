@@ -229,18 +229,23 @@ public enum K48IBoot {
     // MARK: - iBoot patching
 
     /// Locate iBoot32Patcher: the bundled copy first (next to firmwarekit itself, then next to the helper; both are
-    /// the app's Contents/MacOS, where the archive ships it), then FIRMWAREKIT_IBOOT_PATCHER / IBOOT32PATCHER
-    /// (development runs), then a bare name on PATH.
+    /// the app's Contents/MacOS, where the archive ships it), then, in Debug only, FIRMWAREKIT_IBOOT_PATCHER /
+    /// IBOOT32PATCHER and a bare name on PATH. A Release build runs only the bundled one (or names where it is missing).
     public static func patcher(helper: URL?) -> URL {
-        for dir in [Bundle.main.executableURL, helper].compactMap({
+        let dirs = [Bundle.main.executableURL, helper].compactMap {
             $0?.resolvingSymlinksInPath().deletingLastPathComponent()
-        }) {
+        }
+        for dir in dirs {
             let u = dir.appendingPathComponent("iBoot32Patcher")
             if FileManager.default.isExecutableFile(atPath: u.path) { return u }
         }
-        let env = ProcessInfo.processInfo.environment
-        if let p = env["FIRMWAREKIT_IBOOT_PATCHER"] ?? env["IBOOT32PATCHER"] { return URL(fileURLWithPath: p) }
-        return URL(fileURLWithPath: "iBoot32Patcher")
+        #if DEBUG
+            let env = ProcessInfo.processInfo.environment
+            if let p = env["FIRMWAREKIT_IBOOT_PATCHER"] ?? env["IBOOT32PATCHER"] { return URL(fileURLWithPath: p) }
+            return URL(fileURLWithPath: "iBoot32Patcher")
+        #else
+            return (dirs.first ?? URL(fileURLWithPath: "/")).appendingPathComponent("iBoot32Patcher")
+        #endif
     }
 
     /// A pattern-patched iBoot (RSA/personalization bypass, debug boot, the boot-args string), byte-for-byte what

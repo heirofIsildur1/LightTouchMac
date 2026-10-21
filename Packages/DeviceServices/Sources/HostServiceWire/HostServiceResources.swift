@@ -8,10 +8,14 @@ public nonisolated enum HostServiceResources {
     public static var udid: String? {
         ProcessInfo.processInfo.environment["LTM_SERVICE_UDID"].flatMap { $0.isEmpty ? nil : $0 }
     }
+    /// The services worker beside this executable; in Debug (tests, the sessions drivers) LTM_HOST_SERVICE_WORKER
+    /// names another. A Release build spawns only the bundled one.
     public static var executable: String? {
-        if let override = ProcessInfo.processInfo.environment["LTM_HOST_SERVICE_WORKER"] {
-            return FileManager.default.isExecutableFile(atPath: override) ? override : nil
-        }
+        #if DEBUG
+            if let override = ProcessInfo.processInfo.environment["LTM_HOST_SERVICE_WORKER"] {
+                return FileManager.default.isExecutableFile(atPath: override) ? override : nil
+            }
+        #endif
         let sibling = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(
             "LightTouchServices"
         ).path

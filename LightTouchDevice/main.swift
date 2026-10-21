@@ -213,9 +213,16 @@ func decodeConfig<T: Decodable>(_ path: String, _: T.Type) -> T {
     }
 }
 
+/// A config's emulator library, for Qemu.candidates: Debug only; a Release helper loads its bundle's.
+func useDylib(_ dylib: String?) {
+    #if DEBUG
+        if let dylib { setenv("LTM_QEMU_DYLIB", dylib, 1) }
+    #endif
+}
+
 @MainActor func runHeadless(configPath: String) -> Never {
     let config = decodeConfig(configPath, HeadlessConfig.self)
-    if let dylib = config.dylib { setenv("LTM_QEMU_DYLIB", dylib, 1) }
+    useDylib(config.dylib)
     guard let qemu = loadQemu() else { exit(70) }
     let status = StatusBlock.create()
     let host = DeviceHost(qemu: qemu, status: status)
@@ -352,7 +359,7 @@ struct OneShotConfig: Decodable {
 
 @MainActor func runOneShot(configPath: String) -> Never {
     let config = decodeConfig(configPath, OneShotConfig.self)
-    if let dylib = config.dylib { setenv("LTM_QEMU_DYLIB", dylib, 1) }
+    useDylib(config.dylib)
     guard let qemu = loadQemu() else { exit(70) }
     let host = DeviceHost(qemu: qemu, status: StatusBlock.create())
     guard takeLease(launch.lease) else { exit(75) }
