@@ -137,6 +137,8 @@ struct SingleCheck: ParsableCommand {
     @Option(help: "Free-form Apply at WxH (as the panel scans) from Home: the frame, the dock row, a tap.")
     var panel: String?
     @Flag(help: "With --afc-race: dirty boots.") var dirty = false
+    @Flag(help: "CoreAnimation composites through the emulator's GL bridge, and the bridge refuses nothing.")
+    var gl = false
     @Flag var noInstall = false
     @Flag var noOffer = false
     @Option(transform: path) var ipa: URL?

@@ -488,6 +488,18 @@ func single(_ args: SingleCheck) -> Never {
         "\(d): no guest faults in the serial log"
             + (serial.isEmpty ? ": no serial log" : faults.isEmpty ? "" : ": " + faults.joined(separator: "; "))
     )
+    if args.gl {
+        let native = (try? String(contentsOf: work.appendingPathComponent("\(d)/native.log"), encoding: .utf8)) ?? ""
+        let lines = native.split(separator: "\n")
+        let refused = Set(
+            lines.filter { $0.contains("[gles] REFUSED ") }.map { $0.replacing("[gles] REFUSED ", with: "") }
+        )
+        r.check(
+            lines.contains { $0.contains("[gles] CoreAnimation composites through the host") } && refused.isEmpty,
+            "\(d): CoreAnimation composites through the GL bridge, which refuses nothing"
+                + (refused.isEmpty ? "" : ": " + refused.sorted().joined(separator: ", "))
+        )
+    }
     // Launchd's job lines reach the serial log on 1.x's two boards only: from 3.0 the guest's crash reports name a
     // crashed process, listed after each boot and before each shutdown (GuestFaults.listsCrashReports).
     let listings = events.find("crashReports", ["device": d])
