@@ -147,11 +147,13 @@ import Testing
             try w.link(path, to: f)
             m.items[path] = .file(d, group: g)
         case 70..<80:
-            // overwrite in place: every hard link to the file sees the new content
+            // overwrite in place; one name of a hard-linked file is replaced instead (DevicePath's rule)
             guard let f = files.randomElement(using: &rng), case .file(_, let g) = m.items[f] else { return }
             let d = content()
             try w.put(d, at: f)
-            for (k, v) in m.items { if case .file(_, g) = v { m.items[k] = .file(d, group: g) } }
+            let names = m.items.filter { if case .file(_, g) = $0.value { true } else { false } }.count
+            m.items[f] = .file(d, group: names > 1 ? m.nextGroup : g)
+            if names > 1 { m.nextGroup += 1 }
         case 80..<90:
             guard let src = m.items.keys.sorted().randomElement(using: &rng),
                 !(path + "/").hasPrefix(src + "/")
@@ -280,6 +282,46 @@ import Testing
         }
     }
 
+    /// A file HFS-compressed by macOS (ditto --hfsCompression onto a kernel-mounted volume: its content in the
+    /// com.apple.decmpfs attribute or the resource fork) overwritten in place is stored plainly: compressed flag,
+    /// decmpfs attribute and kHFSHasAttributesMask gone, its record and owner kept, and fsck_hfs passes.
+    @Test func overwritingACompressedFileStoresItPlainly() async throws {
+        try await Oracle.withTemp { dir in
+            let img = dir.appendingPathComponent("c.img")
+            try await VolumeMount.makeHFS(img, size: 64 << 20, journaled: false)
+            let src = dir.appendingPathComponent("text")
+            try Data(String(repeating: "compress me ", count: 100_000).utf8).write(to: src)
+            try await VolumeMount.withMounted(img, at: dir.appendingPathComponent("mnt")) { m in
+                _ = try await DiskImage.run([
+                    "/usr/bin/ditto", "--hfsCompression", src.path, m.appendingPathComponent("f").path,
+                ])
+            }
+            func flags() throws -> (record: UInt16, owner: UInt8, cnid: UInt32) {
+                let v = try HFSPlusVolume(img)
+                let r = try v.record(at: "f")
+                let t = try v.read(v.catalogFork, fileID: 4, offset: 0, count: 512)
+                let rec = try v.read(
+                    v.catalogFork,
+                    fileID: 4,
+                    offset: r.node * Int(be16(t, 32)) + r.bodyOffset,
+                    count: 4
+                )
+                return (be16(rec, 2), r.ownerFlags, r.cnid)
+            }
+            let before = try flags()
+            try #require(before.owner & 0x20 != 0 && before.record & 0x04 != 0, "ditto did not compress the file")
+            let w = try HFSPlusWriter(img)
+            try w.put(Data("plain".utf8), at: "f")
+            try w.close()
+            let after = try flags()
+            #expect(after.owner & 0x20 == 0 && after.record & 0x04 == 0 && after.cnid == before.cnid)
+            #expect(try HFSPlusVolume(img).attributeOwners().isEmpty)
+            #expect(try HFSPlusVolume(img).contents(HFSPlusVolume(img).record(at: "f")) == Data("plain".utf8))
+            let fsck = try await Self.fsck(img)
+            #expect(fsck.ok, "\(fsck.output)")
+        }
+    }
+
     /// The same edits give the same image, byte for byte.
     @Test func theSameEditsGiveTheSameBytes() throws {
         try Oracle.withTemp { dir in
@@ -309,6 +351,8 @@ import Testing
             let w = try HFSPlusWriter(img)
             try w.put(Data("x".utf8), at: "caf\u{E9}")
             try w.put(Data("y".utf8), at: "GMT-0:15")
+            try w.setMode("", 0o700)  // the root, keyed by the volume's name
+            #expect(try w.item(at: "")?.mode == 0o40700)
             #expect(try w.contents(at: "cafe\u{301}") == Data("x".utf8))
             try w.close()
             let names = try HFSPlusVolume(img).catalog().map(\.name)
@@ -359,4 +403,3 @@ import Testing
         }
     }
 }
-

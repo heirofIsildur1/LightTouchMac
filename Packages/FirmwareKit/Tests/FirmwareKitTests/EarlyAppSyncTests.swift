@@ -42,7 +42,7 @@ struct EarlyAppSyncTests {
                 lockbot ? ["com.apple.mobile.installation_proxy": job, "unrelated": ["Label": "keep"]] : job
             try PropertyListSerialization.data(fromPropertyList: original, format: .xml, options: 0).write(to: plist)
             _ = try SystemEdits.installAppSync(
-                root,
+                MountedVolume(root: root),
                 helper: helpers.appendingPathComponent(SystemEdits.Helpers.appsync),
                 cache: sharedCache ? "System/Library/Caches/com.apple.dyld/dyld_shared_cache_armv7" : "absent-cache",
                 log: { _ in }

@@ -24,7 +24,7 @@ public enum FirmwareCommand {
     public struct Create: FirmwareCommandLine {
         public static let configuration = CommandConfiguration(commandName: "create")
         public enum Stop: String, ExpressibleByArgument, Sendable {
-            /// fit.json: the fit checks' survey, no device.
+            /// fit.json: the fit checks' survey, and the volume images in volumes/; no device.
             case volumes
         }
         @Option(help: "The catalog entry, as JSON.") public var entry: String? = nil

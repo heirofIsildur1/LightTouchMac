@@ -102,26 +102,26 @@ extension SystemEdits {
     /// through SpringBoard's DYLD_INSERT_LIBRARIES: 3.x hands that variable on to the apps SpringBoard launches, and
     /// cydo (Cydia's root helper) refuses a parent whose job has any DYLD_ variable, so Cydia could neither install
     /// nor link its sources. Returns the log lines and the owners and modes to set, as installCydia's.
-    static func installJailbreak(_ m: URL, bootstrap: URL, typeinBySubstrate: Bool) throws -> (
+    static func installJailbreak(_ v: any VolumeFiles, bootstrap: URL, typeinBySubstrate: Bool) throws -> (
         afc2: String, cydia: String, root: [String], mobile: [String], modes: [(path: String, mode: UInt16)]
     ) {
-        let afc2 = try installAFC2(m)
-        let cydia = try installCydia(m, bootstrap: bootstrap)
+        let afc2 = try installAFC2(v)
+        let cydia = try installCydia(v, bootstrap: bootstrap)
         var root = afc2.root + cydia.root
         let typein = "usr/lib/it_typein.dylib"
-        if typeinBySubstrate, DevicePath.exists(m.appendingPathComponent(typein)) {
-            try editSpringBoardJob(m) { env, _ in
+        if typeinBySubstrate, v.exists(typein) {
+            try editSpringBoardJob(v) { env, _ in
                 let libs = (env["DYLD_INSERT_LIBRARIES"] as? String ?? "").split(separator: ":").map(String.init)
                     .filter { $0 != "/" + typein }
                 env["DYLD_INSERT_LIBRARIES"] = libs.isEmpty ? nil : libs.joined(separator: ":")
             }
             let dir = "Library/MobileSubstrate/DynamicLibraries"
-            try mkdirs(m.appendingPathComponent(dir))
-            try DevicePath.remove(m.appendingPathComponent(dir + "/it_typein.dylib"))
-            try DevicePath.symlink(m.appendingPathComponent(dir + "/it_typein.dylib"), to: "/" + typein)
-            try put(
+            try v.makeDirectory(dir)
+            try v.remove(dir + "/it_typein.dylib")
+            try v.makeSymlink(dir + "/it_typein.dylib", to: "/" + typein)
+            try v.put(
                 Data(#"{ Filter = { Bundles = ( "com.apple.springboard" ); }; }"#.utf8),
-                m.appendingPathComponent(dir + "/it_typein.plist"),
+                at: dir + "/it_typein.plist",
                 mode: 0o644
             )
             root += ["Library/MobileSubstrate", dir, dir + "/it_typein.dylib", dir + "/it_typein.plist"]
@@ -134,13 +134,13 @@ extension SystemEdits {
     /// /private/var/mobile, root's elsewhere (its symbolic links too, which tar replaces). `modes`: the set-user-ID
     /// and set-group-ID files it added (cydo, su, login, passwd) with their archive modes, which tar, not run as root,
     /// doesn't restore; the catalog takes them with the root owner (HFSPlusVolume.setOwner).
-    static func installCydia(_ m: URL, bootstrap: URL) throws -> (
+    static func installCydia(_ v: any VolumeFiles, bootstrap: URL) throws -> (
         line: String, root: [String], mobile: [String], modes: [(path: String, mode: UInt16)]
     ) {
-        func exists(_ rel: String) -> Bool { DevicePath.exists(m.appendingPathComponent(rel)) }
-        func link(_ rel: String) -> Bool { DevicePath.isLink(m.appendingPathComponent(rel)) }
+        let exists = { (rel: String) in v.exists(rel) }
+        let link = { (rel: String) in v.isSymlink(rel) }
         // Substrate on 3.x to 6.x, HTTPatch on 3.x
-        let major = majorVersion(m)
+        let major = majorVersion(v)
         let packages = [
             (Cydia.files[0].name, true), (Cydia.files[1].name, Cydia.substrateMajors.contains(major)),
             (Cydia.files[2].name, major == 3),
@@ -157,51 +157,40 @@ extension SystemEdits {
         }
         entries = entries.filter { !$0.isEmpty }
         let added = Set(entries.filter { !exists($0) })
-        // Extracted on the host, then merged in keeping what is there (copyTree, as tar -k): tar -k into the volume
-        // itself would set an archive member's mode on whatever a link already at its name leads to.
-        let staging = FileManager.default.temporaryDirectory.appendingPathComponent("ltm-cydia-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)  // host file
-        defer { try? FileManager.default.removeItem(at: staging) }  // host file
-        for p in packages {
-            let excluded = ["--exclude", "./" + Cydia.excluded, "--exclude", Cydia.excluded]
-            _ = try tar(["-xkf", p.path, "-C", staging.path] + excluded)
-        }
-        try copyTree(staging, m, keepingExisting: true)
+        for p in packages { try v.extract(tar: p, excluding: [Cydia.excluded]) }
         guard exists("Applications/Cydia.app/Cydia") else {
             throw FirmwareError(.internal, "Cydia bootstrap: no Applications/Cydia.app/Cydia after extracting")
         }
         // Patcyh (a Substrate extension for lsd and installd, for iOS 8.3 and later) out, as Legacy iOS Kit takes
         // it out below 8.3: with Substrate it would load into installd beside AppSync.
-        for rel in Cydia.patcyh { try? DevicePath.remove(m.appendingPathComponent(rel)) }
+        for rel in Cydia.patcyh { try? v.remove(rel) }
         for rel in ["private/var/lib/dpkg/status", "private/var/lib/dpkg/available"] {
-            let u = m.appendingPathComponent(rel)
-            guard let data = try? DevicePath.read(u), let text = String(data: data, encoding: .utf8) else { continue }
+            guard let text = (try? v.contents(at: rel)).flatMap({ String(data: $0, encoding: .utf8) }) else { continue }
             let kept = text.components(separatedBy: "\n\n").filter { !$0.hasPrefix("Package: com.saurik.patcyh\n") }
-            try put(Data(kept.joined(separator: "\n\n").utf8), u)
+            try v.put(Data(kept.joined(separator: "\n\n").utf8), at: rel)
         }
         entries.removeAll { Cydia.patcyh.contains($0) }
         // SpringBoard lists a system app outside its own set only with this key (the bootstrap's copy of the file
         // gives it, unless the firmware has the file already).
-        let prefs = m.appendingPathComponent(Cydia.springBoardPrefs)
         let hadPrefs = exists(Cydia.springBoardPrefs)
-        try seedPlist(prefs) { $0["SBShowNonDefaultSystemApps"] = true }
+        try seedPlist(v, Cydia.springBoardPrefs) { $0["SBShowNonDefaultSystemApps"] = true }
         // Cydia's first launch would otherwise stash /Applications, /usr/share and the rest onto the data volume
         // ("Preparing Filesystem", then exit) to free a stock-sized root; this root is grown, so no stash, as Legacy
         // iOS Kit's own restores mark it.
-        try put(Data(), m.appendingPathComponent(Cydia.noStash), mode: 0o644)
+        try v.put(Data(), at: Cydia.noStash, mode: 0o644)
         // Its sources: read once by Cydia (as mobile), which keeps them in its preferences and removes the file.
         var sources: [String: Any] = [:]
         for uri in Cydia.sources {
             sources["deb:\(uri):stable"] = ["Type": "deb", "URI": uri, "Distribution": "stable", "Sections": ["main"]]
         }
-        try mkdirs(m.appendingPathComponent(Cydia.metadata).deletingLastPathComponent())
-        try put(
+        try v.makeDirectory((Cydia.metadata as NSString).deletingLastPathComponent)
+        try v.put(
             PropertyListSerialization.data(
                 fromPropertyList: ["Version": 1, "Sources": sources] as [String: Any],
                 format: .xml,
                 options: 0
             ),
-            m.appendingPathComponent(Cydia.metadata),
+            at: Cydia.metadata,
             mode: 0o644
         )
         var root: [String] = [Cydia.noStash, Cydia.metadata]

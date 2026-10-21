@@ -27,7 +27,7 @@ extension StoppedVolumeEdit {
                 throw FirmwareError(.internal, "jailbreak: the volume isn't mounted")
             }
             let jb = try SystemEdits.installJailbreak(
-                URL(fileURLWithPath: point),
+                MountedVolume(root: URL(fileURLWithPath: point)),
                 bootstrap: bootstrap,
                 typeinBySubstrate: lock.board == "n72ap"
             )

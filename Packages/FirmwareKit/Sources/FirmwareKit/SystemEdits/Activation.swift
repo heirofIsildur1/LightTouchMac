@@ -38,8 +38,22 @@ public enum Activation {
         public let original: Data, replacement: Data
     }
 
+    /// lockdownd at `path` on the volume activated in place: its catalog record and metadata kept. A mounted
+    /// volume's file is written through `run(on:)` (which makes a read-only file writable for the write).
+    public static func run(on v: any VolumeFiles, _ path: String) throws -> Result {
+        if let m = v as? MountedVolume { return try run(on: m.url(path)) }
+        let (after, result) = try activated(try v.contents(at: path))
+        try v.put(after, at: path)
+        return result
+    }
+
     public static func run(on file: URL) throws -> Result {
-        let before = try Data(contentsOf: file)
+        let (after, result) = try activated(try Data(contentsOf: file))
+        try overwrite(file, with: after)
+        return result
+    }
+
+    static func activated(_ before: Data) throws -> (Data, Result) {
         var after = before
         var error: UnsafePointer<CChar>?
         var report = LTActivationReport()
@@ -55,6 +69,17 @@ public enum Activation {
         if success != 2 || MachOSignature.codeSignature(in: after) != nil {
             after = try signed(after)
         }
+        let patch = Patch(
+            strategy: String(cString: report.strategy),
+            isa: String(cString: report.isa),
+            offset: report.offset,
+            original: withUnsafeBytes(of: report.original) { Data($0.prefix(Int(report.width))) },
+            replacement: withUnsafeBytes(of: report.replacement) { Data($0.prefix(Int(report.width))) }
+        )
+        return (after, Result(inputSHA256: Preparer.sha256(before), outputSHA256: Preparer.sha256(after), patch: patch))
+    }
+
+    private static func overwrite(_ file: URL, with after: Data) throws {
         // Preserve the HFS catalog record and its metadata; this file is on a disposable staging volume.
         let metadata = open(file.path, O_RDONLY | O_NOFOLLOW)
         guard metadata >= 0 else { throw ActivationFailure("Cannot open activation target") }
@@ -83,14 +108,6 @@ public enum Activation {
                 offset += count
             }
         }
-        let patch = Patch(
-            strategy: String(cString: report.strategy),
-            isa: String(cString: report.isa),
-            offset: report.offset,
-            original: withUnsafeBytes(of: report.original) { Data($0.prefix(Int(report.width))) },
-            replacement: withUnsafeBytes(of: report.replacement) { Data($0.prefix(Int(report.width))) }
-        )
-        return Result(inputSHA256: Preparer.sha256(before), outputSHA256: Preparer.sha256(after), patch: patch)
     }
 
     /// iOS 6 lockdownd, which no binary strategy matches, takes its activation state from its data ark: the

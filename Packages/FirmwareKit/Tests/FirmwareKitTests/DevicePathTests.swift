@@ -148,7 +148,10 @@ struct DevicePathTests {
         } else {
             #expect(throws: FirmwareError.self) { try DevicePath.read(u) }
             #expect(DevicePath.dictionary(u) == nil)
-            #expect(N45Board.springBoardUser(v.root).uid == 0, "the job isn't read: root's, as with none")
+            #expect(
+                N45Board.springBoardUser(MountedVolume(root: v.root)).uid == 0,
+                "the job isn't read: root's, as with none"
+            )
         }
         #expect(try Data(contentsOf: v.canary) == Self.plist)
         #expect(!v.fm.fileExists(atPath: v.missing.path))
@@ -170,7 +173,7 @@ struct DevicePathTests {
         ] {
             try v.plant(link, at: rel)
         }
-        let completed = (try? SystemEdits.installCydia(v.root, bootstrap: bootstrap)) != nil
+        let completed = (try? SystemEdits.installCydia(MountedVolume(root: v.root), bootstrap: bootstrap)) != nil
         try v.expectUntouched("installCydia with \(link) links")
         // a hard link reads (on a device it can only be to a file of the same volume; here the host's isn't a plist)
         if link != .parent && link != .hard {
@@ -207,9 +210,9 @@ struct DevicePathTests {
     @Test(arguments: Link.allCases) func systemConfigurationThroughALink(link: Link) throws {
         let v = try Volume()
         defer { try? v.fm.removeItem(at: v.base) }
-        let sc = N45Board.scPrefs(v.root)
+        let sc = N45Board.scPrefs(MountedVolume(root: v.root))
         for rel in [sc + "/com.apple.wifi.plist", sc + "/preferences.plist"] { try v.plant(link, at: rel) }
-        let completed = (try? N45Board.seedSystemConfiguration(v.root)) != nil
+        let completed = (try? N45Board.seedSystemConfiguration(MountedVolume(root: v.root))) != nil
         try v.expectUntouched("seedSystemConfiguration through a \(link) link")
         if link != .hard { #expect(completed == (link != .parent)) }
     }

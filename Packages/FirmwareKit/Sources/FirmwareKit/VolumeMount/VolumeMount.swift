@@ -3,6 +3,8 @@
 // The disk-image operations (attach, detach, resize) go through DiskImage; mount/unmount, newfs_hfs and
 // fsck_hfs are run here.
 //
+//   try await VolumeMount.withVolume(image, at: mountPoint) { v in ... }       // VolumeFiles: the mount below, or
+//                                                                        // HFSPlusWriter (FIRMWAREKIT_HFS=writer)
 //   try await VolumeMount.withMounted(image, at: mountPoint) { root in ... }   // attach + diskutil mount (nobrowse,
 //                                                                        // nosuid, nodev); then junk removed, unmount
 //                                                                        // (retried), fsck_hfs -fn, detach
@@ -19,11 +21,15 @@ import Foundation
 
 public enum VolumeMount {
     /// How volumes are edited: `kernel`, attached and mounted through the stock tools (the default), or `writer`,
-    /// offline through HFSPlusWriter and UDIFReader. FIRMWAREKIT_HFS=writer|kernel overrides.
+    /// offline through HFSPlusWriter and UDIFReader. FIRMWAREKIT_HFS=writer|kernel overrides (Debug only).
     public enum Backend: String, Sendable { case kernel, writer }
 
-    public static let backend: Backend =
-        ProcessInfo.processInfo.environment["FIRMWAREKIT_HFS"].flatMap(Backend.init) ?? .kernel
+    public static let backend: Backend = {
+        #if DEBUG
+            if let b = ProcessInfo.processInfo.environment["FIRMWAREKIT_HFS"].flatMap(Backend.init) { return b }
+        #endif
+        return .kernel
+    }()
 
     /// What macOS drops on a mounted volume; removed from its root before unmounting.
     public static let junk = [".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", ".DS_Store"]
@@ -71,6 +77,33 @@ public enum VolumeMount {
         }
         if let journal { try HFSPlusVolume(image, writable: true).restore(journal) }
         return value
+    }
+
+    /// `body` with the files of `image` through `backend`: kernel, `withMounted` at `mountPoint` (a MountedVolume);
+    /// writer, an HFSPlusWriter dating what it writes `date` (default: the volume's modify date), `junk` removed
+    /// from its root and closed (its B-trees, bitmap and headers written) after `body` returns. When `body` throws,
+    /// the writer's edits are left unwritten in the catalog and the error wins.
+    nonisolated(nonsending) public static func withVolume<T>(
+        _ image: URL,
+        at mountPoint: URL,
+        date: UInt32? = nil,
+        backend: Backend = backend,
+        _ body: (any VolumeFiles) async throws -> T
+    ) async throws -> T {
+        switch backend {
+        case .kernel: return try await withMounted(image, at: mountPoint) { try await body(MountedVolume(root: $0)) }
+        case .writer:
+            try Task.checkCancellation()
+            let w = try HFSPlusWriter(image)
+            if let date { w.date = date }
+            let value = try await body(w)
+            try Task.checkCancellation()
+            // what a mount removes before unmounting, so both backends leave the same volume (the IPSW root
+            // filesystems ship a .fseventsd)
+            for name in junk where w.exists(name) { try w.remove(name) }
+            try w.close()
+            return value
+        }
     }
 
     private static func finish(dev: String, mountPoint: URL, check shouldCheck: Bool) async throws -> (
@@ -217,6 +250,7 @@ public enum VolumeMount {
     /// A bare (no partition map) case-sensitive journaled HFS+ volume in a sparse raw file of `size` bytes
     /// (rounded down to 4 KiB): newfs_hfs writes only metadata, so a 14.7 GB data volume costs ~40 MB.
     public static func makeHFS(_ image: URL, size: Int64, name: String = "Data", journaled: Bool = true) async throws {
+        if backend == .writer { return try HFSPlusWriter.makeHFS(image, size: size, name: name, journaled: journaled) }
         guard FileManager.default.createFile(atPath: image.path, contents: nil),
             truncate(image.path, off_t(size / 4096 * 4096)) == 0
         else {
@@ -234,10 +268,14 @@ public enum VolumeMount {
     /// system, but keeps the file's slack past the volume (the iPad IPSW volumes: one 4 KiB sector), so the file
     /// system stops that short; pad the file and move the alternate volume header to the new end - 1024, where
     /// fsck_hfs and the kernel look for it.
-    public static func grow(_ image: URL, toBytes bytes: Int, backend: DiskImage.Backend = DiskImage.backend)
-        async throws
-    {
+    public static func grow(
+        _ image: URL,
+        toBytes bytes: Int,
+        volumes: Backend = backend,
+        backend: DiskImage.Backend = DiskImage.backend
+    ) async throws {
         guard try size(image) != bytes else { return }
+        if volumes == .writer { return try HFSPlusWriter.grow(image, toBytes: bytes) }
         try await DiskImage.resize(image, toBytes: bytes, backend: backend)
         let old = try size(image)
         guard old <= bytes else { throw FirmwareError(.internal, "resize overshot \(bytes) bytes (\(old))") }

@@ -352,7 +352,9 @@ enum FitFixture {
                 return e.map { ($0.name, $0.name == "loader/it_boot" ? itmedia : $0.data) }
             }
             let log = FitCheck.Log()
-            #expect(throws: FirmwareError.self) { try GuestPackage.seed(volume: v, itpack: bad, gles: true, fit: log) }
+            #expect(throws: FirmwareError.self) {
+                try GuestPackage.seed(volume: MountedVolume(root: v), itpack: bad, gles: true, fit: log)
+            }
             // the seed stops at the loader (before it, n72-ios2's it_typein hook is dropped: its target is not here)
             #expect(
                 log.fits.last.map { !$0.fits && $0.piece.hasPrefix("it_boot") && $0.proof.contains("0x80000022") }
@@ -360,7 +362,7 @@ enum FitFixture {
                 "\(log.fits)"
             )
             let good = FitCheck.Log()
-            _ = try GuestPackage.seed(volume: v, itpack: itpack, gles: true, fit: good)
+            _ = try GuestPackage.seed(volume: MountedVolume(root: v), itpack: itpack, gles: true, fit: good)
             #expect(good.fits.first { $0.piece.hasPrefix("it_boot") }?.fits == true, "\(good.fits)")
         }
     }
@@ -529,7 +531,7 @@ enum FitFixture {
                 }
                 let log = FitCheck.Log()
                 let (_, record) = try GuestPackage.seed(
-                    volume: v,
+                    volume: MountedVolume(root: v),
                     itpack: itpack,
                     gles: false,
                     omitted: omitted,
@@ -610,7 +612,7 @@ enum FitFixture {
             var owners: [(UInt32, String)] = []
             let report = try await VolumeMount.withMounted(raw, at: dir.appendingPathComponent("mnt")) {
                 m -> [String: Any] in
-                let r = try N72Board(o).bake(m, c, owners: &owners)
+                let r = try N72Board(o).bake(MountedVolume(root: m), c, owners: &owners)
                 #expect(
                     !FileManager.default.fileExists(atPath: m.appendingPathComponent("usr/local/bin/it_agent").path)
                 )

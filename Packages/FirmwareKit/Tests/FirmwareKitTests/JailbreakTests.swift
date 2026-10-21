@@ -34,7 +34,7 @@ struct JailbreakTests {
         let stock: [String: Any] = ["com.apple.afc": Self.stockAFC[era], "com.apple.syslog_relay": ["Label": "x"]]
         try PropertyListSerialization.data(fromPropertyList: stock, format: .binary, options: 0).write(to: services)
         try Self.put(Data("usage: -L | --lockdown : run under old-style lockdown".utf8), root, SystemEdits.afcd)
-        #expect(try SystemEdits.installAFC2(root).root.isEmpty)
+        #expect(try SystemEdits.installAFC2(MountedVolume(root: root)).root.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(SystemEdits.afc2d).path))
         var format = PropertyListSerialization.PropertyListFormat.xml
         let edited = try #require(
@@ -64,7 +64,7 @@ struct JailbreakTests {
         try PropertyListSerialization.data(fromPropertyList: [String: Any](), format: .xml, options: 0)
             .write(to: services)
         try Self.put(Data("--lockdown".utf8), root, SystemEdits.afcd)
-        #expect(throws: FirmwareError.self) { try SystemEdits.installAFC2(root) }
+        #expect(throws: FirmwareError.self) { try SystemEdits.installAFC2(MountedVolume(root: root)) }
     }
 
     static func put(_ data: Data, _ root: URL, _ rel: String) throws {
@@ -108,7 +108,7 @@ struct JailbreakTests {
         let afcd = Self.afcd71()
         try Self.put(Data(afcd), root, SystemEdits.afcd)
 
-        let added = try SystemEdits.installAFC2(root).root
+        let added = try SystemEdits.installAFC2(MountedVolume(root: root)).root
         #expect(added == [SystemEdits.afc2d, SystemEdits.afc2Job])
 
         let services = try #require(NSDictionary(contentsOf: root.appendingPathComponent(SystemEdits.lockdownServices)))
@@ -160,7 +160,7 @@ struct JailbreakTests {
             SystemEdits.daemons + "/com.apple.afcd.plist"
         )
         try Self.put(Data(ActivationTests.syntheticMachO()), root, SystemEdits.afcd)
-        #expect(throws: FirmwareError.self) { try SystemEdits.installAFC2(root) }
+        #expect(throws: FirmwareError.self) { try SystemEdits.installAFC2(MountedVolume(root: root)) }
     }
 
     @Test func theOptionIsOffUnlessAskedFor() throws {
@@ -272,7 +272,7 @@ struct CydiaInstallTests {
         let dir = fm.temporaryDirectory.appendingPathComponent("ltm-cydia-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }
         let m = try firmware(in: dir, prefs: nil)
-        let r = try SystemEdits.installCydia(m, bootstrap: try bootstrap(in: dir))
+        let r = try SystemEdits.installCydia(MountedVolume(root: m), bootstrap: try bootstrap(in: dir))
         let cydia = m.appendingPathComponent("Applications/Cydia.app/Cydia")
         #expect(try String(contentsOf: cydia, encoding: .utf8) == "cydia")
         #expect(
@@ -307,7 +307,7 @@ struct CydiaInstallTests {
         let dir = fm.temporaryDirectory.appendingPathComponent("ltm-cydia-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }
         let m = try firmware(in: dir, prefs: nil)
-        let r = try SystemEdits.installCydia(m, bootstrap: try bootstrap(in: dir))
+        let r = try SystemEdits.installCydia(MountedVolume(root: m), bootstrap: try bootstrap(in: dir))
         #expect(r.modes.map(\.path) == ["usr/libexec/cydia/cydo"])
         #expect(r.modes.first?.mode == 0o6755)
         #expect(r.root.contains("usr/libexec/cydia/cydo"))
@@ -333,7 +333,7 @@ struct CydiaInstallTests {
         let dir = fm.temporaryDirectory.appendingPathComponent("ltm-cydia-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }
         let m = try firmware(in: dir, prefs: nil)
-        let r = try SystemEdits.installCydia(m, bootstrap: try bootstrap(in: dir))
+        let r = try SystemEdits.installCydia(MountedVolume(root: m), bootstrap: try bootstrap(in: dir))
         let u = m.appendingPathComponent("private/var/lib/cydia/metadata.plist")
         let plist = try #require(
             PropertyListSerialization.propertyList(from: Data(contentsOf: u), format: nil) as? [String: Any]
@@ -358,7 +358,7 @@ struct CydiaInstallTests {
         let dir = fm.temporaryDirectory.appendingPathComponent("ltm-cydia-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }
         let m = try firmware(in: dir, prefs: ["SBAutoLockTime": 60])
-        let r = try SystemEdits.installCydia(m, bootstrap: try bootstrap(in: dir))
+        let r = try SystemEdits.installCydia(MountedVolume(root: m), bootstrap: try bootstrap(in: dir))
         let prefs = try springBoard(m)
         #expect(prefs["SBShowNonDefaultSystemApps"] as? Bool == true)
         #expect(prefs["SBAutoLockTime"] as? Int == 60)
@@ -373,7 +373,7 @@ struct CydiaInstallTests {
         let dir = fm.temporaryDirectory.appendingPathComponent("ltm-cydia-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }
         let m = try firmware(in: dir, prefs: nil, version: version)
-        let r = try SystemEdits.installCydia(m, bootstrap: try bootstrap(in: dir))
+        let r = try SystemEdits.installCydia(MountedVolume(root: m), bootstrap: try bootstrap(in: dir))
         let major = Int(version.prefix(1)) ?? 0
         let auto = "private/var/root/Media/Cydia/AutoInstall/"
         for (deb, wanted) in [

@@ -70,7 +70,7 @@ struct GLIDispatchCheckTests {
         let log = FitCheck.Log()
         #expect {
             try SystemEdits.installCAOGL(
-                m,
+                MountedVolume(root: m),
                 helpers: helpers,
                 arch: "armv7",
                 fw: FitCheck.Firmware(root: m, arch: "armv7"),

@@ -48,14 +48,22 @@ import Testing
         defer { try? fm.removeItem(at: dir) }
         let bootstrap = try CydiaInstallTests().bootstrap(in: dir)
         let plain = try firmware(in: dir.appendingPathComponent("plain"), version: "4.2.1")
-        let r = try SystemEdits.installJailbreak(plain, bootstrap: bootstrap, typeinBySubstrate: false)
+        let r = try SystemEdits.installJailbreak(
+            MountedVolume(root: plain),
+            bootstrap: bootstrap,
+            typeinBySubstrate: false
+        )
         #expect(r.afc2.hasPrefix("afc2:") && r.cydia.hasPrefix("Cydia:"))
         #expect(
             try environment(plain)["DYLD_INSERT_LIBRARIES"] as? String
                 == "/usr/lib/it_typein.dylib:/usr/lib/other.dylib"
         )
         let n72 = try firmware(in: dir.appendingPathComponent("n72"), version: "3.1.3")
-        let s = try SystemEdits.installJailbreak(n72, bootstrap: bootstrap, typeinBySubstrate: true)
+        let s = try SystemEdits.installJailbreak(
+            MountedVolume(root: n72),
+            bootstrap: bootstrap,
+            typeinBySubstrate: true
+        )
         #expect(try environment(n72)["DYLD_INSERT_LIBRARIES"] as? String == "/usr/lib/other.dylib")
         let ext = "Library/MobileSubstrate/DynamicLibraries/it_typein"
         #expect(

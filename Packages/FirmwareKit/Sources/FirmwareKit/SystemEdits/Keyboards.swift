@@ -58,11 +58,12 @@ extension SystemEdits {
         var modes: [String: [String: Any]] = [:]
         var defaults: [String: [String]] = [:]
 
-        /// Read from `textInput`, the rootfs's /System/Library/TextInput; nil where it has none (1.x).
-        init?(_ textInput: URL) {
-            guard let bundles = try? FileManager.default.contentsOfDirectory(atPath: textInput.path) else { return nil }
-            for b in bundles where b.hasPrefix("TextInput_") {
-                guard let data = try? Data(contentsOf: textInput.appendingPathComponent("\(b)/Info.plist")),
+        /// Read from the system volume's System/Library/TextInput; nil where it has none (1.x).
+        init?(_ v: any VolumeFiles) {
+            let textInput = "System/Library/TextInput"
+            guard let bundles = try? v.contentsOfDirectory(at: textInput) else { return nil }
+            for b in bundles.sorted() where b.hasPrefix("TextInput_") {
+                guard let data = try? v.contents(at: "\(textInput)/\(b)/Info.plist"),
                     let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
                 else { continue }
                 modes.merge(info["UIKeyboardSupportedInputModes"] as? [String: [String: Any]] ?? [:]) { a, _ in a }

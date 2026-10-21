@@ -358,13 +358,14 @@ public enum PreparedBase {
         defer { try? fm.removeItem(at: work) }
         guard let image = try VolumeRebuild.rebuild(base: nand, overlay: nil, into: work, only: ["system"]).first?.image
         else { throw FirmwareError(.unsupported, "the base has no system volume") }
-        let seeded = try await VolumeMount.withMounted(image, at: work.appendingPathComponent("mnt")) { m in
+        let seeded = try await VolumeMount.withVolume(image, at: work.appendingPathComponent("mnt")) { v in
             try SystemEdits.seedLanguage(
-                m.appendingPathComponent("private/var"),
+                v,
+                "private/var",
                 tag: tag,
                 keyboards: keyboards,
-                catalog: SystemEdits.KeyboardCatalog(m.appendingPathComponent("System/Library/TextInput")),
-                formats: SystemEdits.regionFormats(m)
+                catalog: SystemEdits.KeyboardCatalog(v),
+                formats: SystemEdits.regionFormats(v)
             )
         }
         guard let seeded else { return }

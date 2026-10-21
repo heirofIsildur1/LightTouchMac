@@ -35,13 +35,13 @@ public enum Preferences1x {
         let session = try await StoppedVolumeEdit.begin(device: device, policy: policy, log: log)
         do {
             let point = session.image.deletingLastPathComponent().appendingPathComponent("preferences-mount")
-            try await VolumeMount.withMounted(session.image, at: point) { mount in
-                let dir = N45Board.springBoardUser(mount).library + "/Preferences"
+            try await VolumeMount.withVolume(session.image, at: point) { v in
+                let dir = N45Board.springBoardUser(v).library + "/Preferences"
                 for (domain, keys) in Dictionary(grouping: changes, by: { $0["domain"] as? String ?? "" }) {
                     guard !domain.isEmpty, !domain.contains("/") else {
                         throw FirmwareError(.internal, "a preference change without a domain")
                     }
-                    try SystemEdits.seedPlist(mount.appendingPathComponent("\(dir)/\(domain).plist")) { d in
+                    try SystemEdits.seedPlist(v, "\(dir)/\(domain).plist") { d in
                         for change in keys {
                             guard let key = change["key"] as? String else { continue }
                             if let value = change["value"] { d[key] = value } else { d.removeObject(forKey: key) }

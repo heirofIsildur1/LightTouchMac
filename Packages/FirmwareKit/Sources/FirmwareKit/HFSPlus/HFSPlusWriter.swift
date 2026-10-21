@@ -12,29 +12,20 @@
 //   try w.rename("a", to: "b"); try w.remove("b")           // remove is recursive
 //   try w.close()
 //
-// New items take what a mount by this process would give them: its uid, the parent folder's gid, 0666/0777 less its
-// umask; dates are `date` (the volume's own modify date unless set). Paths are volume-relative as HFSPlusVolume's;
-// symlinks inside a path are followed within the volume, a path's last component only where its content is read
-// or written. A journaled volume must have nothing to replay; the journal is left as it is.
+// New items take what a noowners mount by this process would give them: its uid and gid, 0666/0777 less its
+// umask; dates are `date` (the volume's own modify date unless set). Paths are volume-relative as HFSPlusVolume's,
+// and no link on the volume is followed (VolumeFiles' rule, DevicePath's on a mount). A journaled volume must have
+// nothing to replay; the journal is left as it is.
 
 import Foundation
 
-public final class HFSPlusWriter {
-    public enum Kind: Sendable, Equatable { case file, folder, symlink }
-
-    /// What `item(at:)` tells about a path.
-    public struct Item: Sendable, Equatable {
-        public let kind: Kind
-        public let cnid: UInt32
-        public let uid: UInt32, gid: UInt32, mode: UInt16
-        public let size: UInt64
-    }
-
+public final class HFSPlusWriter: VolumeFiles {
     public let url: URL
     public let blockSize: Int
     /// The catalog date of everything this writer creates or changes (seconds since 1904).
     public var date: UInt32
-    /// The owner of new items; nil: this process's uid and the parent folder's gid, as a mount gives them.
+    /// The owner of new items; nil: this process's uid and gid, as a noowners mount gives them (not the parent
+    /// folder's gid).
     public var owner: (uid: UInt32, gid: UInt32)?
     private let fd: Int32
     private var vh: [UInt8]
@@ -113,14 +104,13 @@ public final class HFSPlusWriter {
 
     // MARK: - Reading
 
-    public func item(at path: String, followLast: Bool = false) throws -> Item? {
-        guard let r = try lookup(path, followLast: followLast).value else { return nil }
+    public func item(at path: String) throws -> VolumeItem? {
+        guard let r = try lookup(path).value else { return nil }
         let c = try content(of: r)
-        let kind: Kind =
+        let kind: VolumeItem.Kind =
             be16(r, 0) == Self.folderType ? .folder : be16(c, 42) & 0o170000 == 0o120000 ? .symlink : .file
-        return Item(
+        return VolumeItem(
             kind: kind,
-            cnid: be32(r, 8),
             uid: be32(c, 32),
             gid: be32(c, 36),
             mode: be16(c, 42),
@@ -130,7 +120,7 @@ public final class HFSPlusWriter {
 
     /// The names in a folder (as a mount lists them: the hard-link private folders left out), in catalog order.
     public func contentsOfDirectory(at path: String) throws -> [String] {
-        guard let r = try lookup(path, followLast: true).value, be16(r, 0) == Self.folderType else {
+        guard let r = try lookup(path).value, be16(r, 0) == Self.folderType else {
             throw FirmwareError(.internal, "\(path): not a folder")
         }
         let id = be32(r, 8)
@@ -140,16 +130,17 @@ public final class HFSPlusWriter {
         }
     }
 
-    /// A file's content: a hard link's inode's, decompressed when the file is HFS-compressed.
+    /// A regular file's content (a link is not read through): a hard link's inode's, decompressed when the file
+    /// is HFS-compressed.
     public func contents(at path: String) throws -> Data {
-        guard let r = try lookup(path, followLast: true).value, be16(r, 0) == Self.fileType else {
-            throw FirmwareError(.internal, "\(path): not a file")
+        guard let r = try lookup(path).value, be16(r, 0) == Self.fileType, !isSymlink(r) else {
+            throw FirmwareError(.unsupported, "read \(path): not a regular file")
         }
         return Data(try readContent(try content(of: r)))
     }
 
     public func destinationOfSymlink(at path: String) throws -> String {
-        guard let r = try lookup(path, followLast: false).value, be16(r, 0) == Self.fileType,
+        guard let r = try lookup(path).value, be16(r, 0) == Self.fileType,
             be16(r, 42) & 0o170000 == 0o120000
         else { throw FirmwareError(.internal, "\(path): not a symlink") }
         return String(decoding: try readFork(r, data: true), as: UTF8.self)
@@ -177,10 +168,17 @@ public final class HFSPlusWriter {
     private func put(at path: String, mode: UInt16?, size: Int, _ produce: ((Data) throws -> Void) throws -> Void)
         throws
     {
-        let at = try lookup(path, followLast: true)
+        let at = try lookup(path)
         var key = catalogKey(at.parent, at.name)
         var r: [UInt8]
-        if let existing = at.value {
+        var existing = at.value
+        let sharedInode = try existing.flatMap { isHardLink($0) ? try inodeKey($0) : nil }.flatMap { catalog[$0] }
+        if let e = existing, isSymlink(e) || sharedInode.map({ be32($0, 44) > 1 }) == true {
+            // a link, or one name of a hard-linked file: the name is replaced, nothing it leads to is written
+            try remove(e, parent: at.parent, name: at.name)
+            existing = nil
+        }
+        if let existing {
             guard be16(existing, 0) == Self.fileType else { throw FirmwareError(.internal, "\(path) is a folder") }
             if isHardLink(existing), let inode = try inodeKey(existing) {
                 key = inode
@@ -194,7 +192,7 @@ public final class HFSPlusWriter {
             r[41] &= ~Self.compressed
             r.replaceSubrange(168..<248, with: [UInt8](repeating: 0, count: 80))
         } else {
-            r = try newRecord(Self.fileType, parent: at.parent, mode: 0o100000 | (0o666 & ~Self.creationMask))
+            r = try newRecord(Self.fileType, mode: 0o100000 | (0o666 & ~Self.creationMask))
             try insert(r, parent: at.parent, name: at.name)
         }
         let fork = try writeFork(be32(r, 8), size: size, produce)
@@ -209,13 +207,13 @@ public final class HFSPlusWriter {
         var done = ""
         for part in path.split(separator: "/") {
             done += (done.isEmpty ? "" : "/") + part
-            let at = try lookup(done, followLast: true)
+            let at = try lookup(done)
             if let r = at.value {
                 guard be16(r, 0) == Self.folderType else { throw FirmwareError(.internal, "\(done) is a file") }
                 continue
             }
             try insert(
-                try newRecord(Self.folderType, parent: at.parent, mode: 0o40000 | (0o777 & ~Self.creationMask)),
+                try newRecord(Self.folderType, mode: 0o40000 | (0o777 & ~Self.creationMask)),
                 parent: at.parent,
                 name: at.name
             )
@@ -225,9 +223,9 @@ public final class HFSPlusWriter {
 
     /// A symlink at `path` (0777 less the umask, as macOS makes one) to `target`.
     public func makeSymlink(_ path: String, to target: String) throws {
-        let at = try lookup(path, followLast: false)
+        let at = try lookup(path)
         guard at.value == nil else { throw FirmwareError(.internal, "\(path) exists") }
-        var r = try newRecord(Self.fileType, parent: at.parent, mode: 0o120000 | (0o777 & ~Self.creationMask))
+        var r = try newRecord(Self.fileType, mode: 0o120000 | (0o777 & ~Self.creationMask))
         putBE32(&r, 48, 0x736C_6E6B)  // 'slnk'
         putBE32(&r, 52, 0x7268_6170)  // 'rhap'
         let bytes = Data(target.utf8)
@@ -237,9 +235,9 @@ public final class HFSPlusWriter {
 
     /// A hard link at `path` to the file at `existing` (a link to it already, or a plain file that becomes one).
     public func link(_ path: String, to existing: String) throws {
-        let at = try lookup(path, followLast: false)
+        let at = try lookup(path)
         guard at.value == nil else { throw FirmwareError(.internal, "\(path) exists") }
-        let src = try lookup(existing, followLast: false)
+        let src = try lookup(existing)
         guard var srcRecord = src.value, be16(srcRecord, 0) == Self.fileType, !isSymlink(srcRecord) else {
             throw FirmwareError(.internal, "\(existing): not a file")
         }
@@ -277,9 +275,9 @@ public final class HFSPlusWriter {
 
     /// Moves `path` to `destination`, which must not exist; the item keeps its record.
     public func rename(_ path: String, to destination: String) throws {
-        let from = try lookup(path, followLast: false)
+        let from = try lookup(path)
         guard let r = from.value else { throw FirmwareError(.internal, "\(path) does not exist") }
-        let to = try lookup(destination, followLast: false)
+        let to = try lookup(destination)
         guard to.value == nil else { throw FirmwareError(.internal, "\(destination) exists") }
         let folder = be16(r, 0) == Self.folderType
         if folder {
@@ -300,16 +298,19 @@ public final class HFSPlusWriter {
         )
     }
 
-    /// Removes `path` (a folder with everything in it; a symlink itself, not its target).
+    /// Removes `path` (a folder with everything in it; a symlink itself, not its target); nothing there is no error.
     public func remove(_ path: String) throws {
-        let at = try lookup(path, followLast: false)
-        guard let r = at.value else { throw FirmwareError(.internal, "\(path) does not exist") }
+        let at = try lookup(path)
+        guard let r = at.value else { return }
         guard be32(r, 8) != Self.rootID else { throw FirmwareError(.internal, "refusing to remove the volume root") }
         try remove(r, parent: at.parent, name: at.name)
     }
 
-    /// Whether `path` names an item (a symlink itself, not its target); false too when a folder on the way is missing.
-    public func exists(_ path: String) -> Bool { (try? lookup(path, followLast: false))?.value != nil }
+    public func setMode(_ path: String, _ mode: UInt16) throws { try setAttributes(path, mode: mode) }
+
+    public func extract(tar: URL, excluding: [String]) throws {
+        try TarArchive(contentsOf: tar).extract(into: self, excluding: excluding)
+    }
 
     /// Sets owner, group, permission bits (the file type kept) and BSD flags (admin << 16 | owner) of `path`; a hard
     /// link's are its inode's.
@@ -320,7 +321,7 @@ public final class HFSPlusWriter {
         mode: UInt16? = nil,
         flags: UInt32? = nil
     ) throws {
-        let at = try lookup(path, followLast: false)
+        let at = try lookup(path)
         guard var r = at.value else { throw FirmwareError(.internal, "\(path) does not exist") }
         var key = catalogKey(at.parent, at.name)
         if isHardLink(r), let k = try inodeKey(r), let inode = catalog[k] {
@@ -359,6 +360,39 @@ public final class HFSPlusWriter {
         mark(.init(start: UInt32(totalBlocks - 1), count: 1), used: true)
         let have = Int(be64(vh, 112))
         if bitmap.count > have { try growSpecial(112, by: bitmap.count - have) }
+    }
+
+    /// Journals the volume as `diskutil enableJournal` does, but with the journal left for the device's kernel to
+    /// initialize (kJIJournalNeedInitMask, as newfs_hfs leaves one): the journal info block and the journal (newfs_hfs's
+    /// sizes) in contiguous blocks, the root's .journal_info_block and .journal files, the header's journaled bit.
+    public func enableJournal() throws {
+        guard be32(vh, 4) & (1 << 13) == 0 else { return }
+        let bytes = totalBlocks * blockSize >= 128 << 20 ? 8 << 20 : 512 << 10
+        let runs = try allocate(1 + (bytes + blockSize - 1) / blockSize)
+        guard runs.count == 1 else {
+            throw FirmwareError(.internal, "\(url.lastPathComponent): no contiguous room for a journal")
+        }
+        let jib = Int(runs[0].start)
+        try pwriteFully(Data(count: Int(runs[0].count) * blockSize), at: jib * blockSize)
+        var info = [UInt8](repeating: 0, count: 52)
+        putBE32(&info, 0, 1 | 4)  // in this volume, to be initialized
+        putBE64(&info, 36, UInt64((jib + 1) * blockSize))
+        putBE64(&info, 44, UInt64(bytes))
+        try pwriteFully(info, at: jib * blockSize)
+        for (name, start, count) in [(".journal_info_block", jib, 1), (".journal", jib + 1, bytes / blockSize)] {
+            // owned as the files diskutil makes: by this process's user
+            var r = try newRecord(Self.fileType, mode: 0o100000)
+            putBE32(&r, 48, 0x6A72_6E6C)  // 'jrnl'
+            putBE32(&r, 52, 0x6866_732B)  // 'hfs+'
+            putBE16(&r, 56, 0x5000)  // kIsInvisible + kNameLocked
+            putBE64(&r, 88, UInt64(count * blockSize))
+            putBE32(&r, 100, UInt32(count))
+            putBE32(&r, 104, UInt32(start))
+            putBE32(&r, 108, UInt32(count))
+            try insert(r, parent: Self.rootID, name: Array(name.utf16))
+        }
+        putBE32(&vh, 12, UInt32(jib))
+        putBE32(&vh, 4, be32(vh, 4) | 1 << 13)
     }
 
     // MARK: - Catalog
@@ -405,40 +439,29 @@ public final class HFSPlusWriter {
     }
 
     /// Where `path` is: its parent folder, its catalog name, and its record if there is one.
-    private func lookup(_ path: String, followLast: Bool, depth: Int = 0) throws -> (
-        parent: UInt32, name: [UInt16], value: [UInt8]?
-    ) {
-        guard depth < 32 else { throw FirmwareError(.internal, "\(path): too many levels of symlinks") }
-        let parts = path.split(separator: "/").filter { $0 != "." }
+    /// Where `path` is: its parent folder, its catalog name, and its record if there is one. No link is followed
+    /// (DevicePath's rule): one on the way throws, as does a "." or ".." component.
+    private func lookup(_ path: String) throws -> (parent: UInt32, name: [UInt16], value: [UInt8]?) {
+        let parts = path.split(separator: "/")
+        guard !parts.contains(where: { $0 == "." || $0 == ".." }) else {
+            throw FirmwareError(.unsupported, "\(path): not a plain path on the device's volume")
+        }
+        guard !parts.isEmpty else {
+            // the root: its record is keyed by the volume's name under parent 1
+            guard let (key, value) = try record(id: Self.rootID) else { throw FirmwareError(.unsupported, "no root") }
+            return (1, (0..<Int(be16(key, 6))).map { be16(key, 8 + 2 * $0) }, value)
+        }
         var cur = Self.rootID
-        var curPath: [Substring] = []
-        guard !parts.isEmpty else { return (1, [], try record(id: Self.rootID)?.value) }
         for (i, part) in parts.enumerated() {
-            let last = i == parts.count - 1
-            if part == ".." {
-                cur = cur == Self.rootID ? cur : try parentID(of: cur)
-                curPath = curPath.dropLast()
-                if last { return try lookup(curPath.joined(separator: "/"), followLast: followLast, depth: depth) }
-                continue
-            }
             let name = HFSUnicode.catalogName(HFSPlusVolume.catalogName(String(part)))
-            guard let r = catalog[catalogKey(cur, name)] else {
-                guard last else {
-                    throw FirmwareError(.internal, "\(path): no \(curPath.joined(separator: "/")) / \(part)")
-                }
-                return (cur, name, nil)
+            let r = catalog[catalogKey(cur, name)]
+            if i == parts.count - 1 { return (cur, name, r) }
+            guard let r else { throw FirmwareError(.internal, "\(path): no \(parts[...i].joined(separator: "/"))") }
+            guard !isSymlink(r) else {
+                throw FirmwareError(.unsupported, "\(path): a link on the device's volume, not followed")
             }
-            if be16(r, 0) == Self.fileType && isSymlink(r) && (!last || followLast) {
-                let target = String(decoding: try readFork(r, data: true), as: UTF8.self)
-                let base = target.hasPrefix("/") ? "" : curPath.joined(separator: "/")
-                let rest = parts[(i + 1)...].joined(separator: "/")
-                let joined = [base, target, rest].filter { !$0.isEmpty }.joined(separator: "/")
-                return try lookup(joined, followLast: followLast, depth: depth + 1)
-            }
-            if last { return (cur, name, r) }
             guard be16(r, 0) == Self.folderType else { throw FirmwareError(.internal, "\(path): \(part) is a file") }
             cur = be32(r, 8)
-            curPath.append(part)
         }
         throw FirmwareError(.internal, "unreachable")
     }
@@ -461,7 +484,7 @@ public final class HFSPlusWriter {
         return inode
     }
 
-    private func newRecord(_ type: UInt16, parent: UInt32, mode: UInt16) throws -> [UInt8] {
+    private func newRecord(_ type: UInt16, mode: UInt16) throws -> [UInt8] {
         var r = [UInt8](repeating: 0, count: type == Self.folderType ? 88 : 248)
         putBE16(&r, 0, type)
         putBE16(&r, 2, type == Self.folderType ? Self.hasFolderCount : Self.threadExists)
@@ -469,9 +492,8 @@ public final class HFSPlusWriter {
         putBE32(&vh, 64, id + 1)
         putBE32(&r, 8, id)
         for i in 0..<4 { putBE32(&r, 12 + 4 * i, date) }
-        let parentRecord = try record(id: parent)?.value
         putBE32(&r, 32, owner?.uid ?? getuid())
-        putBE32(&r, 36, owner?.gid ?? parentRecord.map { be32($0, 36) } ?? getgid())
+        putBE32(&r, 36, owner?.gid ?? getgid())
         putBE16(&r, 42, mode)
         if type == Self.fileType { putBE32(&r, 44, 1) }  // the link count a mount gives a new file
         return r
@@ -543,7 +565,7 @@ public final class HFSPlusWriter {
     }
 
     private func linkRecord(inode: UInt32, created: UInt32, next: UInt32) throws -> [UInt8] {
-        var r = try newRecord(Self.fileType, parent: Self.rootID, mode: 0o100444)
+        var r = try newRecord(Self.fileType, mode: 0o100444)
         putBE16(&r, 2, Self.threadExists | Self.hasLinkChain)
         putBE32(&r, 12, created)
         putBE32(&r, 32, 0)  // the previous link: none, a new link heads the chain
@@ -560,7 +582,7 @@ public final class HFSPlusWriter {
     private func privateDirectory() throws -> (id: UInt32, value: [UInt8]) {
         let name = Array(Self.privateDirName.utf16)
         if let r = catalog[catalogKey(Self.rootID, name)] { return (be32(r, 8), r) }
-        var r = try newRecord(Self.folderType, parent: Self.rootID, mode: 0o40000)
+        var r = try newRecord(Self.folderType, mode: 0o40000)
         putBE32(&r, 32, 0)
         putBE32(&r, 36, 0)
         r[41] = Self.immutable
@@ -920,6 +942,7 @@ public final class HFSPlusWriter {
     }
 
     private func flush() throws {
+        recountFolders()
         try store(catalog, forkAt: 272)
         try store(attributes, forkAt: 352)
         try store(extents, forkAt: 192)
@@ -943,6 +966,28 @@ public final class HFSPlusWriter {
         // unmounted cleanly, not inconsistent
         putBE32(&vh, 4, be32(vh, 4) & ~UInt32(1 << 11) | 1 << 8)
         try writeHeaders()
+    }
+
+    /// Every folder's valence and HFSX folder count (kHFSHasFolderCountMask set) as its children are: the edits keep
+    /// them, and this also sets what a catalog came without (1.x's stock folders have no folder count, which
+    /// fsck_hfs -fy adds on HFSX and -fn reports).
+    private func recountFolders() {
+        var children: [UInt32: UInt32] = [:]
+        var folders: [UInt32: UInt32] = [:]
+        for r in catalog.records where Int(be16(r.key, 6)) > 0 {
+            let type = be16(r.value, 0)
+            guard type == Self.folderType || type == Self.fileType else { continue }
+            children[be32(r.key, 2), default: 0] += 1
+            if type == Self.folderType { folders[be32(r.key, 2), default: 0] += 1 }
+        }
+        for r in catalog.records where be16(r.value, 0) == Self.folderType {
+            let id = be32(r.value, 8)
+            var v = r.value
+            putBE32(&v, 4, children[id] ?? 0)
+            putBE16(&v, 2, be16(v, 2) | Self.hasFolderCount)
+            putBE32(&v, 84, folders[id] ?? 0)
+            if v != r.value { catalog[r.key] = v }
+        }
     }
 
     private func writeHeaders() throws {

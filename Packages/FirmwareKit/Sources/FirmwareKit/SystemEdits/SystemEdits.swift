@@ -241,12 +241,11 @@ public enum SystemEdits {
         var productMajor = 0
         var keyboards: KeyboardCatalog?
         var formats: Set<String>?
-        try await VolumeMount.withMounted(system, at: work.appendingPathComponent("mnt-system")) { m in
-            let at = { (rel: String) in m.appendingPathComponent(rel) }
-            keyboards = KeyboardCatalog(at("System/Library/TextInput"))
-            formats = regionFormats(m)
+        try await VolumeMount.withVolume(system, at: work.appendingPathComponent("mnt-system"), date: newest) { v in
+            keyboards = KeyboardCatalog(v)
+            formats = regionFormats(v)
             // every baked helper proven to load on this firmware (FitCheck.loads), read before any edit
-            let fw = FitCheck.Firmware(root: m, arch: "armv7", kernelcache: kernel)
+            let fw = FitCheck.Firmware(volume: v, arch: "armv7", kernelcache: kernel)
             // a dyld without LC_DYLD_INFO_ONLY (3.0's: none of its own executables carry one) takes the legacy builds
             let legacy = fw.precedent[MachO32.lcDyldInfoOnly] == nil
             let pick = { (n: String) in legacy ? Helpers.legacy(n) : n }
@@ -254,12 +253,12 @@ public enum SystemEdits {
             // it_msmquiet only in the jobs that raise the notice it recognizes; else left out, jobs untouched (3.1.x
             // has no storage_mounter job at all). One job raises it per version, so the others' misfits are no warning.
             let msm = Helpers.msmQuiet
-            let candidates = noticeJobs.filter { o.guestTools && DevicePath.exists(at($0.0)) }
+            let candidates = noticeJobs.filter { o.guestTools && v.exists($0.0) }
             let quietFits = fit.checkAny(
                 try candidates.map { job, label in
                     FitCheck.msmQuiet(
                         fw,
-                        program: try stockProgram(m, job, label: label),
+                        program: try stockProgram(v, job, label: label),
                         dylib: try Data(contentsOf: helper(pick(msm.name)))  // host file
                     )
                 }
@@ -286,22 +285,22 @@ public enum SystemEdits {
                 fit.notInstalled("AppSync", "appsync off")
             }
             if let kernelcache {  // real-iBoot fsboot: the raw IPSW img3 kernelcache in the system volume
-                try mkdirs(at(kernelcachePath).deletingLastPathComponent())
-                try put(kernelcache, at(kernelcachePath), mode: 0o644)
+                try v.makeDirectory((kernelcachePath as NSString).deletingLastPathComponent)
+                try v.put(kernelcache, at: kernelcachePath, mode: 0o644)
             }
-            productMajor = majorVersion(m)
+            productMajor = majorVersion(v)
             // 7.x's launchd cannot remount / rw (mount_hfs: Operation not permitted) and reboots; keep its stock ro root
-            try put(Data((productMajor >= 7 ? fstabRO : fstabRW).utf8), at(fstab))
+            try v.put(Data((productMajor >= 7 ? fstabRO : fstabRW).utf8), at: fstab)
             if o.webProxy {
                 try fit.check(
-                    FitCheck.webProxy(FitCheck.Firmware(root: m, arch: "armv7")),
+                    FitCheck.webProxy(FitCheck.Firmware(volume: v, arch: "armv7")),
                     required: false,
                     outcome: "kept: the PAC is unused"
                 )
-                rootOwned += try installPAC(m)
+                rootOwned += try installPAC(v)
             }
             if o.caOGL {  // GL first
-                let (engine, owned) = try installCAOGL(m, helpers: helpers, arch: "armv7", fw: fw, fit: fit, log: log)
+                let (engine, owned) = try installCAOGL(v, helpers: helpers, arch: "armv7", fw: fw, fit: fit, log: log)
                 result.engine = engine
                 rootOwned += owned
             }
@@ -316,14 +315,14 @@ public enum SystemEdits {
                 required: false,
                 outcome: "kept: a switch nothing reads is inert"
             )
-            try editSpringBoardJob(m) { env, d in
+            try editSpringBoardJob(v) { env, d in
                 env.addEntries(from: o.caOGL ? sbEnvCAOGL : sbEnv)
                 d["StandardOutPath"] = "/dev/console"
                 d["StandardErrorPath"] = "/dev/console"
             }
             if o.jailbreak {
                 guard let bootstrap = o.cydia else { throw FirmwareError(.internal, "jailbreak: no Cydia bootstrap") }
-                let jb = try installJailbreak(m, bootstrap: bootstrap, typeinBySubstrate: false)
+                let jb = try installJailbreak(v, bootstrap: bootstrap, typeinBySubstrate: false)
                 log(jb.afc2)
                 log(jb.cydia)
                 rootOwned += jb.root
@@ -332,7 +331,7 @@ public enum SystemEdits {
             }
             if o.appsync {
                 _ = try installAppSync(
-                    m,
+                    v,
                     helper: try helper(pick(Helpers.appsync)),
                     cache: dyldCache("armv7"),
                     log: log
@@ -340,25 +339,25 @@ public enum SystemEdits {
                 rootOwned.append(appsyncPath)
             }
             // bake
-            for rel in retired { try DevicePath.remove(at(rel)) }
+            for rel in retired { try v.remove(rel) }
             for t in tools {
-                try mkdirs(at(t.path).deletingLastPathComponent())
-                try put(Data(contentsOf: try helper(pick(t.name))), at(t.path), mode: t.mode)  // host file
+                try v.makeDirectory((t.path as NSString).deletingLastPathComponent)
+                try v.put(contentsOf: try helper(pick(t.name)), at: t.path, mode: UInt16(t.mode))  // host file
             }
-            for j in jobs { try put(Data(contentsOf: try helper(j)), at(daemons + "/" + j), mode: 0o644) }  // host file
+            for j in jobs { try v.put(contentsOf: try helper(j), at: daemons + "/" + j, mode: 0o644) }  // host file
             for (job, label) in quietJobs {
-                try rewritePlist(at(job)) { d in
+                try rewritePlist(v, job) { d in
                     guard d["Label"] as? String == label else {
                         throw FirmwareError(.unsupported, "\(job): not \(label)'s job")
                     }
                     dict(d, "EnvironmentVariables")["DYLD_INSERT_LIBRARIES"] = "/" + msm.path
                 }
             }
-            if !o.bluetooth { try rewritePlist(at(btJob)) { $0["Disabled"] = true } }
+            if !o.bluetooth { try rewritePlist(v, btJob) { $0["Disabled"] = true } }
             do {
-                result.activation = try activate(m, log: log)
+                result.activation = try activate(v, log: log)
             } catch let e as ActivationFailure {
-                guard let r = Activation.dataArkRoute(lockdownd: try DevicePath.read(at(lockdownd))) else { throw e }
+                guard let r = Activation.dataArkRoute(lockdownd: try v.contents(at: lockdownd)) else { throw e }
                 log(
                     "lockdownd: no binary strategy; activation by the data ark (\((r.dataArk?.keys.sorted() ?? []).joined(separator: ", ")))"
                 )
@@ -369,7 +368,7 @@ public enum SystemEdits {
             let omitted = Set((o.appsync ? [] : ["/" + appsyncPath]) + (quiet ? [] : ["/" + msm.path]))
             if o.guestTools {
                 let (seeded, record) = try seedGuestPackage(
-                    m,
+                    v,
                     helpers: helpers,
                     arch: "armv7",
                     gles: result.engine != nil,
@@ -381,11 +380,11 @@ public enum SystemEdits {
                 rootOwned += seeded
             }
             rootOwned +=
-                ["usr/local", "usr/local/bin", "usr/local/lib"].filter { DevicePath.exists(at($0)) }
+                ["usr/local", "usr/local/bin", "usr/local/lib"].filter { v.exists($0) }
                 + jobs.map { daemons + "/" + $0 } + tools.map(\.path)
 
             // /private/var skeleton for the data volume
-            try copyTree(at("private/var"), skeleton)
+            try copyTree(v, "private/var", to: MountedVolume(root: skeleton), "")
         }
         let sys = try HFSPlusVolume(system, writable: true)
         var n = try sys.setOwner(rootOwned, uid: 0, gid: 0) + sys.setOwner(mobileOwned, uid: 501, gid: 501)
@@ -408,9 +407,11 @@ public enum SystemEdits {
         try? fm.removeItem(at: data)  // host file
         try await VolumeMount.makeHFS(data, size: dataBytes, journaled: o.dataJournal)
         var byOwner: [[UInt32]: [String]] = [:]
-        try await VolumeMount.withMounted(data, at: work.appendingPathComponent("mnt-data")) { m in
-            try copyTree(skeleton, m)  // merges into the root, which takes /private/var's mode
-            try walk(m) { rel in
+        try await VolumeMount.withVolume(data, at: work.appendingPathComponent("mnt-data"), date: newest) { v in
+            // merges into the root, which takes /private/var's mode
+            try copyTree(MountedVolume(root: skeleton), "", to: v, "")
+            for rel in try v.walk()
+            where !rel.split(separator: "/").contains(where: { VolumeMount.junk.contains(String($0)) }) {
                 let own: [UInt32] =
                     owners[rel].map { [$0.uid, $0.gid] }
                     ?? (mobileTop.contains(String(rel.prefix { $0 != "/" })) ? [501, 501] : [0, 0])
@@ -443,40 +444,37 @@ public enum SystemEdits {
 
     /// The web-proxy PAC at /usr/share/ltm/proxy.pac; `dirs` are created too (the iPod's SystemConfiguration
     /// on the system volume). Returns the paths to make root-owned.
-    static func installPAC(_ m: URL, dirs: [String] = []) throws -> [String] {
+    static func installPAC(_ v: any VolumeFiles, dirs: [String] = []) throws -> [String] {
         var owned: [String] = []
         for rel in ["usr/share/ltm"] + dirs {
-            try mkdirs(m.appendingPathComponent(rel))
+            try v.makeDirectory(rel)
             owned.append(rel)
         }
-        try put(Data(pac.utf8), m.appendingPathComponent(pacPath))
+        try v.put(Data(pac.utf8), at: pacPath)
         return owned + [pacPath]
     }
 
     /// Inject the helper into the firmware's installation service
     /// (installd or mobile_installation_proxy), retaining stock libmis and its cache.
-    static func installAppSync(_ m: URL, helper: URL, cache: String, log: (String) -> Void) throws -> (
+    static func installAppSync(_ v: any VolumeFiles, helper: URL, cache: String, log: (String) -> Void) throws -> (
         status: String, job: String
     ) {
-        let cached = DevicePath.exists(m.appendingPathComponent(cache))
+        let cached = v.exists(cache)
         if !cached, let why = MachOSignature.earlyARMProblem(helper) {
             throw FirmwareError(.unsupported, "AppSync: \(why)")
         }
         let line = "stock libmis retained; installation-service interposition"
         log(line)
-        try mkdirs(m.appendingPathComponent(appsyncPath).deletingLastPathComponent())
-        try put(Data(contentsOf: helper), m.appendingPathComponent(appsyncPath), mode: 0o644)  // host file
-        let job = ["com.apple.mobile.installd.plist", "com.apple.installd.plist"].map {
-            m.appendingPathComponent(daemons + "/" + $0)
-        }
-        .first { DevicePath.exists($0) }
+        try v.makeDirectory((appsyncPath as NSString).deletingLastPathComponent)
+        try v.put(contentsOf: helper, at: appsyncPath, mode: 0o644)  // host file
+        let job = ["com.apple.mobile.installd.plist", "com.apple.installd.plist"].map { daemons + "/" + $0 }
+            .first { v.exists($0) }
         if let job {
-            try rewritePlist(job) { dyldInsert($0, "/" + appsyncPath) }
-            return (line, job.lastPathComponent)
+            try rewritePlist(v, job) { dyldInsert($0, "/" + appsyncPath) }
+            return (line, (job as NSString).lastPathComponent)
         }
         // 2.x installs in the Lockdown-launched mobile_installation_proxy, before installd existed.
-        let services = m.appendingPathComponent("System/Library/Lockdown/Services.plist")
-        try rewritePlist(services) { root in
+        try rewritePlist(v, lockdownServices) { root in
             guard let service = root["com.apple.mobile.installation_proxy"] as? NSMutableDictionary,
                 let arguments = service["ProgramArguments"] as? [String],
                 arguments.first == "/usr/libexec/mobile_installation_proxy"
@@ -487,7 +485,7 @@ public enum SystemEdits {
             if let why = MachOSignature.earlyARMProblem(launcher) {
                 throw FirmwareError(.unsupported, "AppSync launcher: \(why)")
             }
-            try put(Data(contentsOf: launcher), m.appendingPathComponent(appsyncLauncherPath), mode: 0o755)  // host file
+            try v.put(contentsOf: launcher, at: appsyncLauncherPath, mode: 0o755)  // host file
             service["ProgramArguments"] = ["/" + appsyncLauncherPath] + arguments
         }
         return (line, "Services.plist:com.apple.mobile.installation_proxy")
@@ -501,10 +499,10 @@ public enum SystemEdits {
     /// on those options (Files: device connection lost). There afc2 is a copy of it, afc2d, serving "/" as its own
     /// XPC service com.apple.afc2 from a launchd job without the stock job's user (so as root); afcd's own sandbox
     /// profile still applies, and the root extension it issues itself covers "/". Returns the log line and the files it added (root's).
-    static func installAFC2(_ m: URL) throws -> (line: String, root: [String]) {
-        let stock = try DevicePath.read(m.appendingPathComponent(afcd))
+    static func installAFC2(_ v: any VolumeFiles) throws -> (line: String, root: [String]) {
+        let stock = try v.contents(at: afcd)
         let oldStyle = stock.range(of: Data("--lockdown".utf8)) != nil
-        try rewritePlist(m.appendingPathComponent(lockdownServices)) { services in
+        try rewritePlist(v, lockdownServices) { services in
             guard services["com.apple.afc"] != nil else {
                 throw FirmwareError(.unsupported, "\(lockdownServices) has no com.apple.afc service")
             }
@@ -517,19 +515,18 @@ public enum SystemEdits {
                 : ["AllowUnactivatedService": true, "Label": "com.apple.afc2", "XPCServiceName": "com.apple.afc2"]
         }
         if oldStyle { return ("afc2: com.apple.afc2 runs afcd at / (Lockdown/Services.plist)", []) }
-        try put(try afc2Copy(stock), m.appendingPathComponent(afc2d), mode: 0o755)
-        let jobURL = m.appendingPathComponent(daemons + "/com.apple.afcd.plist")
-        guard let job = DevicePath.dictionary(jobURL), job["Label"] as? String == "com.apple.afcd" else {
-            throw FirmwareError(.unsupported, "\(jobURL.lastPathComponent): not com.apple.afcd's job")
+        try v.put(try afc2Copy(stock), at: afc2d, mode: 0o755)
+        let afcdJob = daemons + "/com.apple.afcd.plist"
+        guard let job = v.plist(at: afcdJob)?.mutableCopy() as? NSMutableDictionary,
+            job["Label"] as? String == "com.apple.afcd"
+        else {
+            throw FirmwareError(.unsupported, "\((afcdJob as NSString).lastPathComponent): not com.apple.afcd's job")
         }
         job["Label"] = "com.apple.afc2"
         job["MachServices"] = ["com.apple.afc2": true]
         job["ProgramArguments"] = ["/" + afc2d]
         job.removeObject(forKey: "UserName")
-        try put(
-            PropertyListSerialization.data(fromPropertyList: job, format: .xml, options: 0),
-            m.appendingPathComponent(afc2Job)
-        )
+        try v.put(PropertyListSerialization.data(fromPropertyList: job, format: .xml, options: 0), at: afc2Job)
         return (
             "afc2: com.apple.afc2 is afc2d, afcd at / as an XPC service (Lockdown/Services.plist)", [afc2d, afc2Job]
         )
@@ -553,8 +550,8 @@ public enum SystemEdits {
     }
 
     /// The program of the stock job `job` (volume-relative), checked by label.
-    static func stockProgram(_ m: URL, _ job: String, label: String) throws -> String {
-        guard let d = DevicePath.dictionary(m.appendingPathComponent(job)), d["Label"] as? String == label,
+    static func stockProgram(_ v: any VolumeFiles, _ job: String, label: String) throws -> String {
+        guard let d = v.plist(at: job), d["Label"] as? String == label,
             let program = (d["ProgramArguments"] as? [String])?.first ?? d["Program"] as? String
         else {
             throw FirmwareError(.unsupported, "\(job): not \(label)'s job")
@@ -563,8 +560,11 @@ public enum SystemEdits {
     }
 
     /// SpringBoard's launchd job, checked by label: `edit` gets its EnvironmentVariables and the job.
-    static func editSpringBoardJob(_ m: URL, _ edit: (NSMutableDictionary, NSMutableDictionary) throws -> Void) throws {
-        try rewritePlist(m.appendingPathComponent(springBoardJob)) { d in
+    static func editSpringBoardJob(
+        _ v: any VolumeFiles,
+        _ edit: (NSMutableDictionary, NSMutableDictionary) throws -> Void
+    ) throws {
+        try rewritePlist(v, springBoardJob) { d in
             guard d["Label"] as? String == "com.apple.SpringBoard" else {
                 throw FirmwareError(.unsupported, "\(springBoardJob): not SpringBoard's job")
             }
@@ -573,14 +573,14 @@ public enum SystemEdits {
     }
 
     /// lockdownd activated in place (Activation); the caller makes it root-owned.
-    static func activate(_ m: URL, log: (String) -> Void) throws -> Activation.Result {
+    static func activate(_ v: any VolumeFiles, log: (String) -> Void) throws -> Activation.Result {
         log("Activating device")
-        return try Activation.run(on: m.appendingPathComponent(lockdownd))
+        return try Activation.run(on: v, lockdownd)
     }
 
     /// The guest-package loader and the arch's seed package (GuestPackage.seed of <arch>.itpack).
     static func seedGuestPackage(
-        _ m: URL,
+        _ v: any VolumeFiles,
         helpers: URL,
         arch: String,
         gles: Bool,
@@ -589,7 +589,7 @@ public enum SystemEdits {
         log: (String) -> Void
     ) throws -> ([String], GuestPackage.Record) {
         let (seeded, record) = try GuestPackage.seed(
-            volume: m,
+            volume: v,
             itpack: helpers.appendingPathComponent(Helpers.itpack(arch)),
             gles: gles,
             omitted: omitted,
@@ -605,7 +605,7 @@ public enum SystemEdits {
     /// software-CoreAnimation device. Nothing under OpenGLES (GLEngine, libGFXShared, a gld plugin) is touched.
     /// Returns the helper name and the files to own by root.
     static func installCAOGL(
-        _ m: URL,
+        _ v: any VolumeFiles,
         helpers: URL,
         arch: String,
         fw: FitCheck.Firmware,
@@ -628,12 +628,12 @@ public enum SystemEdits {
             )
         }
         let cached = fw.cache?.image("/" + FitCheck.openGLES) != nil
-        let backup = try GuestPackage.preserveHook(volume: m, target: FitCheck.openGLES)
-        if cached { try setOverrideSwitch(m, image: FitCheck.openGLES) }
+        let backup = try GuestPackage.preserveHook(volume: v, target: FitCheck.openGLES)
+        if cached { try setOverrideSwitch(v, image: FitCheck.openGLES) }
         log(
             "GL front end \(Helpers.openGLES) as OpenGLES.framework/OpenGLES; \(cached ? "cached OpenGLES overridden by the file" : "the stock file replaced")"
         )
-        try put(bin, m.appendingPathComponent(FitCheck.openGLES), mode: 0o755)
+        try v.put(bin, at: FitCheck.openGLES, mode: 0o755)
         return (Helpers.openGLES, [FitCheck.openGLES, backup] + (cached ? [dyldOverride] : []))
     }
 
@@ -651,19 +651,22 @@ public enum SystemEdits {
     }
 
     /// Fails closed if this dyld has no such switch.
-    static func setOverrideSwitch(_ m: URL, image: String) throws {
-        let dyld = try DevicePath.read(m.appendingPathComponent("usr/lib/dyld"))
+    static func setOverrideSwitch(_ v: any VolumeFiles, image: String) throws {
+        let dyld = try v.contents(at: "usr/lib/dyld")
         guard dyld.range(of: Data(("/" + dyldOverride + "\0").utf8)) != nil else {
             throw FirmwareError(
                 .unsupported,
                 "\((image as NSString).lastPathComponent) is in the shared cache and this dyld has no enable-dylibs-to-override-cache switch: the GL shim cannot load"
             )
         }
-        let dir = m.appendingPathComponent(dyldOverride).deletingLastPathComponent()
-        let mode = try DevicePath.permissions(dir)
-        try DevicePath.setPermissions(dir, mode | 0o200)
-        try put(Data(), m.appendingPathComponent(dyldOverride))
-        try DevicePath.setPermissions(dir, mode)
+        // the folder may be read-only to the owner, as a mount shows it
+        let dir = (dyldOverride as NSString).deletingLastPathComponent
+        guard let mode = try v.item(at: dir)?.mode else {
+            throw FirmwareError(.internal, "no \(dir)")
+        }
+        try v.setMode(dir, mode | 0o200)
+        try v.put(Data(), at: dyldOverride)
+        try v.setMode(dir, mode)
     }
 
     // MARK: - Plist edits (ipad1_rootfs.springboard_env, dyld_insert, wifi_proxy_prefs)
@@ -730,7 +733,8 @@ public enum SystemEdits {
         let sc = skeleton.appendingPathComponent("preferences/SystemConfiguration")
         if o.webProxy { try seedPlist(sc.appendingPathComponent("preferences.plist"), wifiProxyPrefs) }
         let language = try seedLanguage(
-            skeleton,
+            MountedVolume(root: skeleton),
+            "",
             tag: o.language,
             keyboards: o.keyboards,
             catalog: keyboards,
@@ -741,7 +745,7 @@ public enum SystemEdits {
         }
         if o.skipSetup, productMajor >= 5 {
             let (l, locale) = language.map { ($0.language, $0.locale) } ?? ("en", "en_US")
-            try seedFinishedSetup(skeleton, major: productMajor, language: l, locale: locale)
+            try seedFinishedSetup(MountedVolume(root: skeleton), "", major: productMajor, language: l, locale: locale)
             log("Setup Assistant: seeded as finished (iOS \(productMajor))")
         }
         if let dataArk {
@@ -793,6 +797,36 @@ public enum SystemEdits {
         )
     }
 
+    /// `rewritePlist` of the plist at `path` on a volume.
+    static func rewritePlist(_ v: any VolumeFiles, _ path: String, _ edit: (NSMutableDictionary) throws -> Void) throws
+    {
+        var fmt = PropertyListSerialization.PropertyListFormat.xml
+        guard
+            let d = try PropertyListSerialization.propertyList(
+                from: v.contents(at: path),
+                options: .mutableContainersAndLeaves,
+                format: &fmt
+            ) as? NSMutableDictionary
+        else {
+            throw FirmwareError(.unsupported, "\((path as NSString).lastPathComponent) is not a dictionary plist")
+        }
+        try edit(d)
+        try v.put(
+            PropertyListSerialization.data(fromPropertyList: d, format: fmt == .binary ? .binary : .xml, options: 0),
+            at: path
+        )
+    }
+
+    /// `seedPlist` of the plist at `path` on a volume.
+    static func seedPlist(_ v: any VolumeFiles, _ path: String, _ edit: (NSMutableDictionary) throws -> Void) throws {
+        // a link there is replaced (put), never read through
+        if v.isFile(path) { return try rewritePlist(v, path, edit) }
+        try v.makeDirectory((path as NSString).deletingLastPathComponent)
+        let d = NSMutableDictionary()
+        try edit(d)
+        try v.put(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0), at: path)
+    }
+
     /// Edits the plist in place, or creates it (XML, as configd writes) from an empty dictionary.
     static func seedPlist(_ url: URL, _ edit: (NSMutableDictionary) throws -> Void) throws {
         // a link there is replaced (put), never read through
@@ -812,9 +846,40 @@ public enum SystemEdits {
     static func permissions(_ url: URL) throws -> mode_t { try DevicePath.permissions(url) }
 
     /// The volume's iOS major version (SystemVersion.plist), 0 when unknown.
-    static func majorVersion(_ m: URL) -> Int {
-        let plist = DevicePath.dictionary(m.appendingPathComponent("System/Library/CoreServices/SystemVersion.plist"))
+    static func majorVersion(_ v: any VolumeFiles) -> Int {
+        let plist = v.plist(at: "System/Library/CoreServices/SystemVersion.plist")
         return Int((plist?["ProductVersion"] as? String)?.split(separator: ".").first ?? "") ?? 0
+    }
+
+    /// `copyTree` from `path` on one volume (or host folder) to `destination` on another: symlinks as symlinks,
+    /// file content written plainly, then the permission bits. No owners, dates, xattrs or flags.
+    static func copyTree(
+        _ from: any VolumeFiles,
+        _ path: String,
+        to: any VolumeFiles,
+        _ destination: String
+    ) throws {
+        if let a = from as? MountedVolume, let b = to as? MountedVolume {
+            return try copyTree(a.url(path), b.url(destination))  // with the dates, as a mount has always copied
+        }
+        guard let item = try from.item(at: path) else {
+            throw FirmwareError(.internal, "copy: no \(path)")
+        }
+        switch item.kind {
+        case .symlink: return try to.makeSymlink(destination, to: from.destinationOfSymlink(at: path))
+        case .folder:
+            if !to.exists(destination) { try to.makeDirectory(destination) }
+            for n in try from.contentsOfDirectory(at: path).sorted() {  // no link followed
+                try copyTree(
+                    from,
+                    path.isEmpty ? n : path + "/" + n,
+                    to: to,
+                    destination.isEmpty ? n : destination + "/" + n
+                )
+            }
+        case .file: try to.put(from.contents(at: path), at: destination)
+        }
+        try to.setMode(destination, item.mode & 0o7777)
     }
 
     /// shutil.copytree(symlinks=True, dirs_exist_ok=True) with copy2: symlinks as symlinks, file content
@@ -850,17 +915,5 @@ public enum SystemEdits {
         }
         try DevicePath.setPermissions(dst, st.st_mode & 0o7777)
         try DevicePath.setModified(dst, st.st_mtimespec)
-    }
-
-    /// Every path under `root` (relative, directories and symlinks included), skipping macOS junk at any level.
-    static func walk(_ root: URL, _ body: (String) throws -> Void) throws {
-        guard let e = FileManager.default.enumerator(atPath: root.path) else { return }  // no link followed
-        while let rel = e.nextObject() as? String {
-            if VolumeMount.junk.contains((rel as NSString).lastPathComponent) {
-                if (e.fileAttributes?[.type] as? FileAttributeType) == .typeDirectory { e.skipDescendants() }
-                continue
-            }
-            try body(rel)
-        }
     }
 }

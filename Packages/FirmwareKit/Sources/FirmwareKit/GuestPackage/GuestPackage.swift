@@ -32,28 +32,19 @@ public enum GuestPackage {
     /// Preserve the original file or its absence before any installer changes it.
     /// Existing provenance is immutable; callers root-own the returned relative path.
     static func preserveHook(
-        volume: URL,
+        volume v: any VolumeFiles,
         target: String,
         write: ((String, Data, mode_t) throws -> Void)? = nil
     ) throws -> String {
-        let fm = FileManager.default
-        let at = { volume.appendingPathComponent($0) }
         let baked = target + ".baked"
         let absent = target + ".baked-absent"
-        func attributes(_ path: String) throws -> [FileAttributeKey: Any]? {
-            do { return try fm.attributesOfItem(atPath: at(path).path) } catch let error as CocoaError
-                where error.code == .fileReadNoSuchFile
-            { return nil }
-        }
-        let haveBaked = try attributes(baked)
-        let haveAbsent = try attributes(absent)
+        let haveBaked = try v.item(at: baked)
+        let haveAbsent = try v.item(at: absent)
         guard haveBaked == nil || haveAbsent == nil else {
             throw FirmwareError(.internal, "conflicting hook provenance for \(target)")
         }
         if let marker = haveAbsent {
-            guard marker[.type] as? FileAttributeType == .typeRegular,
-                (marker[.size] as? NSNumber)?.intValue == 0
-            else {
+            guard marker.kind == .file, marker.size == 0 else {
                 throw FirmwareError(.internal, "invalid absent hook marker for \(target)")
             }
             return absent
@@ -61,11 +52,12 @@ public enum GuestPackage {
         if haveBaked != nil { return baked }
         let put =
             write ?? { rel, data, mode in
-                try SystemEdits.mkdirs(at(rel).deletingLastPathComponent())
-                try SystemEdits.put(data, at(rel), mode: mode)
+                try v.makeDirectory((rel as NSString).deletingLastPathComponent)
+                try v.put(data, at: rel, mode: UInt16(mode))
             }
-        if try attributes(target) != nil {
-            try put(baked, Data(contentsOf: at(target)), try SystemEdits.permissions(at(target)))
+        if v.exists(target) {
+            let mode = try v.item(at: target)?.mode ?? 0o644
+            try put(baked, try v.contents(at: target), mode_t(mode & 0o7777))
             return baked
         }
         try put(absent, Data(), 0o644)
@@ -83,17 +75,15 @@ public enum GuestPackage {
     /// A hook whose target is not on the volume is dropped; unless the preparer left that target out on purpose
     /// (`omitted`) or it is a GL engine's, the drop is a recorded misfit (a warning), never silent.
     public static func seed(
-        volume m: URL,
+        volume v: any VolumeFiles,
         itpack: URL,
         gles: Bool,
         omitted: Set<String> = [],
         fit: FitCheck.Log = FitCheck.Log()
     ) throws -> (written: [String], record: Record) {
-        let fm = FileManager.default
         let list = try GuestPack.read(itpack)
         let entries = Dictionary(list.map { ($0.name, $0.data) }, uniquingKeysWith: { a, _ in a })
-        let at = { (rel: String) in m.appendingPathComponent(rel) }
-        guard let build = (NSDictionary(contentsOf: at(systemVersion)))?["ProductBuildVersion"] as? String else {
+        guard let build = v.plist(at: systemVersion)?["ProductBuildVersion"] as? String else {
             throw FirmwareError(.unsupported, "no ProductBuildVersion in /\(systemVersion)")
         }
         let families = try GuestPack.packages(list, build: build, stubs: true)
@@ -106,10 +96,10 @@ public enum GuestPackage {
         let family = families[0].family
         var man = families[0].manifest
         let hooks = man.hooks.filter { h in
-            (gles || !glTargets.contains(h.target)) && fm.fileExists(atPath: at(String(h.target.dropFirst())).path)
+            (gles || !glTargets.contains(h.target)) && v.exists(String(h.target.dropFirst()))
         }
         let needsAbsence = hooks.contains { h in
-            (try? fm.attributesOfItem(atPath: at(String(h.target.dropFirst()) + ".baked-absent").path)) != nil
+            v.exists(String(h.target.dropFirst()) + ".baked-absent")
         }
         if needsAbsence && entries["loader/hook-provenance"] != Data("file-or-absence 1\n".utf8) {
             throw FirmwareError(
@@ -134,7 +124,7 @@ public enum GuestPackage {
         var written: [String] = []
 
         // the loader and the package's own binaries must load on this firmware's dyld, with this firmware's images
-        let fw = FitCheck.Firmware(root: m, arch: itpack.deletingPathExtension().lastPathComponent)
+        let fw = FitCheck.Firmware(volume: v, arch: itpack.deletingPathExtension().lastPathComponent)
         // a legacy-linked family's loader where the arch's own is modern (armv7.itpack's k48-ios30; mkpkg.LEGACY_LOADER)
         let legacyLoader = man.requires.link == "legacy" && entries["loader/it_boot-legacy"] != nil
         let loaderName = legacyLoader ? "loader/it_boot-legacy" : "loader/it_boot"
@@ -167,15 +157,12 @@ public enum GuestPackage {
         func put(_ rel: String, _ data: Data, _ mode: mode_t) throws {
             var missing: [String] = []
             var parent = (rel as NSString).deletingLastPathComponent
-            var isDir: ObjCBool = false
-            while !parent.isEmpty, !(fm.fileExists(atPath: at(parent).path, isDirectory: &isDir) && isDir.boolValue) {
+            while !parent.isEmpty, !v.isDirectory(parent) {
                 missing.insert(parent, at: 0)
                 parent = (parent as NSString).deletingLastPathComponent
             }
-            for d in missing where mkdir(at(d).path, 0o777) != 0 {
-                throw FirmwareError(.internal, "mkdir \(d): \(String(cString: strerror(errno)))")
-            }
-            try SystemEdits.put(data, at(rel), mode: mode)  // in place: an existing file keeps its catalog record
+            for d in missing { try v.makeDirectory(d) }
+            try v.put(data, at: rel, mode: UInt16(mode))  // in place: an existing file keeps its catalog record
             written += missing + [rel]
         }
         let mode = { (s: String) in mode_t(strtoul(s, nil, 8)) }
@@ -186,7 +173,7 @@ public enum GuestPackage {
         let pkg = "\(root)/pkgs/\(serial)"
         for f in files { try put(pkg + "/" + f.name, payload(family + "/" + f.name), mode(f.mode)) }
         try put(pkg + "/offer", Data(GuestPack.offerText(man, build: build).utf8), 0o644)
-        try fm.createSymbolicLink(atPath: at(root + "/current").path, withDestinationPath: "pkgs/\(serial)")
+        try v.makeSymlink(root + "/current", to: "pkgs/\(serial)")
         var state = "seed \(serial)\n"
         try put(root + "/state", Data(state.utf8), 0o644)
         written.append(root + "/current")
@@ -196,7 +183,7 @@ public enum GuestPackage {
             let target = String(h.target.dropFirst())
             // <target>.baked keeps what the volume had (the stock file, or what the preparer put there), so a
             // package without the hook puts it back
-            let backup = try preserveHook(volume: m, target: target, write: put)
+            let backup = try preserveHook(volume: v, target: target, write: put)
             if !written.contains(backup) { written.append(backup) }
             try put(target, payload(family + "/" + file), modes[file] ?? 0o755)
             // A first offer without this hook must restore .baked even before
@@ -207,7 +194,7 @@ public enum GuestPackage {
         let jobs = man.jobs.map { ($0 as NSString).lastPathComponent }
         for j in jobs {
             let rel = "System/Library/LaunchDaemons/" + j
-            if (try? fm.attributesOfItem(atPath: at(rel).path)) != nil { try fm.removeItem(at: at(rel)) }
+            if v.exists(rel) { try v.remove(rel) }
         }
         let sha = SHA256.hash(data: try Data(contentsOf: itpack)).hexString
         return (

@@ -172,7 +172,7 @@ import Testing
                 return m
             }
             let a = try volume("swift")
-            let (written, record) = try GuestPackage.seed(volume: a, itpack: itpack, gles: true)
+            let (written, record) = try GuestPackage.seed(volume: MountedVolume(root: a), itpack: itpack, gles: true)
             #expect(!written.isEmpty)
             #expect(record.family == "n72-ios2" && record.hooks == ["/" + N72Board.openGLES])
             // The seed's state must let a different first offer restore the stock
@@ -183,7 +183,7 @@ import Testing
 
             // Dropping the GL hook keeps stock bytes and does not claim ownership.
             let noGL = try volume("no-gl")
-            let (_, noGLRecord) = try GuestPackage.seed(volume: noGL, itpack: itpack, gles: false)
+            let (_, noGLRecord) = try GuestPackage.seed(volume: MountedVolume(root: noGL), itpack: itpack, gles: false)
             #expect(noGLRecord.hooks.isEmpty)
             #expect(
                 try String(contentsOf: noGL.appendingPathComponent(statePath), encoding: .utf8)
@@ -196,7 +196,7 @@ import Testing
             let omittedTarget = omitted.appendingPathComponent(N72Board.openGLES)
             try FileManager.default.removeItem(at: omittedTarget)
             let (_, omittedRecord) = try GuestPackage.seed(
-                volume: omitted,
+                volume: MountedVolume(root: omitted),
                 itpack: itpack,
                 gles: true,
                 omitted: ["/" + N72Board.openGLES]
@@ -221,7 +221,7 @@ import Testing
                 mode: 0o755
             )
             #expect(throws: (any Error).self) {
-                try GuestPackage.seed(volume: failed, itpack: itpack, gles: true)
+                try GuestPackage.seed(volume: MountedVolume(root: failed), itpack: itpack, gles: true)
             }
             #expect(
                 try String(contentsOf: failed.appendingPathComponent(statePath), encoding: .utf8)
@@ -258,7 +258,7 @@ import Testing
             ).write(to: sb)
             try SystemEdits.seedPlist(plist) { $0["lock-unlock"] = true }
             #expect(
-                try N72Board.bakePrefs(m, dir: N72Board.prefs)
+                try N72Board.bakePrefs(MountedVolume(root: m), dir: N72Board.prefs)
                     == "SBDidShowReorderText, SBBacklightLevel2, SBAutoLockTime, SBAutoDimTime baked (no helpers)"
             )
             var d = try baked()
@@ -275,7 +275,7 @@ import Testing
             // 1.0's SpringBoard names these (and no SBShowBatteryPercentage): as it_prefs sets them on 2.x+
             try Data("\0SBBacklightLevel\0SBAutoLockTime\0SBHideACPower\0SBEnableALS\0".utf8).write(to: sb)
             #expect(
-                try N72Board.bakePrefs(m, dir: N72Board.prefs)
+                try N72Board.bakePrefs(MountedVolume(root: m), dir: N72Board.prefs)
                     == "SBBacklightLevel, SBAutoLockTime, SBHideACPower, SBEnableALS baked (no helpers)"
             )
             d = try baked()
@@ -290,7 +290,10 @@ import Testing
 
             try FileManager.default.removeItem(at: plist)
             try Data("SpringBoard SBDidShowReorderTextX".utf8).write(to: sb)
-            #expect(try N72Board.bakePrefs(m, dir: N72Board.prefs).hasSuffix("left alone") && !Oracle.exists(plist))
+            #expect(
+                try N72Board.bakePrefs(MountedVolume(root: m), dir: N72Board.prefs).hasSuffix("left alone")
+                    && !Oracle.exists(plist)
+            )
         }
     }
 

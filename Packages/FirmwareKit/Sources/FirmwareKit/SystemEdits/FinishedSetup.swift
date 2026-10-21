@@ -97,14 +97,13 @@ extension SystemEdits {
     }
 
     /// The region formats a firmware offers (Settings ▸ International ▸ Region Format, CFLocale's available
-    /// locales): the locales in its ICU data under `root`, the table of contents of /usr/share/icu/icudt*l.dat
+    /// locales): the locales in the system volume's ICU data, the table of contents of /usr/share/icu/icudt*l.dat
     /// ("uk_UA" for icudt42l/uk_UA.res); nil where it has none.
-    static func regionFormats(_ root: URL) -> Set<String>? {
-        let icu = root.appendingPathComponent("usr/share/icu")
+    static func regionFormats(_ v: any VolumeFiles) -> Set<String>? {
         guard
-            let name = try? FileManager.default.contentsOfDirectory(atPath: icu.path)
+            let name = try? v.contentsOfDirectory(at: "usr/share/icu").sorted()
                 .first(where: { $0.hasPrefix("icudt") && $0.hasSuffix("l.dat") }),
-            let data = try? Data(contentsOf: icu.appendingPathComponent(name), options: .alwaysMapped)
+            let data = try? v.contents(at: "usr/share/icu/" + name)
         else { return nil }
         return try? data.withUnsafeBytes { b throws -> Set<String>? in
             // ICU's common data: a header (its size, magic DA 27, format "CmnD"), then the entry count and each
@@ -138,14 +137,15 @@ extension SystemEdits {
     }
 
     /// Sets the device's language and region (`deviceLanguage`, from `tag`, else the Mac's) in each user's
-    /// .GlobalPreferences under `skeleton` (/private/var) that lists the firmware's languages: the language moved
+    /// .GlobalPreferences under `top` (/private/var, or "" for the skeleton of it) on `v` that lists the firmware's languages: the language moved
     /// first, AppleLocale set; with `catalog`, the firmware's keyboards, AppleKeyboards (KeyboardCatalog.keyboards)
     /// for the language and `keyboards`, Mac input source IDs, else the Mac's enabled ones; with `formats`, the
     /// firmware's region formats (regionFormats), AppleLocale is `tag`'s or the Mac's own locale where it has it.
     /// Nil where the firmware has no such list.
     @discardableResult
     static func seedLanguage(
-        _ skeleton: URL,
+        _ v: any VolumeFiles,
+        _ top: String,
         tag: String?,
         keyboards: [String]? = nil,
         catalog: KeyboardCatalog? = nil,
@@ -157,9 +157,9 @@ extension SystemEdits {
         let mac = catalog == nil ? [] : macKeyboards(keyboards)
         var chosen: (language: String, locale: String, keyboards: [String])?
         for path in [globalPreferences, "root/Library/Preferences/.GlobalPreferences.plist"] {
-            let url = skeleton.appendingPathComponent(path)
-            guard FileManager.default.fileExists(atPath: url.path) else { continue }
-            try rewritePlist(url) { d in
+            let rel = top.isEmpty ? path : top + "/" + path
+            guard v.exists(rel) else { continue }
+            try rewritePlist(v, rel) { d in
                 guard var list = d["AppleLanguages"] as? [String] else { return }
                 let pick = deviceLanguage(
                     supported: list,
@@ -179,11 +179,13 @@ extension SystemEdits {
         return chosen
     }
 
-    /// Seeds `finishedSetup` into `skeleton` (/private/var), merged into the plists already there, as Setup's walk in
-    /// `language` and `locale` (seedLanguage's) leaves it.
-    static func seedFinishedSetup(_ skeleton: URL, major: Int, language: String, locale: String) throws {
+    /// Seeds `finishedSetup` into `top` (/private/var, or "" for the skeleton of it) on `v`, merged into the plists
+    /// already there, as Setup's walk in `language` and `locale` (seedLanguage's) leaves it.
+    static func seedFinishedSetup(_ v: any VolumeFiles, _ top: String, major: Int, language: String, locale: String)
+        throws
+    {
         for (path, keys) in finishedSetup(major: major, language: language, locale: locale) {
-            try seedPlist(skeleton.appendingPathComponent(path)) { $0.addEntries(from: keys) }
+            try seedPlist(v, top.isEmpty ? path : top + "/" + path) { $0.addEntries(from: keys) }
         }
     }
 }

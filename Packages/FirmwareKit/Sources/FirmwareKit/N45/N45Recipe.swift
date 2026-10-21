@@ -59,19 +59,20 @@ final class N45Board: Board {
     /// The directories of the kept jobs' StandardOutPath/StandardErrorPath that the image lacks, made (volume-relative,
     /// to own as root). 1.x's launchd does not start a job whose log file it cannot open: 1.0's BTServer
     /// (/var/logs/BTServer/stderr) never ran, and SpringBoard stalled on Bluetooth as if it were removed.
-    static func makeLogDirs(_ m: URL, jobs: [String]) throws -> [String] {
+    static func makeLogDirs(_ v: any VolumeFiles, jobs: [String]) throws -> [String] {
         var made: [String] = []
         for job in jobs.sorted() {
-            let url = m.appendingPathComponent(SystemEdits.daemons + "/" + job)
-            guard let d = DevicePath.dictionary(url) else { continue }
+            guard
+                let d = (try? v.contents(at: SystemEdits.daemons + "/" + job)).flatMap({
+                    try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
+                })
+            else { continue }
             for key in ["StandardOutPath", "StandardErrorPath"] {
                 guard let path = d[key] as? String, path.hasPrefix("/") else { continue }
                 var dir = ((path as NSString).deletingLastPathComponent as NSString).substring(from: 1)
                 if dir.hasPrefix("var/") { dir = "private/" + dir }
-                guard !dir.isEmpty, !made.contains(dir),
-                    !DevicePath.exists(m.appendingPathComponent(dir))
-                else { continue }
-                try SystemEdits.mkdirs(m.appendingPathComponent(dir))
+                guard !dir.isEmpty, !made.contains(dir), !v.exists(dir) else { continue }
+                try v.makeDirectory(dir)
                 made.append(dir)
             }
         }
@@ -81,21 +82,21 @@ final class N45Board: Board {
     /// 1.x's SpringBoard puts the system to deep sleep (pmu go hib) when the lock screen idles, seconds after boot,
     /// and the machine has no resume path (qemu-ios docs/ipod1g, debt 9). SBDisableIdleSleep keeps it to a display
     /// sleep, which Home or Hold wakes. Set in `prefs` (volume-relative) when SpringBoard names it; true if set.
-    static func bakeNoIdleSleep(_ m: URL, prefs: String) throws -> Bool {
+    static func bakeNoIdleSleep(_ v: any VolumeFiles, prefs: String) throws -> Bool {
         let key = "SBDisableIdleSleep"
-        guard let sb = try? DevicePath.read(m.appendingPathComponent(N72Board.springBoard)),
-            sb.range(of: Data((key + "\0").utf8)) != nil
+        guard let sb = try? v.contents(at: N72Board.springBoard), sb.range(of: Data((key + "\0").utf8)) != nil
         else { return false }
-        try SystemEdits.seedPlist(m.appendingPathComponent(prefs)) { $0[key] = true }
+        try SystemEdits.seedPlist(v, prefs) { $0[key] = true }
         return true
     }
 
     static let rootLibrary = "private/var/root/Library"
     /// Whose Library SpringBoard reads its preferences from: mobile (501) when its launchd job says so (1.1.3 on), else root.
-    static func springBoardUser(_ m: URL) -> (library: String, uid: UInt32) {
-        let job = m.appendingPathComponent(SystemEdits.daemons + "/com.apple.SpringBoard.plist")
-        return DevicePath.dictionary(job)?["UserName"] as? String == "mobile"
-            ? ("private/var/mobile/Library", 501) : (rootLibrary, 0)
+    static func springBoardUser(_ v: any VolumeFiles) -> (library: String, uid: UInt32) {
+        let plist = (try? v.contents(at: SystemEdits.springBoardJob)).flatMap {
+            try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
+        }
+        return plist?["UserName"] as? String == "mobile" ? ("private/var/mobile/Library", 501) : (rootLibrary, 0)
     }
     static let openGLESExports = "opengles-1x.exports"
     /// Where configd keeps its SCPreferences. While everything runs as root (1.0 to 1.1.2), SystemConfiguration opens
@@ -103,22 +104,22 @@ final class N45Board: Board {
     /// (springBoardUser), it opens /Library/Preferences/SystemConfiguration, which the root links to
     /// /private/var/preferences, and never looks in root's home: 1.1.4's configd creates that directory at its first
     /// boot, next to a seeded one in root's home, and joins nothing.
-    static func scPrefs(_ m: URL) -> String {
-        springBoardUser(m).uid == 0
+    static func scPrefs(_ v: any VolumeFiles) -> String {
+        springBoardUser(v).uid == 0
             ? rootLibrary + "/Preferences/SystemConfiguration" : "private/var/preferences/SystemConfiguration"
     }
     /// configd's Aeropuerto plug-in (AirPort-53 on 1.0, -63 on 1.1) keeps the Wi-Fi power preference (AllowEnable)
     /// and the networks it has joined ("List of known networks", entries keyed by SSID_STR) in this file.
-    static func wifiPrefs(_ m: URL) -> String { scPrefs(m) + "/com.apple.wifi.plist" }
+    static func wifiPrefs(_ v: any VolumeFiles) -> String { scPrefs(v) + "/com.apple.wifi.plist" }
     /// The PAC, the en0 AirPort service carrying it (preferences.plist) and the known network (wifiPrefs) in scPrefs.
     /// Returns the paths to make root-owned. The recipe writes them on a fresh volume; its admission step
     /// (N45Migration) on a device whose configd has already written both files there: the PAC goes on configd's own
     /// en0 service (not a second one) and qemu-ios joins its known networks, the rest of each file kept.
-    static func seedSystemConfiguration(_ m: URL) throws -> [String] {
-        let scPrefs = scPrefs(m)
-        let wifiPrefs = wifiPrefs(m)
-        let owned = try SystemEdits.installPAC(m, dirs: [scPrefs])
-        try SystemEdits.seedPlist(m.appendingPathComponent(scPrefs + "/preferences.plist")) { d in
+    static func seedSystemConfiguration(_ v: any VolumeFiles) throws -> [String] {
+        let scPrefs = scPrefs(v)
+        let wifiPrefs = wifiPrefs(v)
+        let owned = try SystemEdits.installPAC(v, dirs: [scPrefs])
+        try SystemEdits.seedPlist(v, scPrefs + "/preferences.plist") { d in
             let en0 = ((d["NetworkServices"] as? NSDictionary)?.allValues ?? []).compactMap {
                 $0 as? NSMutableDictionary
             }
@@ -132,17 +133,18 @@ final class N45Board: Board {
             // applies the set's global Proxies to it (without them EDGE went DIRECT to :443; with them, CONNECT to the proxy).
             SystemEdits.dict(SystemEdits.currentNetwork(d), "Global")["Proxies"] = SystemEdits.pacProxies
         }
-        let wifi = m.appendingPathComponent(wifiPrefs)
         var known =
-            DevicePath.dictionary(wifi) as? [String: Any] ?? [:]
+            (try? v.contents(at: wifiPrefs)).flatMap {
+                try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
+            } ?? [:]
         if known["AllowEnable"] == nil { known["AllowEnable"] = wifiKnownNetwork["AllowEnable"] }
         let list = known["List of known networks"] as? [[String: Any]] ?? []
         if !list.contains(where: { $0["SSID_STR"] as? String == "qemu-ios" }) {
             known["List of known networks"] = list + [qemuNetwork]
         }
-        try SystemEdits.put(
+        try v.put(
             try PropertyListSerialization.data(fromPropertyList: known, format: .xml, options: 0),
-            wifi,
+            at: wifiPrefs,
             mode: 0o644
         )
         return owned + [scPrefs + "/preferences.plist", wifiPrefs]
@@ -266,9 +268,10 @@ final class N45Board: Board {
         try await UDIF.extractRootfs(dmg: c.decFile("rootfs.dmg"), to: volume)
         try await VolumeMount.grow(volume, toBytes: bytes)
         // Modern HFS checks reject the stock 1.x catalog's legacy folder counts.
-        // Normalize the private working volume before mounting/editing it, then verify it.
-        let device = try await VolumeMount.attach(volume)
-        do {
+        // Normalize the private working volume before mounting/editing it, then verify it. (The offline writer
+        // keeps the counts as the catalog has them.)
+        if VolumeMount.backend == .kernel {
+            let device = try await VolumeMount.attach(volume)
             let check: (ok: Bool, output: String)
             do {
                 c.log(try await VolumeMount.run("/sbin/fsck_hfs", ["-fy", device]))
@@ -292,38 +295,39 @@ final class N45Board: Board {
             newest = try v.newestDate()
         }
         var owners: [(UInt32, String)] = [(0, kcPath), (0, SystemEdits.lockdownd)]
-        let (activation, removed) = try await VolumeMount.withMounted(volume, at: c.work.appendingPathComponent("mnt"))
-        { m -> (Activation.Result, [String]) in
-            let at = { (rel: String) in m.appendingPathComponent(rel) }
-            try SystemEdits.put(Data(N72Board.fstabRW.utf8), at(SystemEdits.fstab))
-            try SystemEdits.mkdirs(at(kcPath).deletingLastPathComponent())
+        let (activation, removed) = try await VolumeMount.withVolume(
+            volume,
+            at: c.work.appendingPathComponent("mnt"),
+            date: newest
+        ) { v -> (Activation.Result, [String]) in
+            try v.put(Data(N72Board.fstabRW.utf8), at: SystemEdits.fstab)
+            try v.makeDirectory((kcPath as NSString).deletingLastPathComponent)
             // 1.0 ships only the restore kernelcache in the IPSW (RestoreKernelCaches "kernelcache.restore.*");
             // its system volume carries the one iBoot boots, where iBoot loads it: kept.
-            if !(Self.restoreOnly(kcMember) && DevicePath.exists(at(kcPath))) {
-                try c.ipsw.extract(kcMember, to: at(kcPath))
+            if !(Self.restoreOnly(kcMember) && v.exists(kcPath)) {
+                try v.put(member: kcMember, of: c.ipsw, at: kcPath)
             }
-            let jobs = try DevicePath.contents(at(SystemEdits.daemons)).filter {
-                $0.hasSuffix(".plist")
-            }
+            let jobs = try v.contentsOfDirectory(at: SystemEdits.daemons)  // no link followed
+                .filter { $0.hasSuffix(".plist") }.sorted()
             try c.fit.check(Self.keptDaemonsFit(jobs), required: false, outcome: "the rest removed as planned")
             c.fit.notInstalled(
                 "AppSync",
                 recipe.options["appsync"] == true ? "the 1.x recipe has no AppSync" : "appsync off"
             )
             let removed = Self.removedDaemons(jobs, iPhone: iPhone)
-            for n in removed { try DevicePath.remove(at(SystemEdits.daemons + "/" + n)) }
-            owners += try Self.makeLogDirs(m, jobs: jobs.filter { !removed.contains($0) }).map { (0, $0) }
+            for n in removed { try v.remove(SystemEdits.daemons + "/" + n) }
+            owners += try Self.makeLogDirs(v, jobs: jobs.filter { !removed.contains($0) }).map { (0, $0) }
             for d in ["", "/AddressBook", "/Lockdown", "/Preferences"] {
-                try SystemEdits.mkdirs(at(Self.rootLibrary + d))
+                try v.makeDirectory(Self.rootLibrary + d)
                 owners.append((0, Self.rootLibrary + d))
             }
             // An iPod's first iTunes handshake clears BrickState independently of activation.
             // The 1G has no host USB transport yet. Seed the same persistent boolean on its fresh
             // data volume; lockdownd owns the rest of this dictionary and preserves it on reboot.
             let ark = Self.rootLibrary + "/Lockdown/data_ark.plist"
-            try SystemEdits.put(
+            try v.put(
                 try PropertyListSerialization.data(fromPropertyList: ["-BrickState": false], format: .xml, options: 0),
-                at(ark),
+                at: ark,
                 mode: 0o600
             )
             owners.append((0, ark))
@@ -331,32 +335,33 @@ final class N45Board: Board {
             // set (configd's auto-join skips an interface with none: "AirPort interface en0 not active"), carrying the
             // web proxy's PAC as on the 2G, and Wi-Fi on with qemu-ios among the known networks.
             try c.fit.check(
-                FitCheck.webProxy(FitCheck.Firmware(root: m, arch: "armv6")),
+                FitCheck.webProxy(FitCheck.Firmware(volume: v, arch: "armv6")),
                 required: false,
                 outcome: "kept: the PAC is unused"
             )
-            owners += try Self.seedSystemConfiguration(m).map { (UInt32(0), $0) }
+            owners += try Self.seedSystemConfiguration(v).map { (UInt32(0), $0) }
             derived["wifi"] =
-                "en0 AirPort service (PAC /\(SystemEdits.pacPath)); known network qemu-ios, Wi-Fi on (/\(Self.wifiPrefs(m)))"
+                "en0 AirPort service (PAC /\(SystemEdits.pacPath)); known network qemu-ios, Wi-Fi on (/\(Self.wifiPrefs(v)))"
             // 1.x runs no guest helpers (it_prefs): its SpringBoard preferences, in the home of the user SpringBoard
             // runs as (root's on 1.0 and 1.1.2; mobile's from 1.1.3, its launchd job's UserName)
-            let user = Self.springBoardUser(m)
+            let user = Self.springBoardUser(v)
             let sbPrefs = user.library + "/Preferences/com.apple.springboard.plist"
-            let prefs = try N72Board.bakePrefs(m, dir: user.library + "/Preferences")
+            let prefs = try N72Board.bakePrefs(v, dir: user.library + "/Preferences")
             derived["prefs"] =
-                try Self.bakeNoIdleSleep(m, prefs: sbPrefs) ? prefs + "; SBDisableIdleSleep (no deep sleep)" : prefs
-            if DevicePath.exists(at(sbPrefs)) { owners.append((user.uid, sbPrefs)) }
+                try Self.bakeNoIdleSleep(v, prefs: sbPrefs) ? prefs + "; SBDisableIdleSleep (no deep sleep)" : prefs
+            if v.exists(sbPrefs) { owners.append((user.uid, sbPrefs)) }
             if let l = try SystemEdits.seedLanguage(
-                at("private/var"),
+                v,
+                "private/var",
                 tag: c.o.language,
                 keyboards: c.o.keyboards,
-                catalog: SystemEdits.KeyboardCatalog(at("System/Library/TextInput")),
-                formats: SystemEdits.regionFormats(m)
+                catalog: SystemEdits.KeyboardCatalog(v),
+                formats: SystemEdits.regionFormats(v)
             ) {
                 derived["language"] = "\(l.language), region \(l.locale), keyboards \(l.keyboards)"
             }
             let (report, record, owned) = try Self.bake(
-                m,
+                v,
                 helpers: c.o.guestTools,
                 gles: recipe.options["gles_shim"] ?? true,
                 fit: c.fit,
@@ -368,8 +373,12 @@ final class N45Board: Board {
             // One partition, so the root holds what a device keeps in its journaled /private/var: journaled, so a
             // hard power-off is replayed at mount (the stock root is unjournaled and 1.x runs no fsck or update);
             // the journal itself is left for the device's first mount to initialize (leaveJournalToDevice).
-            try await VolumeMount.run("/usr/sbin/diskutil", ["enableJournal", m.path])
-            return (try SystemEdits.activate(m, log: c.log), removed)
+            if let m = v as? MountedVolume {
+                try await VolumeMount.run("/usr/sbin/diskutil", ["enableJournal", m.root.path])
+            } else if let w = v as? HFSPlusWriter {
+                try w.enableJournal()
+            }
+            return (try SystemEdits.activate(v, log: c.log), removed)
         }
         c.activation = activation
         derived["launch_daemons_removed"] = removed
@@ -381,18 +390,24 @@ final class N45Board: Board {
         c.log("\(try hfs.normalize(after: newest, to: newest)) catalog records dated as of the IPSW's newest file")
     }
 
-    /// ipod1g_device.bake over the mounted 1.x volume `m`: the GL front end if the stock OpenGLES exports exactly
+    /// ipod1g_device.bake over the 1.x system volume `v`: the GL front end if the stock OpenGLES exports exactly
     /// opengles-1x.exports (and `gles`), the seed package (GuestPackage.seed of armv6.itpack: the loader and n45-ios1),
     /// SpringBoard's LK_* environment. Returns (the lock's derived gles/gles_engine, the guest_package record, the
     /// volume-relative paths to make root-owned).
-    static func bake(_ m: URL, helpers: URL, gles: Bool, fit: FitCheck.Log = FitCheck.Log(), log: (String) -> Void)
+    static func bake(
+        _ v: any VolumeFiles,
+        helpers: URL,
+        gles: Bool,
+        fit: FitCheck.Log = FitCheck.Log(),
+        log: (String) -> Void
+    )
         throws -> ([String: Any], GuestPackage.Record, [String])
     {
         var front = false
         var report: [String: Any] = [:]
         if gles {
             let (ok, line) = try N72Board.frontEnd(
-                m.appendingPathComponent(N72Board.openGLES),
+                try? v.contents(at: N72Board.openGLES),
                 exports: helpers.appendingPathComponent(openGLESExports)
             )
             front = ok
@@ -401,7 +416,7 @@ final class N45Board: Board {
             report["gles"] = "gles off; software LayerKit"
         }
         let (seeded, record) = try SystemEdits.seedGuestPackage(
-            m,
+            v,
             helpers: helpers,
             arch: "armv6",
             gles: front,
@@ -419,14 +434,14 @@ final class N45Board: Board {
         if front {
             try fit.check(
                 FitCheck.environment(
-                    FitCheck.Firmware(root: m, arch: "armv6"),
+                    FitCheck.Firmware(volume: v, arch: "armv6"),
                     [["LK_ENABLE_OGL"], ["LK_AUTO_ENABLE_OGL"]]
                 ),
                 required: false,
                 outcome: "kept: a switch nothing reads is inert"
             )
         }
-        try SystemEdits.editSpringBoardJob(m) { env, _ in
+        try SystemEdits.editSpringBoardJob(v) { env, _ in
             if front {
                 env["LK_ENABLE_OGL"] = "1"
                 env["LK_AUTO_ENABLE_OGL"] = "0"

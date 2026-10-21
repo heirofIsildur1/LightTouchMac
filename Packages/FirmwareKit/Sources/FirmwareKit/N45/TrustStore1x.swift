@@ -156,8 +156,14 @@ public enum TrustStore1x {
         let session = try await StoppedVolumeEdit.begin(device: device, policy: policy, log: log)
         do {
             let point = session.image.deletingLastPathComponent().appendingPathComponent("trust-anchor-mount")
-            try await VolumeMount.withMounted(session.image, at: point) { mount in
-                try addAnchor(certificate, to: mount.appendingPathComponent(path))
+            try await VolumeMount.withVolume(session.image, at: point) { v in
+                if let m = v as? MountedVolume { return try addAnchor(certificate, to: m.url(path)) }
+                // the store is a SQLite file: edited as a file on the host, then put back in place
+                let copy = session.image.deletingLastPathComponent().appendingPathComponent("trust-store")
+                defer { try? FileManager.default.removeItem(at: copy) }  // host file
+                try v.contents(at: path).write(to: copy)  // host file
+                try addAnchor(certificate, to: copy)
+                try v.put(contentsOf: copy, at: path, mode: nil)  // host file
             }
             log("anchor \(sha1) added to /\(path)")
             try await StoppedVolumeEdit.commit(device: device, id: session.id, policy: policy, log: log)

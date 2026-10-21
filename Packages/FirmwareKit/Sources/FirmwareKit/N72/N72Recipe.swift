@@ -210,13 +210,12 @@ final class N72Board: Board {
             newest = try v.newestDate()
         }
         var owners: [(UInt32, String)] = [(0, kcPath)]
-        let report = try await VolumeMount.withMounted(volume, at: c.work.appendingPathComponent("mnt")) {
-            m -> [String: Any] in
-            try SystemEdits.put(Data(Self.fstabRW.utf8), m.appendingPathComponent(SystemEdits.fstab))
-            let kc = m.appendingPathComponent(kcPath)
-            try SystemEdits.mkdirs(kc.deletingLastPathComponent())
-            try c.ipsw.extract(kcMember, to: kc)
-            return try bake(m, c, owners: &owners)
+        let report = try await VolumeMount.withVolume(volume, at: c.work.appendingPathComponent("mnt"), date: newest) {
+            v -> [String: Any] in
+            try v.put(Data(Self.fstabRW.utf8), at: SystemEdits.fstab)
+            try v.makeDirectory((kcPath as NSString).deletingLastPathComponent)
+            try v.put(member: kcMember, of: c.ipsw, at: kcPath)
+            return try bake(v, c, owners: &owners)
         }
         c.activation = report["activation"] as? Activation.Result
         c.guestPackage = report["guest_package"] as? GuestPackage.Record
@@ -348,15 +347,14 @@ final class N72Board: Board {
         return (out, names)
     }
 
-    /// ipod2g_device.bake over the mounted volume `m` (bake-guest-tools.sh, patch-appsync-dylib.sh,
+    /// ipod2g_device.bake over the system volume `v` (bake-guest-tools.sh, patch-appsync-dylib.sh,
     /// install_web_proxy, activation) with the shared pieces of SystemEdits. Appends the owners to patch;
     /// returns the report (the lock's `derived`, plus activation and guest_package).
-    func bake(_ m: URL, _ c: Recipe.Context, owners: inout [(UInt32, String)]) throws -> [String: Any] {
+    func bake(_ v: any VolumeFiles, _ c: Recipe.Context, owners: inout [(UInt32, String)]) throws -> [String: Any] {
         let fm = FileManager.default
         let opt = recipe.options
         let helpers = c.o.guestTools
         let cache = SystemEdits.dyldCache(arch)
-        let at = { (rel: String) in m.appendingPathComponent(rel) }
         // The guest helpers (it_agent, it_typein DYLD_INSERTed into SpringBoard, sblaunch, it_prefs, the loader and
         // its seed package) are checked against the volume's dyld and imports. The exported armv6 set is now
         // legacy-linked for 2.x through 4.x; old helper directories with LC_DYLD_INFO_ONLY still fail the fit
@@ -368,7 +366,7 @@ final class N72Board: Board {
             }
             return try Data(contentsOf: u)
         }
-        let fw = FitCheck.Firmware(root: m, arch: arch)
+        let fw = FitCheck.Firmware(volume: v, arch: arch)
         let toolsFit = try Self.guestToolsFit(fw, helpers: helpers)
         let tools = try c.fit.check(toolsFit, required: false)
         if opt["appsync"] == true {
@@ -388,7 +386,7 @@ final class N72Board: Board {
         var gles = false
         if opt["gles_shim"] ?? true {
             let (engine, owned) = try SystemEdits.installCAOGL(
-                m,
+                v,
                 helpers: helpers,
                 arch: arch,
                 fw: fw,
@@ -407,20 +405,20 @@ final class N72Board: Board {
 
         // bake-guest-tools.sh
         if tools {
-            try SystemEdits.mkdirs(at("usr/local/bin"))
-            try SystemEdits.put(helper("sblaunch"), at("usr/local/bin/sblaunch"), mode: 0o755)
+            try v.makeDirectory("usr/local/bin")
+            try v.put(helper("sblaunch"), at: "usr/local/bin/sblaunch", mode: 0o755)
             if fm.fileExists(atPath: helpers.appendingPathComponent("sbdlicon").path) {
-                try SystemEdits.put(helper("sbdlicon"), at("usr/local/bin/sbdlicon"), mode: 0o755)
+                try v.put(helper("sbdlicon"), at: "usr/local/bin/sbdlicon", mode: 0o755)
             }
-            try SystemEdits.put(helper("it_agent"), at("usr/local/bin/it_agent"), mode: 0o755)
-            try SystemEdits.put(helper("it_typein.dylib"), at("usr/lib/it_typein.dylib"), mode: 0o755)
+            try v.put(helper("it_agent"), at: "usr/local/bin/it_agent", mode: 0o755)
+            try v.put(helper("it_typein.dylib"), at: "usr/lib/it_typein.dylib", mode: 0o755)
         }
         try c.fit.check(
             FitCheck.environment(fw, Self.sbSwitches),
             required: false,
             outcome: "kept: a switch nothing reads is inert"
         )
-        try SystemEdits.editSpringBoardJob(m) { env, _ in
+        try SystemEdits.editSpringBoardJob(v) { env, _ in
             for k in ["CA_ENABLE_OGL", "LK_ENABLE_OGL"] { env[k] = gles ? "1" : "0" }
             for k in ["CA_AUTO_ENABLE_OGL", "LK_AUTO_ENABLE_OGL"] { env[k] = "0" }
             let old = (env["DYLD_INSERT_LIBRARIES"] as? String ?? "").split(separator: ":").map(String.init)
@@ -429,43 +427,45 @@ final class N72Board: Board {
                 + (tools ? ["/usr/lib/it_typein.dylib"] : [])
             env["DYLD_INSERT_LIBRARIES"] = libs.isEmpty ? nil : libs.joined(separator: ":")
         }
-        if tools { try SystemEdits.put(helper("com.qemu.it-agent.plist"), at(Self.agentJob), mode: 0o644) }
-        try? fm.removeItem(at: at("System/Library/LaunchDaemons/com.qemu.it-pbd.plist"))
-        let sbp = at(Self.prefs + "/com.apple.springboard.plist")
-        if fm.fileExists(atPath: sbp.path),
-            let d = try PropertyListSerialization.propertyList(from: Data(contentsOf: sbp), format: nil)
+        if tools { try v.put(helper("com.qemu.it-agent.plist"), at: Self.agentJob, mode: 0o644) }
+        let pbdJob = "System/Library/LaunchDaemons/com.qemu.it-pbd.plist"
+        if v.exists(pbdJob) { try v.remove(pbdJob) }
+        let sbp = Self.prefs + "/com.apple.springboard.plist"
+        if v.exists(sbp),
+            let d = try PropertyListSerialization.propertyList(from: v.contents(at: sbp), format: nil)
                 as? [String: Any],
             d["SBDontLockEver"] != nil || d["SBDisableCABlanking"] != nil
         {
-            try SystemEdits.rewritePlist(sbp) { $0.removeObjects(forKeys: ["SBDontLockEver", "SBDisableCABlanking"]) }
+            try SystemEdits.rewritePlist(v, sbp) {
+                $0.removeObjects(forKeys: ["SBDontLockEver", "SBDisableCABlanking"])
+            }
         }
         for (name, changes) in Self.soundDefaults {
-            try SystemEdits.seedPlist(at(Self.prefs + "/" + name)) { $0.addEntries(from: changes) }
+            try SystemEdits.seedPlist(v, Self.prefs + "/" + name) { $0.addEntries(from: changes) }
         }
         if let l = try SystemEdits.seedLanguage(
-            at("private/var"),
+            v,
+            "private/var",
             tag: c.o.language,
             keyboards: c.o.keyboards,
-            catalog: SystemEdits.KeyboardCatalog(at("System/Library/TextInput")),
-            formats: SystemEdits.regionFormats(m)
+            catalog: SystemEdits.KeyboardCatalog(v),
+            formats: SystemEdits.regionFormats(v)
         ) {
             report["language"] = "\(l.language), region \(l.locale), keyboards \(l.keyboards)"
         }
-        let media = at("private/var/mobile/Media")
+        let media = "private/var/mobile/Media"
         if tools {
-            try SystemEdits.mkdirs(media)
-            for v in 1...3 {
-                try SystemEdits.put(Data("v\(v)\n".utf8), media.appendingPathComponent(".lt-guest-tools-v\(v)"))
-            }
+            try v.makeDirectory(media)
+            for n in 1...3 { try v.put(Data("v\(n)\n".utf8), at: media + "/.lt-guest-tools-v\(n)") }
         } else {
-            for rel in [Self.agentJob] + (1...3).map({ "private/var/mobile/Media/.lt-guest-tools-v\($0)" }) {
-                try? fm.removeItem(at: at(rel))
+            for rel in [Self.agentJob] + (1...3).map({ "\(media)/.lt-guest-tools-v\($0)" }) where v.exists(rel) {
+                try v.remove(rel)
             }
         }
 
         if opt["jailbreak"] == true {
             guard let bootstrap = c.cydia else { throw FirmwareError(.internal, "jailbreak: no Cydia bootstrap") }
-            let jb = try SystemEdits.installJailbreak(m, bootstrap: bootstrap, typeinBySubstrate: tools)
+            let jb = try SystemEdits.installJailbreak(v, bootstrap: bootstrap, typeinBySubstrate: tools)
             report["afc2"] = jb.afc2
             report["cydia"] = jb.cydia
             report["cydia_modes"] = jb.modes
@@ -473,7 +473,7 @@ final class N72Board: Board {
         }
         if opt["appsync"] == true {  // patch-appsync-dylib.sh
             let (line, job) = try SystemEdits.installAppSync(
-                m,
+                v,
                 helper: helpers.appendingPathComponent(SystemEdits.Helpers.appsync),
                 cache: cache,
                 log: c.log
@@ -482,7 +482,7 @@ final class N72Board: Board {
                 line, "installation service (\(job)) DYLD_INSERT_LIBRARIES += /\(SystemEdits.appsyncPath)",
             ]
             owners.append((0, SystemEdits.appsyncPath))
-            if FileManager.default.fileExists(atPath: m.appendingPathComponent(SystemEdits.appsyncLauncherPath).path) {
+            if v.exists(SystemEdits.appsyncLauncherPath) {
                 owners.append((0, SystemEdits.appsyncLauncherPath))
             }
         }
@@ -490,25 +490,25 @@ final class N72Board: Board {
             report["prefs"] =
                 "it_prefs (guest package): SBDidShowReorderText, then Brightness and Auto-Lock once, at first boot"
         } else {  // Older incompatible helper inputs: bake its keys into mobile’s SpringBoard preferences
-            report["prefs"] = try Self.bakePrefs(m, dir: Self.prefs)
+            report["prefs"] = try Self.bakePrefs(v, dir: Self.prefs)
         }
         // install_web_proxy: the PAC, and the Wi-Fi service on the system volume's /private/var
         if opt["web_proxy"] ?? true {
             try c.fit.check(FitCheck.webProxy(fw), required: false, outcome: "kept: the PAC is unused")
             let sc = "private/var/preferences/SystemConfiguration"
-            owners += try SystemEdits.installPAC(m, dirs: [sc]).map { (UInt32(0), $0) }
-            try SystemEdits.seedPlist(at(sc + "/preferences.plist"), SystemEdits.wifiProxyPrefs)
+            owners += try SystemEdits.installPAC(v, dirs: [sc]).map { (UInt32(0), $0) }
+            try SystemEdits.seedPlist(v, sc + "/preferences.plist", SystemEdits.wifiProxyPrefs)
             owners.append((0, sc + "/preferences.plist"))
             report["web_proxy"] = "PAC /\(SystemEdits.pacPath) on the en0 Wi-Fi service"
         }
-        report["activation"] = try SystemEdits.activate(m, log: c.log)
+        report["activation"] = try SystemEdits.activate(v, log: c.log)
         owners.append((0, SystemEdits.lockdownd))
         // mkpkg.seed: the loader and the seed package; it_boot loads the package's jobs (com.qemu.it-agent), so
         // the baked copies it provides are removed. Owners after it, for only what is left.
         // On 2.x and 3.0 the package carries only the GL front end's hook.
         if tools || gles {
             let (seeded, record) = try SystemEdits.seedGuestPackage(
-                m,
+                v,
                 helpers: helpers,
                 arch: arch,
                 gles: gles,
@@ -519,9 +519,7 @@ final class N72Board: Board {
             report["guest_package"] = record
             owners += seeded.map { (UInt32(0), $0) }
         }
-        owners += Self.guestToolOwners.filter {
-            (try? fm.destinationOfSymbolicLink(atPath: at($0.1).path)) != nil || fm.fileExists(atPath: at($0.1).path)
-        }
+        owners += Self.guestToolOwners.filter { v.exists($0.1) }
         c.log("bake: \(report.filter { $0.key != "activation" && $0.key != "guest_package" })")
         return report
     }
@@ -572,15 +570,15 @@ extension N72Board {
     /// 1.x SBBacklightLevel) and Auto-Lock Never (SBAutoLockTime -1, where Settings keeps it through 3.x, with
     /// SBAutoDimTime -1: SpringBoard resets both to its defaults when the dim time is above the lock time). Baked once
     /// at prepare, so the user's later choices stand. Returns the report line.
-    static func bakePrefs(_ m: URL, dir: String) throws -> String {
-        guard let sb = try? Data(contentsOf: m.appendingPathComponent(springBoard), options: .alwaysMapped) else {
+    static func bakePrefs(_ v: any VolumeFiles, dir: String) throws -> String {
+        guard let sb = try? v.contents(at: springBoard) else {
             return "no SpringBoard: left alone"
         }
         let named = prefsBaked.filter { sb.range(of: Data(($0.key + "\0").utf8)) != nil }
         guard !named.isEmpty else {
             return "SpringBoard names none of \(prefsBaked.map(\.key).joined(separator: ", ")): left alone"
         }
-        try SystemEdits.seedPlist(m.appendingPathComponent(dir + "/com.apple.springboard.plist")) { d in
+        try SystemEdits.seedPlist(v, dir + "/com.apple.springboard.plist") { d in
             for (k, v) in named { d[k] = v }
         }
         return named.map(\.key).joined(separator: ", ") + " baked (no helpers)"
@@ -600,8 +598,8 @@ extension N72Board {
     /// ipod2g_device.gles2x_front_end (ipod1g_device's for 1.x): (true, line) if the stock OpenGLES exports exactly
     /// the names in `exports` (contrib/it-gles/opengles-<1x|2x>.exports), so the package's hook may replace it;
     /// else (false, why), stock kept.
-    static func frontEnd(_ stock: URL, exports: URL) throws -> (Bool, String) {
-        guard FileManager.default.fileExists(atPath: stock.path) else { return (false, "no \(openGLES)") }
+    static func frontEnd(_ stock: Data?, exports: URL) throws -> (Bool, String) {
+        guard let stock else { return (false, "no \(openGLES)") }
         guard let list = try? String(contentsOf: exports, encoding: .utf8) else {
             throw FirmwareError(
                 .internal,
@@ -612,7 +610,7 @@ extension N72Board {
             list.split(separator: "\n").filter { !$0.hasPrefix("#") }.map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
         )
-        let got = Set(try exportedSymbols(Data(contentsOf: stock)))
+        let got = Set(try exportedSymbols(stock))
         guard want == got else {
             return (
                 false,

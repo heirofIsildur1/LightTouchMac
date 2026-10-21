@@ -182,6 +182,13 @@ public enum Recipe {
                 "entry": e.id, "build": e.build, "board": e.board, "fit": c.fit.object,
                 "guest_package": c.guestPackage?.object ?? NSNull(), "warnings": c.warnings,
             ]
+            // the volume images the recipe built (system.img, data.img or volume.img) kept beside it, for inspection
+            let volumes = c.o.out.appendingPathComponent("volumes")
+            try? fm.removeItem(at: volumes)
+            try fm.createDirectory(at: volumes, withIntermediateDirectories: true)
+            for n in try fm.contentsOfDirectory(atPath: c.work.path) where n.hasSuffix(".img") {
+                try fm.moveItem(at: c.work.appendingPathComponent(n), to: volumes.appendingPathComponent(n))
+            }
             try? fm.removeItem(at: c.work)
             try Preparer.lockData(survey).write(to: c.file("fit.json"))
             progress.finish()

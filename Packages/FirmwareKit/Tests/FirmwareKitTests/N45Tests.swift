@@ -295,7 +295,7 @@ import Testing
 
             let names = try N72Board.exportedSymbols(stockGL)
             #expect(names.count == 186)
-            let (ok, line) = try N72Board.frontEnd(gl, exports: list)
+            let (ok, line) = try N72Board.frontEnd(try? Data(contentsOf: gl), exports: list)
             #expect(ok, "\(line)")
             let short = dir.appendingPathComponent("short.exports")
             try (String(contentsOf: list, encoding: .utf8).replacingOccurrences(of: "\nglFlush\n", with: "\n")).write(
@@ -303,9 +303,14 @@ import Testing
                 atomically: true,
                 encoding: .utf8
             )
-            #expect(try N72Board.frontEnd(gl, exports: short).0 == false)
+            #expect(try N72Board.frontEnd(try? Data(contentsOf: gl), exports: short).0 == false)
             // 2.x's list is not 1.x's
-            #expect(try N72Board.frontEnd(gl, exports: it.appendingPathComponent("opengles-2x.exports")).0 == false)
+            #expect(
+                try N72Board.frontEnd(
+                    try? Data(contentsOf: gl),
+                    exports: it.appendingPathComponent("opengles-2x.exports")
+                ).0 == false
+            )
 
             guard Oracle.exists(itpack) else {
                 try FixtureRequirements.missing(#"N45Tests.swift: Oracle.exists(itpack)"#)
@@ -325,7 +330,7 @@ import Testing
                 let a = try volume("swift")
                 let log = FitCheck.Log()
                 let (report, record, owned) = try N45Board.bake(
-                    a,
+                    MountedVolume(root: a),
                     helpers: helpers,
                     gles: gles,
                     fit: log,
@@ -395,7 +400,10 @@ import Testing
             try job("present.plist", ["StandardErrorPath": "/var/log/present.log"])
             try job("relative.plist", ["StandardErrorPath": "logs/x"])
             #expect(
-                try N45Board.makeLogDirs(m, jobs: ["com.apple.BTServer.plist", "present.plist", "relative.plist"]) == [
+                try N45Board.makeLogDirs(
+                    MountedVolume(root: m),
+                    jobs: ["com.apple.BTServer.plist", "present.plist", "relative.plist"]
+                ) == [
                     "private/var/logs/BTServer"
                 ]
             )
@@ -411,10 +419,10 @@ import Testing
             let plist = m.appendingPathComponent(rel)
             try SystemEdits.mkdirs(sb.deletingLastPathComponent())
             try Data("\0SBDisableIdleSleepX\0".utf8).write(to: sb)
-            #expect(try !N45Board.bakeNoIdleSleep(m, prefs: rel) && !Oracle.exists(plist))
+            #expect(try !N45Board.bakeNoIdleSleep(MountedVolume(root: m), prefs: rel) && !Oracle.exists(plist))
             try Data("\0SBAutoLockTime\0SBDisableIdleSleep\0".utf8).write(to: sb)
             try SystemEdits.seedPlist(plist) { $0["SBAutoLockTime"] = -1 }
-            #expect(try N45Board.bakeNoIdleSleep(m, prefs: rel))
+            #expect(try N45Board.bakeNoIdleSleep(MountedVolume(root: m), prefs: rel))
             let d = try #require(
                 PropertyListSerialization.propertyList(from: Data(contentsOf: plist), format: nil) as? [String: Any]
             )
@@ -428,8 +436,8 @@ import Testing
     @Test func springBoardUserFollowsItsJob() throws {
         try Oracle.withTemp { m in
             let rootSC = N45Board.rootLibrary + "/Preferences/SystemConfiguration"
-            #expect(N45Board.springBoardUser(m) == (N45Board.rootLibrary, 0))
-            #expect(N45Board.scPrefs(m) == rootSC)
+            #expect(N45Board.springBoardUser(MountedVolume(root: m)) == (N45Board.rootLibrary, 0))
+            #expect(N45Board.scPrefs(MountedVolume(root: m)) == rootSC)
             let job = m.appendingPathComponent(SystemEdits.daemons + "/com.apple.SpringBoard.plist")
             try SystemEdits.mkdirs(job.deletingLastPathComponent())
             try PropertyListSerialization.data(
@@ -437,15 +445,15 @@ import Testing
                 format: .xml,
                 options: 0
             ).write(to: job)
-            #expect(N45Board.springBoardUser(m) == (N45Board.rootLibrary, 0))
-            #expect(N45Board.scPrefs(m) == rootSC)
+            #expect(N45Board.springBoardUser(MountedVolume(root: m)) == (N45Board.rootLibrary, 0))
+            #expect(N45Board.scPrefs(MountedVolume(root: m)) == rootSC)
             try PropertyListSerialization.data(
                 fromPropertyList: ["Label": "com.apple.SpringBoard", "UserName": "mobile"],
                 format: .xml,
                 options: 0
             ).write(to: job)
-            #expect(N45Board.springBoardUser(m) == ("private/var/mobile/Library", 501))
-            let owned = try N45Board.seedSystemConfiguration(m)
+            #expect(N45Board.springBoardUser(MountedVolume(root: m)) == ("private/var/mobile/Library", 501))
+            let owned = try N45Board.seedSystemConfiguration(MountedVolume(root: m))
             let sc = "private/var/preferences/SystemConfiguration"
             #expect(owned.contains(sc + "/preferences.plist") && owned.contains(sc + "/com.apple.wifi.plist"))
             let known = try #require(

@@ -61,7 +61,8 @@ public enum Preparer {
         /// The entry named by recipe.keybag_ramdisk_from and its IPSW: its restore ramdisk boots the keybag one-shot.
         public var sibling: (entry: FirmwareEntry, ipsw: URL)?
         /// Stop after the volumes step and write fit.json (the fit checks, the seed record, the warnings) instead of a
-        /// device: the offline survey of what each firmware gets (`create --stop-after volumes`); no boot, no store.
+        /// device: the offline survey of what each firmware gets (`create --stop-after volumes`), the volume images kept
+        /// in volumes/; no boot, no store.
         public var stopAfterVolumes = false
         /// The device's language (`create --language`, SystemEdits.Options.language); nil: the Mac's.
         public var language: String?
@@ -247,12 +248,16 @@ public enum Preparer {
         let fm = FileManager.default
         let rd = work.appendingPathComponent("keybag-ramdisk.dmg")
         try fm.copyItem(at: src, to: rd)
-        try await VolumeMount.grow(rd, toBytes: (VolumeMount.size(rd) + (1 << 20) + 4095) / 4096 * 4096)
+        // Through the kernel whatever the backend: every restore ramdisk is case-insensitive HFS+, which
+        // HFSPlusWriter does not write.
+        try await VolumeMount.grow(
+            rd,
+            toBytes: (VolumeMount.size(rd) + (1 << 20) + 4095) / 4096 * 4096,
+            volumes: .kernel
+        )
         let it = try Data(contentsOf: helper)
-        try await VolumeMount.withMounted(rd, at: work.appendingPathComponent("mnt-keybag")) { m in
-            let dst = m.appendingPathComponent(keybagHelper)
-            try it.write(to: dst)
-            guard chmod(dst.path, 0o755) == 0 else { throw FirmwareError(.internal, "chmod \(dst.path)") }
+        try await VolumeMount.withVolume(rd, at: work.appendingPathComponent("mnt-keybag"), backend: .kernel) { v in
+            try v.put(it, at: keybagHelper, mode: 0o755)
         }
         try? fm.removeItem(at: work.appendingPathComponent("mnt-keybag"))
         _ = try HFSPlusVolume(rd, writable: true).setOwner([keybagHelper], uid: 0, gid: 0)

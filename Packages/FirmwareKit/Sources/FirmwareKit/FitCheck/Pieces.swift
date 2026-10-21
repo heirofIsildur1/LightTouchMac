@@ -94,10 +94,7 @@ extension FitCheck {
         var out: [(String, Data)] = []
         if let c = fw.cache { out.append(("the shared cache", c.data)) }
         for dir in frameworkDirs {
-            for f
-                in ((try? FileManager.default.contentsOfDirectory(atPath: fw.root.appendingPathComponent(dir).path))
-                ?? []).sorted() where f.hasSuffix(".framework")
-            {
+            for f in fw.names(dir) where f.hasSuffix(".framework") {
                 let rel = dir + "/" + f + "/" + f.dropLast(".framework".count)
                 if let d = fw.data(rel) { out.append(((rel as NSString).lastPathComponent, d)) }
             }
@@ -306,15 +303,15 @@ extension FitCheck {
         }
         if let job = ["com.apple.mobile.installd.plist", "com.apple.installd.plist"].map({
             SystemEdits.daemons + "/" + $0
-        }).first(where: { fw.resolve($0) != nil }), let plist = fw.resolve(job) {
-            guard let host = program(NSDictionary(contentsOf: plist)) else {
+        }).first(where: { fw.resolve($0) != nil }) {
+            guard let host = program(fw.plist(job)) else {
                 try log.check(Fit(SystemEdits.Helpers.appsync, fits: false, "\(job) names no program"), required: true)
                 return
             }
             try log.check(appSync(fw, host: host, dylib: dylib), required: true)
             return
         }
-        let services = fw.resolve("System/Library/Lockdown/Services.plist").flatMap { NSDictionary(contentsOf: $0) }
+        let services = fw.plist("System/Library/Lockdown/Services.plist")
         guard let host = program(services?["com.apple.mobile.installation_proxy"] as? NSDictionary) else {
             try log.check(
                 Fit(

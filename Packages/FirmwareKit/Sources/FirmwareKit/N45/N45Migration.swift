@@ -32,12 +32,10 @@ public nonisolated enum N45Migration {
         let session = try await StoppedVolumeEdit.begin(device: device, policy: policy, log: log)
         do {
             let point = session.image.deletingLastPathComponent().appendingPathComponent("sc-prefs-mount")
-            try await VolumeMount.withMounted(session.image, at: point) { m in
-                _ = try N45Board.seedSystemConfiguration(m)
+            try await VolumeMount.withVolume(session.image, at: point) { v in
+                _ = try N45Board.seedSystemConfiguration(v)
                 let rootHome = N45Board.rootLibrary + "/Preferences/SystemConfiguration"
-                if N45Board.scPrefs(m) != rootHome {
-                    try? DevicePath.remove(m.appendingPathComponent(rootHome))
-                }
+                if N45Board.scPrefs(v) != rootHome { try? v.remove(rootHome) }
             }
             try await StoppedVolumeEdit.commit(device: device, id: session.id, policy: policy, log: log)
         } catch {

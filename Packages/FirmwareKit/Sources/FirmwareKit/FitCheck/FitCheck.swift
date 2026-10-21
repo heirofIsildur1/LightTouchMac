@@ -2,7 +2,7 @@
 // injected into. Every check returns a Fit: fits with the proof, or does
 // not fit with why. "Could not tell" is never a fit. No per-build tables: only symbols, strings and structure.
 //
-//   let fw = FitCheck.Firmware(root: mountedSystemVolume, arch: "armv7")
+//   let fw = FitCheck.Firmware(volume: systemVolume, arch: "armv7")       // any VolumeFiles, or root: a folder
 //   let f = FitCheck.loads("it_agent", Data(contentsOf: helper), on: fw)   // f.fits, f.proof
 //
 // The recipes record every Fit in the lock ("fit"); a piece that does not fit fails the prepare, or, where the
@@ -58,30 +58,34 @@ public enum FitCheck {
         public var object: [[String: Any]] { fits.map(\.object) }
     }
 
-    /// The pristine firmware as the checks read it: the system volume mounted at `root` (symlinks resolved inside it,
-    /// never on the host), its dyld shared cache, and the decrypted kernelcache when the recipe has one.
+    /// The pristine firmware as the checks read it: the system volume (symlinks resolved inside it, never on the
+    /// host), its dyld shared cache, and the decrypted kernelcache when the recipe has one.
     public final class Firmware {
-        public let root: URL, arch: String, kernelcache: Data?
-        public init(root: URL, arch: String, kernelcache: Data? = nil) {
-            self.root = root
+        public let volume: any VolumeFiles, arch: String, kernelcache: Data?
+        public init(volume: any VolumeFiles, arch: String, kernelcache: Data? = nil) {
+            self.volume = volume
             self.arch = arch
             self.kernelcache = kernelcache
         }
 
-        public lazy var cache: DyldSharedCache? = resolve(SystemEdits.dyldCache(arch)).flatMap {
-            try? DyldSharedCache(contentsOf: $0)
+        /// The firmware in a folder on the host (a mounted volume, an extracted tree).
+        public convenience init(root: URL, arch: String, kernelcache: Data? = nil) {
+            self.init(volume: MountedVolume(root: root), arch: arch, kernelcache: kernelcache)
+        }
+
+        public lazy var cache: DyldSharedCache? = data(SystemEdits.dyldCache(arch)).flatMap {
+            try? DyldSharedCache(data: $0)
         }
 
         /// `rel` (volume-relative, with or without a leading "/") with every symlink followed inside the volume;
         /// nil when it is not there.
-        public func resolve(_ rel: String) -> URL? {
+        public func resolve(_ rel: String) -> String? {
             let (path, exists) = follow(rel)
-            return exists ? root.appendingPathComponent(path) : nil
+            return exists ? path : nil
         }
 
         /// (the path with symlinks followed, whether it exists).
         func follow(_ rel: String) -> (String, Bool) {
-            let fm = FileManager.default
             var parts = rel.split(separator: "/").map(String.init)
             var out: [String] = []
             var hops = 0
@@ -92,8 +96,8 @@ public enum FitCheck {
                     _ = out.popLast()
                     continue
                 }
-                let here = root.appendingPathComponent((out + [p]).joined(separator: "/")).path
-                if let dest = try? fm.destinationOfSymbolicLink(atPath: here) {
+                let here = (out + [p]).joined(separator: "/")
+                if volume.isSymlink(here), let dest = try? volume.destinationOfSymlink(at: here) {
                     hops += 1
                     guard hops < 32 else { return (rel, false) }
                     if dest.hasPrefix("/") { out = [] }
@@ -103,11 +107,17 @@ public enum FitCheck {
                 out.append(p)
             }
             let path = out.joined(separator: "/")
-            return (path, fm.fileExists(atPath: root.appendingPathComponent(path).path))
+            return (path, volume.exists(path))
         }
 
-        public func data(_ rel: String) -> Data? {
-            resolve(rel).flatMap { try? Data(contentsOf: $0, options: .alwaysMapped) }
+        public func data(_ rel: String) -> Data? { resolve(rel).flatMap { try? volume.contents(at: $0) } }
+
+        /// The property list at `rel`, symlinks followed, or nil.
+        public func plist(_ rel: String) -> NSDictionary? { resolve(rel).flatMap { volume.plist(at: $0) } }
+
+        /// The names in the folder at `rel`, sorted; none when it is not there.
+        public func names(_ rel: String) -> [String] {
+            (resolve(rel).flatMap { try? volume.contentsOfDirectory(at: $0) } ?? []).sorted()
         }
 
         /// Does the file at `rel` contain `bytes`?
@@ -254,10 +264,8 @@ public enum FitCheck {
 
     /// The stock executable whose launchd job inserts `dylib` (DYLD_INSERT_LIBRARIES), as the volume's jobs say now.
     static func host(of dylib: String, on fw: Firmware) -> String? {
-        let dir = fw.root.appendingPathComponent(SystemEdits.daemons)
-        for n in ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).sorted()
-        where n.hasSuffix(".plist") {
-            guard let d = NSDictionary(contentsOf: dir.appendingPathComponent(n)),
+        for n in fw.names(SystemEdits.daemons) where n.hasSuffix(".plist") {
+            guard let d = fw.plist(SystemEdits.daemons + "/" + n),
                 let inserted = (d["EnvironmentVariables"] as? [String: Any])?["DYLD_INSERT_LIBRARIES"] as? String,
                 inserted.split(separator: ":").contains(Substring(dylib))
             else { continue }

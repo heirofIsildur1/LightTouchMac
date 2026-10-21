@@ -10,24 +10,26 @@ struct HookProvenanceTests {
             let at = dir.appendingPathComponent(target)
             try SystemEdits.mkdirs(at.deletingLastPathComponent())
             try SystemEdits.put(Data("original".utf8), at, mode: 0o751)
-            let backup = try GuestPackage.preserveHook(volume: dir, target: target)
+            let backup = try GuestPackage.preserveHook(volume: MountedVolume(root: dir), target: target)
             #expect(backup == target + ".baked")
             try SystemEdits.put(Data("frontend".utf8), at, mode: 0o755)
-            #expect(try GuestPackage.preserveHook(volume: dir, target: target) == backup)
+            #expect(try GuestPackage.preserveHook(volume: MountedVolume(root: dir), target: target) == backup)
             #expect(try Data(contentsOf: dir.appendingPathComponent(backup)) == Data("original".utf8))
             #expect(try SystemEdits.permissions(dir.appendingPathComponent(backup)) == 0o751)
 
             let missing = "framework/Missing"
-            let marker = try GuestPackage.preserveHook(volume: dir, target: missing)
+            let marker = try GuestPackage.preserveHook(volume: MountedVolume(root: dir), target: missing)
             #expect(marker == missing + ".baked-absent")
             try SystemEdits.put(Data("override".utf8), dir.appendingPathComponent(missing), mode: 0o755)
-            #expect(try GuestPackage.preserveHook(volume: dir, target: missing) == marker)
+            #expect(try GuestPackage.preserveHook(volume: MountedVolume(root: dir), target: missing) == marker)
             #expect(try Data(contentsOf: dir.appendingPathComponent(marker)).isEmpty)
             #expect(
                 FileManager.default.fileExists(atPath: dir.appendingPathComponent(missing + ".baked").path) == false
             )
             try SystemEdits.put(Data("conflict".utf8), dir.appendingPathComponent(missing + ".baked"), mode: 0o755)
-            #expect(throws: (any Error).self) { try GuestPackage.preserveHook(volume: dir, target: missing) }
+            #expect(throws: (any Error).self) {
+                try GuestPackage.preserveHook(volume: MountedVolume(root: dir), target: missing)
+            }
             #expect(try Data(contentsOf: dir.appendingPathComponent(missing)) == Data("override".utf8))
         }
     }
@@ -70,7 +72,7 @@ struct HookProvenanceTests {
             )
             #expect(throws: (any Error).self) {
                 try SystemEdits.installCAOGL(
-                    stock,
+                    MountedVolume(root: stock),
                     helpers: invalid,
                     arch: arch,
                     fw: fw,
@@ -88,7 +90,7 @@ struct HookProvenanceTests {
                     == false
             )
             let installed = try SystemEdits.installCAOGL(
-                stock,
+                MountedVolume(root: stock),
                 helpers: helpers,
                 arch: arch,
                 fw: fw,
@@ -104,7 +106,7 @@ struct HookProvenanceTests {
             }
             // Reentrancy keeps provenance even though the target is now our frontend.
             _ = try SystemEdits.installCAOGL(
-                stock,
+                MountedVolume(root: stock),
                 helpers: helpers,
                 arch: arch,
                 fw: fw,
@@ -117,11 +119,11 @@ struct HookProvenanceTests {
             if present {
                 let oldVolume = dir.appendingPathComponent("old-present")
                 try FileManager.default.copyItem(at: stock, to: oldVolume)
-                _ = try GuestPackage.seed(volume: oldVolume, itpack: oldPack, gles: true)
+                _ = try GuestPackage.seed(volume: MountedVolume(root: oldVolume), itpack: oldPack, gles: true)
                 #expect(try Data(contentsOf: oldVolume.appendingPathComponent(provenance)) == baseline)
             } else if id != "n72ap-8C148" {  // 4.x is a hookless stub; it does not consume absence.
                 do {
-                    _ = try GuestPackage.seed(volume: stock, itpack: oldPack, gles: true)
+                    _ = try GuestPackage.seed(volume: MountedVolume(root: stock), itpack: oldPack, gles: true)
                     Issue.record("old pack accepted absence contract")
                 } catch let error as FirmwareError {
                     #expect(error.code == .unsupported && error.message.contains("rebuild the guest exports"))
@@ -132,7 +134,7 @@ struct HookProvenanceTests {
                     ) == false
                 )
             }
-            let (_, seeded) = try GuestPackage.seed(volume: stock, itpack: pack, gles: true)
+            let (_, seeded) = try GuestPackage.seed(volume: MountedVolume(root: stock), itpack: pack, gles: true)
             #expect(try Data(contentsOf: stock.appendingPathComponent(provenance)) == baseline)
             #expect(
                 FileManager.default.fileExists(

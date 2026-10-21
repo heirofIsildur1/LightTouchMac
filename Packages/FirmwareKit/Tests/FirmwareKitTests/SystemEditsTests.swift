@@ -132,8 +132,16 @@ enum K48Oracle {
             )
         }
         #expect(try options(#""skip_setup": true"#).skipSetup && !options("").skipSetup, "off unless asked for")
-        let (language, locale, _) = try #require(try SystemEdits.seedLanguage(skeleton, tag: "fr-CA"))
-        try SystemEdits.seedFinishedSetup(skeleton, major: major, language: language, locale: locale)
+        let (language, locale, _) = try #require(
+            try SystemEdits.seedLanguage(MountedVolume(root: skeleton), "", tag: "fr-CA")
+        )
+        try SystemEdits.seedFinishedSetup(
+            MountedVolume(root: skeleton),
+            "",
+            major: major,
+            language: language,
+            locale: locale
+        )
         func plist(_ path: String) -> [String: Any] {
             (try? PropertyListSerialization.propertyList(
                 from: Data(contentsOf: skeleton.appendingPathComponent(path)),
@@ -273,12 +281,12 @@ enum K48Oracle {
         defer { try? fm.removeItem(at: root) }
         let icu = root.appendingPathComponent("usr/share/icu")
         try fm.createDirectory(at: icu, withIntermediateDirectories: true)
-        #expect(SystemEdits.regionFormats(root) == nil, "no ICU data")
+        #expect(SystemEdits.regionFormats(MountedVolume(root: root)) == nil, "no ICU data")
         try Self.icuData([
             "icudt42l/res_index.res", "icudt42l/en.res", "icudt42l/en_US.res", "icudt42l/uk.res",
             "icudt42l/uk_UA.res", "icudt42l/sr_Latn_RS.res", "icudt42l/coll/hi_IN.res", "icudt42l/cnvalias.icu",
         ]).write(to: icu.appendingPathComponent("icudt42l.dat"))
-        let formats = try #require(SystemEdits.regionFormats(root))
+        let formats = try #require(SystemEdits.regionFormats(MountedVolume(root: root)))
         #expect(formats.isSuperset(of: ["en", "en_US", "uk", "uk_UA", "sr_Latn_RS"]))
         #expect(!formats.contains("hi_IN") && !formats.contains("cnvalias.icu"), "only top-level locales")
 
@@ -315,7 +323,9 @@ enum K48Oracle {
             format: .binary,
             options: 0
         ).write(to: global)
-        let seeded = try #require(try SystemEdits.seedLanguage(skeleton, tag: "uk-UA", formats: formats))
+        let seeded = try #require(
+            try SystemEdits.seedLanguage(MountedVolume(root: skeleton), "", tag: "uk-UA", formats: formats)
+        )
         #expect(seeded.language == "en" && seeded.locale == "uk_UA")
         let g = try #require(
             try PropertyListSerialization.propertyList(from: Data(contentsOf: global), format: nil) as? [String: Any]
@@ -337,7 +347,7 @@ enum K48Oracle {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let dat = try Fixtures.extract(build: build, paths: ["usr/share/icu/" + icu], to: dir)[0]
         try FileManager.default.moveItem(at: dat, to: root.appendingPathComponent(icu))
-        let formats = try #require(SystemEdits.regionFormats(dir.appendingPathComponent("root")))
+        let formats = try #require(SystemEdits.regionFormats(MountedVolume(root: dir.appendingPathComponent("root"))))
         #expect(formats.isSuperset(of: ["uk_UA", "en_US", "fr_FR"]) && !formats.contains("en_UA"))
     }
 
@@ -353,7 +363,7 @@ enum K48Oracle {
             _ bundles: [String: [String: [String: Any]]],
             defaults: [String: [String]] = [:]
         ) throws -> SystemEdits.KeyboardCatalog {
-            let dir = root.appendingPathComponent(name)
+            let dir = root.appendingPathComponent(name + "/System/Library/TextInput")
             for (bundle, modes) in bundles {
                 let b = dir.appendingPathComponent("TextInput_\(bundle).bundle")
                 try fm.createDirectory(at: b, withIntermediateDirectories: true)
@@ -364,7 +374,7 @@ enum K48Oracle {
                 try PropertyListSerialization.data(fromPropertyList: info, format: .binary, options: 0)
                     .write(to: b.appendingPathComponent("Info.plist"))
             }
-            return try #require(SystemEdits.KeyboardCatalog(dir))
+            return try #require(SystemEdits.KeyboardCatalog(MountedVolume(root: root.appendingPathComponent(name))))
         }
         // 3.1.3's shape: layout classes, two QWERTY variants of en_US.
         func layout(_ c: String) -> [String: Any] { ["UIKeyboardLayoutClass": ["Portrait": c, "Landscape": c + "L"]] }
@@ -460,7 +470,9 @@ enum K48Oracle {
             format: .binary,
             options: 0
         ).write(to: global)
-        let seeded = try #require(try SystemEdits.seedLanguage(skeleton, tag: "ja-JP", keyboards: [], catalog: v712))
+        let seeded = try #require(
+            try SystemEdits.seedLanguage(MountedVolume(root: skeleton), "", tag: "ja-JP", keyboards: [], catalog: v712)
+        )
         let g = try #require(
             try PropertyListSerialization.propertyList(from: Data(contentsOf: global), format: nil) as? [String: Any]
         )
@@ -546,7 +558,7 @@ enum K48Oracle {
                 return v
             }
             let a = try volume("swift")
-            let (written, record) = try GuestPackage.seed(volume: a, itpack: itpack, gles: gles)
+            let (written, record) = try GuestPackage.seed(volume: MountedVolume(root: a), itpack: itpack, gles: gles)
             #expect(!written.isEmpty)
             #expect(record.gles == gles && record.hooks.contains("/" + FitCheck.openGLES) == gles)
             // "9*": 5.x's own family
