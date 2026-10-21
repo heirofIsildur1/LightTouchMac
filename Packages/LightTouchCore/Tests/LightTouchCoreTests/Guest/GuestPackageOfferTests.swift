@@ -231,6 +231,15 @@ struct GuestPackageOfferTests {
                 #expect(!FileManager.default.fileExists(atPath: dir.path))
             }
             #expect(throws: (any Error).self, "not an itpack") { try GuestPack.read(dir.deletingLastPathComponent()) }
+            // An index size past the stream is refused, not an overflow trap.
+            let huge = t.appendingPathComponent("huge.itpack")
+            let index = try JSONSerialization.data(withJSONObject: [
+                "format": 1, "entries": [["name": "a", "size": 1], ["name": "b", "size": Int.max]],
+            ])
+            var length = UInt32(index.count).littleEndian
+            let stream = try (Data([0]) as NSData).compressed(using: .zlib) as Data
+            try (GuestPack.magic + Data(bytes: &length, count: 4) + index + Data([0x78, 0x9c]) + stream).write(to: huge)
+            #expect(throws: (any Error).self, "size past the stream") { try GuestPack.read(huge) }
             // A payload that doesn't match its manifest is never offered.
             let bent = entries.map {
                 $0.name == "n72-ios3/bin/itmedia" ? ($0.name, $0.data.dropLast() + [($0.data.last! ^ 1)]) : $0
