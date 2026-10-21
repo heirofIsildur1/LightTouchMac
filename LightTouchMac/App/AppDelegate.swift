@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         var sheet: NSWindow?
         let view = DebugPortView(
             shortName: emulator.profile.shortName,
-            port: emulator.debugPort,
+            socket: emulator.debugSocket,
             lldbWithSymbols: emulator.lldbAttachCommand,
             enabled: emulator.debugPortEnabled,
             onToggle: { [weak emulator] in emulator?.toggleDebugPort() },
@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     device.localNetworkEnabled = $0.localNetworkEnabled
                     device.autoRotateEnabled = $0.autoRotateEnabled
                     device.debugPortEnabled = $0.debugPortEnabled
-                    device.debugPort = $0.debugPort
+                    device.debugSocket = $0.debugSocket
                     device.lldbAttachCommand = $0.lldbAttachCommand
                     device.network = $0.network
                     return device

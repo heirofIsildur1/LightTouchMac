@@ -37,7 +37,10 @@ enum N72Keybag {
         let serial = work.appendingPathComponent("keybag.log")
         try fm.copyItem(at: out.appendingPathComponent("nor.bin"), to: nor)
         chmod(nor.path, 0o644)
-        let port = try GDBRemote.freePort()
+        // The stub on a Unix socket only this user reaches (HostRuntime.DebugPort), named before QEMU binds it: no
+        // free-port pick to race, nothing on TCP.
+        let socket = DebugPort.socketPath("ltm-keybag")
+        defer { unlink(socket) }
         let file = { (n: String) in Preparer.esc(out.appendingPathComponent(n)) }
         Machines.helper = helper
         guard let hardware = HostRuntime.Board.n72.hardware else {
@@ -51,11 +54,13 @@ enum N72Keybag {
                 "gid-blobs=\(file("gid-blobs.bin"))", "boot-args=",
             ]
             .joined(separator: ",") + BootRecipe.options(N72Board.machine)
-        let argv = [
-            "LightTouchDevice", "-M", machine, "-m", "128M", "-display", "none", "-audio", "driver=none", "-monitor",
-            "none",
-            "-serial", "file:\(serial.path)", "-gdb", "tcp:127.0.0.1:\(port)", "-S",
-        ]
+        let argv =
+            [
+                "LightTouchDevice", "-M", machine, "-m", "128M", "-display", "none", "-audio", "driver=none",
+                "-monitor",
+                "none",
+                "-serial", "file:\(serial.path)",
+            ] + DebugPort.arguments(socket: socket) + ["-S"]
         let kc = try Data(contentsOf: dec.appendingPathComponent("kernelcache.mach"))
         let image = try Data(contentsOf: rd)
         final class Note: @unchecked Sendable { var text = "" }
@@ -70,7 +75,7 @@ enum N72Keybag {
             work: work,
             log: log
         ) {
-            note.text = try handoff(GDBRemote(port: port), kernelcache: kc, ramdisk: image)
+            note.text = try handoff(GDBRemote(socket: socket), kernelcache: kc, ramdisk: image)
         }
         log(note.text)
         for line in text.split(separator: "\n") where line.contains("it_keybag:") {
@@ -191,41 +196,22 @@ final class GDBRemote {
     let fd: Int32
     var buffer: [UInt8] = []
 
-    /// A port nothing listens on now.
-    static func freePort() throws -> Int {
-        let s = socket(AF_INET, SOCK_STREAM, 0)
-        defer { close(s) }
-        var a = sockaddr_in(
-            sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
-            sin_family: sa_family_t(AF_INET),
-            sin_port: 0,
-            sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")),
-            sin_zero: (0, 0, 0, 0, 0, 0, 0, 0)
-        )
-        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-        let ok = withUnsafeMutablePointer(to: &a) { p in
-            p.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                bind(s, $0, len) == 0 && getsockname(s, $0, &len) == 0
-            }
+    /// Connects to the stub's Unix socket (in the user's own 0700 temporary directory), retrying for up to 10 s
+    /// while the helper starts QEMU.
+    init(socket path: String) throws {
+        var a = sockaddr_un()
+        a.sun_family = sa_family_t(AF_UNIX)
+        let bytes = Array(path.utf8)
+        guard bytes.count < MemoryLayout.size(ofValue: a.sun_path) else {
+            throw FirmwareError(.internal, "gdbstub socket path too long: \(path)")
         }
-        guard ok else { throw FirmwareError(.internal, "no free TCP port") }
-        return Int(UInt16(bigEndian: a.sin_port))
-    }
-
-    /// Connects, retrying for up to 10 s while the helper starts QEMU.
-    init(port: Int) throws {
+        withUnsafeMutableBytes(of: &a.sun_path) { $0.copyBytes(from: bytes) }
+        a.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
         for _ in 0..<100 {
-            let s = socket(AF_INET, SOCK_STREAM, 0)
-            var a = sockaddr_in(
-                sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
-                sin_family: sa_family_t(AF_INET),
-                sin_port: UInt16(port).bigEndian,
-                sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")),
-                sin_zero: (0, 0, 0, 0, 0, 0, 0, 0)
-            )
+            let s = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
             let ok = withUnsafePointer(to: &a) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    connect(s, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+                    connect(s, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) == 0
                 }
             }
             if ok {
@@ -237,7 +223,7 @@ final class GDBRemote {
             close(s)
             usleep(100_000)
         }
-        throw FirmwareError(.oneshotFailed, "no gdbstub on port \(port)")
+        throw FirmwareError(.oneshotFailed, "no gdbstub at \(path)")
     }
 
     deinit { close(fd) }

@@ -36,17 +36,25 @@ struct DeviceOptionsTests {
                 link: { nil },
                 requestLocalNetworkAccess: {}
             )
-            #expect(options.chooseDebugPort(booting: true) == nil && options.lldbAttachCommand == nil, "off by default")
-            options.toggleDebugPort()
-            #expect(options.debugPortEnabled && DeviceSettings.load(directory).debugPort == true)
-            #expect(options.chooseDebugPort(booting: false) == nil, "no boot, no port")
-            let port = try #require(options.chooseDebugPort(booting: true))
             #expect(
-                options.debugPort == port
-                    && options.lldbAttachCommand == DebugPort.lldbCommand(board: "n72", port: port)
+                options.chooseDebugSocket(booting: true) == nil && options.lldbAttachCommand == nil,
+                "off by default"
             )
             options.toggleDebugPort()
-            #expect(options.debugPort == port, "read at each start: this boot keeps its port")
+            #expect(options.debugPortEnabled && DeviceSettings.load(directory).debugPort == true)
+            #expect(options.chooseDebugSocket(booting: false) == nil, "no boot, no socket")
+            let socket = try #require(options.chooseDebugSocket(booting: true))
+            #expect(socket.hasPrefix(NSTemporaryDirectory()) && socket.hasSuffix(".sock"), "the user's own TMPDIR")
+            #expect(
+                options.debugSocket == socket
+                    && options.lldbAttachCommand == DebugPort.lldbCommand(board: "n72", socket: socket)
+            )
+            options.toggleDebugPort()
+            #expect(options.debugSocket == socket, "read at each start: this boot keeps its socket")
+            // The next start's socket replaces the last one's file.
+            FileManager.default.createFile(atPath: socket, contents: nil)
+            #expect(options.chooseDebugSocket(booting: true) == nil)
+            #expect(!FileManager.default.fileExists(atPath: socket))
         }
     }
 

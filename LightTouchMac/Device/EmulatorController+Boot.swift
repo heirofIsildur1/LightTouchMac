@@ -103,9 +103,9 @@ extension EmulatorController {
         var config = preparedBootConfiguration(hardware: hardware)
         config?.webProxy = proxy.endpoint
         config?.storageProof = admittedStorage
-        if let port = options.chooseDebugPort(booting: config != nil) {
-            config?.argv += DebugPort.arguments(port: port)
-            logEvent("debug port: QEMU gdbstub on 127.0.0.1:\(port)")
+        if let socket = options.chooseDebugSocket(booting: config != nil) {
+            config?.argv += DebugPort.arguments(socket: socket)
+            logEvent("debug port: QEMU gdbstub at \(socket)")
         }
         if config != nil {
             bootSettings = nextBootSettings

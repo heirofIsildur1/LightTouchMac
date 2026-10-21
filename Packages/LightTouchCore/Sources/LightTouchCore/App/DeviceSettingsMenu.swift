@@ -1,3 +1,5 @@
+import HostRuntime
+
 /// The app-wide device settings in the Device menu (AppDelegate's items: Attach to Local Network, Rotate
 /// Automatically, Debug Port…, Copy lldb Command, Connect to the Internet) for the device they apply to.
 public struct DeviceSettingsMenu {
@@ -9,8 +11,8 @@ public struct DeviceSettingsMenu {
         public var autoRotateEnabled = true
         /// The switch, for the next start.
         public var debugPortEnabled = false
-        /// The port this boot listens on.
-        public var debugPort: Int?
+        /// The socket this boot's gdbstub listens on.
+        public var debugSocket: String?
         public var lldbAttachCommand: String?
         /// Whether this boot has the Mac's network.
         public var network = true
@@ -74,14 +76,14 @@ public struct DeviceSettingsMenu {
                 isEnabled: device?.isRunning == true,
                 isOn: enabled,
                 toolTip: device.flatMap {
-                    enabled != ($0.debugPort != nil) ? "Takes effect the next time the \($0.shortName) starts." : nil
+                    enabled != ($0.debugSocket != nil) ? "Takes effect the next time the \($0.shortName) starts." : nil
                 }
             )
         case .copyLLDBCommand:
             return Validation(
                 isEnabled: device?.lldbAttachCommand != nil,
-                toolTip: device?.debugPort.map {
-                    "QEMU's gdbstub is on 127.0.0.1:\($0). Replace KERNELCACHE and QEMU_IOS; see qemu-ios docs/guest-debug.md."
+                toolTip: device?.debugSocket.map {
+                    "QEMU's gdbstub is at \($0). Replace KERNELCACHE and QEMU_IOS; see qemu-ios docs/guest-debug.md."
                 }
             )
         case .internet:
@@ -100,19 +102,19 @@ public struct DeviceSettingsMenu {
 
 /// Device ▸ Debugging ▸ Debug Port…'s text: where the switch and this boot stand, and the commands that attach.
 public enum DebugPortText {
-    public static func state(shortName: String, enabled: Bool, port: Int?) -> String {
-        switch (enabled, port) {
-        case (true, let port?): "On, at 127.0.0.1:\(port)."
+    public static func state(shortName: String, enabled: Bool, socket: String?) -> String {
+        switch (enabled, socket) {
+        case (true, let socket?): "On, at \(socket)."
         case (true, nil): "On from the next time the \(shortName) starts."
-        case (false, let port?): "Off from the next start. Until then it’s at 127.0.0.1:\(port)."
+        case (false, let socket?): "Off from the next start. Until then it’s at \(socket)."
         case (false, nil): "Off."
         }
     }
 
-    /// (title, command) for the running port.
-    public static func commands(port: Int, lldbWithSymbols: String?) -> [(String, String)] {
-        [("lldb", "lldb -o 'gdb-remote 127.0.0.1:\(port)'")]
+    /// (title, command) for the running stub's socket.
+    public static func commands(socket: String, lldbWithSymbols: String?) -> [(String, String)] {
+        [("lldb", "lldb -o '\(DebugPort.lldbConnect(socket: socket))'")]
             + (lldbWithSymbols.map { [("lldb with kernel symbols", $0)] } ?? [])
-            + [("GDB", "gdb-multiarch -ex 'target remote 127.0.0.1:\(port)'")]
+            + [("GDB", "gdb-multiarch -ex 'target remote \(socket)'")]
     }
 }

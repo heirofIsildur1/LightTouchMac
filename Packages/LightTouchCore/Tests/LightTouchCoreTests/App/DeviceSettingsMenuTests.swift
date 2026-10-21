@@ -1,4 +1,5 @@
 import Foundation
+import HostRuntime
 import Testing
 
 @testable import LightTouchCore
@@ -88,31 +89,34 @@ struct DeviceSettingsMenuTests {
         func menu() -> DeviceSettingsMenu { DeviceSettingsMenu(device: device, desiredNetwork: true) }
         #expect(menu().validate(.debugPort) == .init(isEnabled: true, isOn: false))
         #expect(!menu().validate(.copyLLDBCommand).isEnabled)
-        #expect(DebugPortText.state(shortName: "iPod", enabled: false, port: nil) == "Off.")
+        #expect(DebugPortText.state(shortName: "iPod", enabled: false, socket: nil) == "Off.")
         device.debugPortEnabled = true
         #expect(
             menu().validate(.debugPort)
                 == .init(isEnabled: true, isOn: true, toolTip: "Takes effect the next time the iPod starts.")
         )
         #expect(
-            DebugPortText.state(shortName: "iPod", enabled: true, port: nil) == "On from the next time the iPod starts."
+            DebugPortText.state(shortName: "iPod", enabled: true, socket: nil)
+                == "On from the next time the iPod starts."
         )
-        device.debugPort = 4321
-        device.lldbAttachCommand = "lldb -o 'gdb-remote 127.0.0.1:4321' KERNELCACHE"
-        #expect(DebugPortText.state(shortName: "iPod", enabled: true, port: 4321) == "On, at 127.0.0.1:4321.")
-        let commands = DebugPortText.commands(port: 4321, lldbWithSymbols: device.lldbAttachCommand).map(\.1)
+        let socket = "/var/folders/xx/T/ltm-gdb-0a1b2c3d.sock"
+        device.debugSocket = socket
+        device.lldbAttachCommand = DebugPort.lldbCommand(board: "n72ap", socket: socket)
+        #expect(DebugPortText.state(shortName: "iPod", enabled: true, socket: socket) == "On, at \(socket).")
+        let commands = DebugPortText.commands(socket: socket, lldbWithSymbols: device.lldbAttachCommand).map(\.1)
         #expect(
-            commands.count == 3 && commands[0].contains("gdb-remote 127.0.0.1:4321")
+            commands.count == 3 && commands[0].contains("process connect unix-connect://\(socket)")
                 && commands[1] == device.lldbAttachCommand
-                && commands[2].contains("target remote 127.0.0.1:4321")
+                && commands[2].contains("target remote \(socket)")
         )
-        #expect(DebugPortText.commands(port: 4321, lldbWithSymbols: nil).count == 2)
+        #expect(!commands.joined().contains("127.0.0.1"), "no TCP anywhere")
+        #expect(DebugPortText.commands(socket: socket, lldbWithSymbols: nil).count == 2)
         #expect(
-            DebugPortText.state(shortName: "iPod", enabled: false, port: 4321).hasPrefix("Off from the next start.")
+            DebugPortText.state(shortName: "iPod", enabled: false, socket: socket).hasPrefix("Off from the next start.")
         )
         #expect(menu().validate(.debugPort).toolTip == nil)
         let copy = menu().validate(.copyLLDBCommand)
-        #expect(copy.isEnabled && copy.toolTip?.contains("127.0.0.1:4321") == true)
+        #expect(copy.isEnabled && copy.toolTip?.contains(socket) == true)
         device.debugPortEnabled = false
         #expect(menu().validate(.debugPort).toolTip == "Takes effect the next time the iPod starts.")
     }

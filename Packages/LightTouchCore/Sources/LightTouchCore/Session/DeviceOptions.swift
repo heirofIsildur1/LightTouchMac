@@ -36,19 +36,21 @@ import Observation
     }
 
     /// Debug port, per device (DeviceSettings.debugPort), off by default; read at each start. QEMU's gdbstub on a
-    /// free loopback port, `debugPort` while this boot has one (qemu-ios docs/guest-debug.md).
+    /// Unix socket only this user reaches, `debugSocket` while this boot has one (qemu-ios docs/guest-debug.md).
     public var debugPortEnabled: Bool { settings.value.debugPort ?? false }
     public func toggleDebugPort() {
         let enabled = !debugPortEnabled
         settings.change { $0.debugPort = enabled }
     }
-    public private(set) var debugPort: Int?
-    /// This boot's port: a free one when the option is on and the boot is built, else none.
-    public func chooseDebugPort(booting: Bool) -> Int? {
-        debugPort = debugPortEnabled && booting ? DebugPort.freePort() : nil
-        return debugPort
+    public private(set) var debugSocket: String?
+    /// This boot's socket: a fresh one when the option is on and the boot is built, else none. The last boot's
+    /// socket file goes.
+    public func chooseDebugSocket(booting: Bool) -> String? {
+        if let old = debugSocket { unlink(old) }
+        debugSocket = debugPortEnabled && booting ? DebugPort.socketPath() : nil
+        return debugSocket
     }
-    public var lldbAttachCommand: String? { debugPort.map { DebugPort.lldbCommand(board: board, port: $0) } }
+    public var lldbAttachCommand: String? { debugSocket.map { DebugPort.lldbCommand(board: board, socket: $0) } }
 
     // MARK: Boot environment (app-wide)
 

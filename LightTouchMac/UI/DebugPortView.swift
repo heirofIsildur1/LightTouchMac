@@ -6,9 +6,9 @@ import SwiftUI
 
 struct DebugPortView: View {
     let shortName: String
-    /// The port this boot listens on; nil when it started without one.
-    let port: Int?
-    /// lldb with the kernel's symbols and XNU macros (EmulatorController.lldbAttachCommand), while there is a port.
+    /// The socket this boot's stub listens on; nil when it started without one.
+    let socket: String?
+    /// lldb with the kernel's symbols and XNU macros (EmulatorController.lldbAttachCommand), while there is a socket.
     let lldbWithSymbols: String?
     @State var enabled: Bool
     var onToggle: () -> Void
@@ -30,17 +30,17 @@ struct DebugPortView: View {
             }
             .toggleStyle(.switch)
 
-            Text(DebugPortText.state(shortName: shortName, enabled: enabled, port: port))
+            Text(DebugPortText.state(shortName: shortName, enabled: enabled, socket: socket))
                 .foregroundStyle(.secondary)
 
             Text(
-                "The emulator’s GDB remote stub. A debugger attached to it runs the \(shortName)’s CPU: it pauses the whole device and reads or changes its kernel and apps. Only this Mac can reach it, and it has no password."
+                "The emulator’s GDB remote stub. A debugger attached to it runs the \(shortName)’s CPU: it pauses the whole device and reads or changes its kernel and apps. Only your account on this Mac can reach it."
             )
             .fixedSize(horizontal: false, vertical: true)
 
-            if let port {
+            if let socket {
                 // FIXME: ugly. `id: \.0` ?? jesus christ
-                ForEach(DebugPortText.commands(port: port, lldbWithSymbols: lldbWithSymbols), id: \.0) {
+                ForEach(DebugPortText.commands(socket: socket, lldbWithSymbols: lldbWithSymbols), id: \.0) {
                     title,
                     command in
                     VStack(alignment: .leading, spacing: 4) {

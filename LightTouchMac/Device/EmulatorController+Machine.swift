@@ -13,7 +13,7 @@ extension EmulatorController {
     func toggleLocalNetwork() { options.toggleLocalNetwork() }
     var debugPortEnabled: Bool { options.debugPortEnabled }
     func toggleDebugPort() { options.toggleDebugPort() }
-    var debugPort: Int? { options.debugPort }
+    var debugSocket: String? { options.debugSocket }
     var lldbAttachCommand: String? { options.lldbAttachCommand }
 
     // MARK: - Guest package

@@ -152,11 +152,11 @@ extension SharedState {
         /// The Debug Port sheet lays out at a real size with its commands. The menu items and the sheet's text are
         /// LightTouchCoreTests' DeviceSettingsMenuTests.
         @Test func debugPortSheet() {
-            let lldb = "lldb -o 'gdb-remote 127.0.0.1:4321' KERNELCACHE"
+            let lldb = "lldb -o 'process connect unix-connect:///var/folders/xx/T/ltm-gdb-0a1b2c3d.sock' KERNELCACHE"
             let sheet = NSHostingView(
                 rootView: DebugPortView(
                     shortName: "iPod",
-                    port: 4321,
+                    socket: "/var/folders/xx/T/ltm-gdb-0a1b2c3d.sock",
                     lldbWithSymbols: lldb,
                     enabled: true,
                     onToggle: {},

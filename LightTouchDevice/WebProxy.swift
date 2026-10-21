@@ -76,6 +76,16 @@ final class WebProxy: @unchecked Sendable {
     private var _localNetwork = true
     /// The egress is listening; without it URLSession has no way out and nothing is fetched.
     private let egressReady: Bool
+    /// The egress's credential: 128 random bits for this proxy's life, known only to its own URLSession.
+    static let egressUser = "light-touch"
+    private let egressAuthorization: String
+
+    /// In constant time: how long it takes says nothing about how much of the credential was right.
+    static func sameSecret(_ offered: String, _ secret: String) -> Bool {
+        let a = Array(offered.utf8)
+        let b = Array(secret.utf8)
+        return a.count == b.count && zip(a, b).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
+    }
 
     /// LTM_WEB_PROXY_TRACE set: one stderr line per request (`sessions proxy-trust`: did Safari's page come here).
     static let trace = ProcessInfo.processInfo.environment["LTM_WEB_PROXY_TRACE"] != nil
@@ -96,11 +106,15 @@ final class WebProxy: @unchecked Sendable {
         configuration.urlCredentialStorage = nil
         configuration.timeoutIntervalForRequest = 60
         // Every request URLSession makes, plain HTTP too, is a CONNECT to the egress. Without one it makes none.
+        // URLSession's proxy can only be host:port, so the egress is on loopback TCP, where any local process (another
+        // account's included) reaches it: it opens a CONNECT only with this session's secret (Proxy-Authorization).
+        let secret = (0..<4).map { _ in String(format: "%08x", arc4random()) }.joined()
+        egressAuthorization = "Basic " + Data("\(Self.egressUser):\(secret)".utf8).base64EncodedString()
         let (egress, port) = Self.egressSocket()
         if let port = NWEndpoint.Port(rawValue: port) {
-            configuration.proxyConfigurations = [
-                ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port))
-            ]
+            var proxy = ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port))
+            proxy.applyCredential(username: Self.egressUser, password: secret)
+            configuration.proxyConfigurations = [proxy]
         }
         egressReady = egress >= 0
         let queue = OperationQueue()
@@ -664,7 +678,16 @@ final class WebProxy: @unchecked Sendable {
         let client = Guest(fd: fd)
         defer { client.finish() }
         do {
-            let (method, target, _) = try readHead(client)
+            let (method, target, headers) = try readHead(client)
+            let offered = headers.first { $0.0.lowercased() == "proxy-authorization" }?.1 ?? ""
+            guard Self.sameSecret(offered, egressAuthorization) else {
+                // URLSession sends its credential when challenged.
+                _ = client.write(
+                    "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"light-touch\"\r\n"
+                        + "Content-Length: 0\r\n\r\n"
+                )
+                return
+            }
             guard method == "CONNECT" else { throw Reply(405, "CONNECT only") }
             let (host, port) = try Self.authority(target)
             guard let remote = NetworkPolicy.connect(try resolve(host, port)) else {
