@@ -34,7 +34,7 @@ func single(_ args: SingleCheck) -> Never {
 
     var single: [String: Any] = [
         "board": d, "base": base.url.path, "lockdownTZ": tools.services.path,
-        "launch": args.launch, "reboot": args.reboot, "install": install, "httpget": httpget(args.inputs).path,
+        "launch": args.launch, "reboot": args.reboot, "install": install, "httpget": httpget(args.inputs).path
     ]
     let homeReference = repository.appendingPathComponent("tests/sessions/matrix-refs/\(base.entryID)-home.png")
     if FileManager.default.fileExists(atPath: homeReference.path) { single["homeReference"] = homeReference.path }
@@ -62,7 +62,10 @@ func single(_ args: SingleCheck) -> Never {
     if args.killPersist { single["killPersist"] = true }
     if let upgrade = args.upgradeIPA { single["upgradeIPA"] = upgrade.path }
     // Every run records the guest's sound (never to the Mac's speakers): the lock sound is judged at every run.
-    single["audioWAV"] = (args.audioWAV ?? work.appendingPathComponent("guest.wav")).path
+    // In a folder of its own: a sandboxed helper is granted the WAV's folder, never the run's root (its library).
+    let wav = args.audioWAV ?? work.appendingPathComponent("audio/guest.wav")
+    try? FileManager.default.createDirectory(at: wav.deletingLastPathComponent(), withIntermediateDirectories: true)
+    single["audioWAV"] = wav.path
     let race = args.afcRace
     if let race {
         single["raceBoots"] = race

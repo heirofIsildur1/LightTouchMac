@@ -81,14 +81,17 @@ public struct WebProxyConfiguration: Codable, Equatable {
         try writeRouting(in: directory)
         try PropertyListFile.write(self, to: Self.preferencesFile(in: directory))
     }
-    /// What the helper serves (BootConfig.webProxy): this directory's routing, and a socket in the temporary
-    /// directory named for it (a Unix socket path stays under 104 bytes; the device directory may not).
+    /// What the helper serves (BootConfig.webProxy): this directory's routing, and a socket named for it in the
+    /// temporary directory or where a sandboxed helper reaches it (HelperSandbox; a Unix socket path stays under 104
+    /// bytes; the device directory may not).
     public static func endpoint(directory: URL) -> WebProxyEndpoint {
         let config = file(in: directory).path
         let hash = config.utf8.reduce(UInt64(14_695_981_039_346_656_037)) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }
         return WebProxyEndpoint(
             config: config,
-            socket: NSTemporaryDirectory() + "ltm-proxy-" + String(hash, radix: 16) + ".sock"
+            socket: HelperSandbox.socketPath(
+                "proxy-" + String(format: "%08x", UInt32(truncatingIfNeeded: hash)) + ".sock"
+            )
         )
     }
     /// The guest's 10.0.2.100:3128: slirp, in the helper, connects each guest connection to the helper's proxy

@@ -13,7 +13,7 @@ import HostRuntime
 nonisolated public enum DeviceLinkWire {
     /// Bumped on any incompatible change to the messages below, the status block
     /// layout or the Mach hello. The helper refuses a hello with another version.
-    public static let protocolVersion = 3
+    public static let protocolVersion = 4
     /// The helper's hello refusal when another helper holds the device's lease; the app shows it as is.
     public static let leaseRefusal = "This device is in use by another copy of Light Touch."
     /// Upper bound on one framed message, either direction. An agent request is
@@ -69,6 +69,9 @@ nonisolated public enum LinkCommand: Codable, Sendable, Equatable {
     /// Hidden, or with the guest's display asleep, the helper publishes frames at a few Hz and lets the Mac
     /// idle-sleep; shown again, the next frame goes at once. Until the first one, shown.
     case screenVisible(Bool)
+    /// A sandboxed helper's grants for what comes next on the link (a boot, a snapshot), issued to its pid
+    /// (HostRuntime SandboxExtension).
+    case sandboxExtensions([String])
 }
 
 nonisolated public enum LinkRequest: Codable, Sendable, Equatable {

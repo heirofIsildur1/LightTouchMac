@@ -39,7 +39,7 @@ enum N72Keybag {
         chmod(nor.path, 0o644)
         // The stub on a Unix socket only this user reaches (HostRuntime.DebugPort), named before QEMU binds it: no
         // free-port pick to race, nothing on TCP.
-        let socket = DebugPort.socketPath("ltm-keybag")
+        let socket = DebugPort.socketPath("keybag")
         defer { unlink(socket) }
         let file = { (n: String) in Preparer.esc(out.appendingPathComponent(n)) }
         Machines.helper = helper
@@ -51,7 +51,7 @@ enum N72Keybag {
                 "\(hardware.machine),bootrom=\(Preparer.esc(bootrom))", "nand=\(file("nand"))",
                 "nor=\(file("nor.bin"))",
                 "nor-rw=\(Preparer.esc(nor))", "direct-iboot=\(file("iBoot.bin"))",
-                "gid-blobs=\(file("gid-blobs.bin"))", "boot-args=",
+                "gid-blobs=\(file("gid-blobs.bin"))", "boot-args="
             ]
             .joined(separator: ",") + BootRecipe.options(N72Board.machine)
         let argv =
@@ -59,7 +59,7 @@ enum N72Keybag {
                 "LightTouchDevice", "-M", machine, "-m", "128M", "-display", "none", "-audio", "driver=none",
                 "-monitor",
                 "none",
-                "-serial", "file:\(serial.path)",
+                "-serial", "file:\(serial.path)"
             ] + DebugPort.arguments(socket: socket) + ["-S"]
         let kc = try Data(contentsOf: dec.appendingPathComponent("kernelcache.mach"))
         let image = try Data(contentsOf: rd)
@@ -73,6 +73,8 @@ enum N72Keybag {
             stop: "panic(",
             timeout: 300,
             work: work,
+            // the base being built (its NAND is booted in place), and the SecureROM's folder
+            grants: [.init(out, .readWrite), .init(bootrom.deletingLastPathComponent(), .read)],
             log: log
         ) {
             note.text = try handoff(GDBRemote(socket: socket), kernelcache: kc, ramdisk: image)

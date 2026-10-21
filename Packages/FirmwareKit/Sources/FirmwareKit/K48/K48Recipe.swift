@@ -503,6 +503,8 @@ final class K48Board: Board {
             stopPattern: stopPattern,
             timeout: timeout,
             work: c.work,
+            // the base being built: the store, booted in place, and its NOR, iBoot or kboot and gid blobs
+            grants: [.init(c.o.out, .readWrite)],
             log: c.log
         )
     }

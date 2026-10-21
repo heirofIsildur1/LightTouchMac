@@ -22,14 +22,21 @@ struct ReleaseAppStaticTests {
         #expect(result.succeeded, "\(result.error)")
     }
 
+    /// The helper's entitlements are exactly its build's (LightTouchDevice-Sandbox.entitlements when the release is
+    /// built with LTM_HELPER_SANDBOX=YES), and the app carries the helper's app group exactly when the helper does.
     @Test func everyExecutableIsHardenedUniversalAndEntitledAsDeclared() throws {
-        let qemu =
+        let sandbox = helperSandbox
+        func entitlements(_ name: String) throws -> NSDictionary {
             try PropertyListSerialization.propertyList(
-                from: Data(
-                    contentsOf: repository.appendingPathComponent("Configuration/LightTouchDevice.entitlements")
-                ),
+                from: Data(contentsOf: repository.appendingPathComponent("Configuration/\(name).entitlements")),
                 format: nil
             ) as! NSDictionary
+        }
+        let qemu = try entitlements(sandbox ? "LightTouchDevice-Sandbox" : "LightTouchDevice")
+        let appEntitlements: NSDictionary =
+            sandbox
+            ? try entitlements("LightTouchMac-Sandbox")
+            : ["com.apple.security.personal-information.location": true]
         let binaries = ReleaseApp.binaries(in: app)
         #expect(binaries.count > 5)
         let resources = binaries.filter { $0.path.hasPrefix(contents.appendingPathComponent("Resources").path + "/") }
@@ -56,7 +63,7 @@ struct ReleaseAppStaticTests {
             let want: NSDictionary =
                 switch binary.lastPathComponent {
                 case "LightTouchDevice": qemu
-                case "LightTouch": ["com.apple.security.personal-information.location": true]
+                case "LightTouch": appEntitlements
                 // as Sparkle signs it; the export keeps it
                 case "Autoupdate": ["com.apple.application-identifier": "org.sparkle-project.Sparkle.Autoupdate"]
                 default: NSDictionary()
@@ -69,6 +76,11 @@ struct ReleaseAppStaticTests {
     @Test func noBinaryNamesADebugOverride() throws {
         let found = try ReleaseApp.overrideNames(in: ReleaseApp.binaries(in: app))
         #expect(found.isEmpty, "\(found)")
+        // DeviceLink's negative control (a Debug helper spawned with no sandbox grants)
+        for binary in ReleaseApp.binaries(in: app) {
+            let data = try Data(contentsOf: binary, options: .alwaysMapped)
+            #expect(data.range(of: Data("LTM_HELPER_NO_GRANTS".utf8)) == nil, "\(binary.lastPathComponent)")
+        }
     }
 
     @Test func hostCodeLoadsOnlyFromTheBundleAtTheAppsMinimum() throws {

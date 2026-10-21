@@ -32,7 +32,7 @@ func proxyTrust(_ args: ProxyTrustCheck) -> Never {
     }
     config["proxy"] = [
         "board": b, "base": base.url.path, "itpack": packs.appendingPathComponent("armv6.itpack").path,
-        "httpget": httpget(args.inputs).path, "url": url,
+        "httpget": httpget(args.inputs).path, "url": url
     ]
     let (e, status) = sessionDriver(
         config,
@@ -243,7 +243,7 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
     guard let loopback = LANProbe(address: "127.0.0.1") else { die("could not listen on 127.0.0.1") }
     let loopbackURLs = [
         "10.0.2.2:\(loopback.port)/nat", "0.0.0.0:\(loopback.port)/zero",
-        "[::ffff:127.0.0.1]:\(loopback.port)/mapped", "localtest.me:\(loopback.port)/name",
+        "[::ffff:127.0.0.1]:\(loopback.port)/mapped", "localtest.me:\(loopback.port)/name"
     ].map { "http://" + $0 }
 
     // The shim, for every architecture a child may be (system tools are arm64e), and a helper copy it can load into.
@@ -257,17 +257,8 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
             log: work.appendingPathComponent("shim.log")
         ) == 0
     else { die("could not build the socket shim") }
-    let observed = work.appendingPathComponent("LightTouchDevice-observed")
-    let entitlements = work.appendingPathComponent("helper.entitlements")
-    try? FileManager.default.copyItem(at: tools.helper, to: observed)
-    try? output("/usr/bin/codesign", ["-d", "--entitlements", "-", "--xml", tools.helper.path]).write(
-        to: entitlements,
-        atomically: true,
-        encoding: .utf8
-    )
-    guard run("/usr/bin/codesign", ["-f", "-s", "-", "--entitlements", entitlements.path, observed.path]) == 0 else {
-        die("could not sign the helper copy")
-    }
+    // ad-hoc and without the hardened runtime, so DYLD_INSERT_LIBRARIES reaches it
+    let observed = helperCopy(tools.helper, named: "observed", in: work, options: [])
     var t = tools
     t.helper = observed
     t.requirement = nil
@@ -291,9 +282,11 @@ func localNetworkCheck(_ args: LocalNetworkCheck) -> Never {
         "itpack": tools.guest.appendingPathComponent("guest-tools/armv6.itpack").path,
         "httpget": httpget(args.inputs).path, "url": "", "lan": lanURL, "loopback": loopbackURLs,
         "internet": args.internet,
-        "dns": args.dns, "domain": args.domain,
+        "dns": args.dns, "domain": args.domain
     ]
-    let sockets = work.appendingPathComponent("sockets.log")
+    // In a folder of its own: a sandboxed helper is granted the log's folder, never the run's root (its library).
+    let sockets = work.appendingPathComponent("sockets/sockets.log")
+    try? FileManager.default.createDirectory(at: sockets.deletingLastPathComponent(), withIntermediateDirectories: true)
     let (e, status) = sessionDriver(
         config,
         work: work,
