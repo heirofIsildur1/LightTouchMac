@@ -97,6 +97,11 @@ func proxyTrust(_ args: ProxyTrustCheck) -> Never {
     let native = (try? String(contentsOf: work.appendingPathComponent("\(b)/native.log"), encoding: .utf8)) ?? ""
     let seen = native.split(separator: "\n").first { $0.contains("web-proxy: ") && $0.contains(host) }
     r.check(seen != nil, "\(b): Safari's page (\(host)) came through the proxy")
+    let forks = e.one("forks")
+    r.check(
+        forks.bool("watched") && forks.int("count") == 0,
+        "\(b): the helper started no process for the proxy's connections (forks: \(forks.int("count") ?? -1))"
+    )
     r.check(
         e.one("quit").bool("exited"),
         "\(b): clean halt, helper exited in \(format(e.one("quit").double("seconds"))) s"

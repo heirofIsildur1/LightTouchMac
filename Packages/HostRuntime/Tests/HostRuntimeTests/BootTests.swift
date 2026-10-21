@@ -34,14 +34,14 @@ struct BootTests {
                 guestPackage: nil,
                 serial: "null",
                 audio: [],
-                netdev: "user,id=wifi0,guestfwd=tcp:10.0.2.100:3128-cmd:nc",
+                netdev: "user,id=wifi0,guestfwd=tcp:10.0.2.100:3128-unix-connect:/p",
                 cellular: .noSIM
             )
             let m = config.argv[config.argv.firstIndex(of: "-M")! + 1]
             let radio = board != .k48
             #expect(m.hasPrefix(machine + ","))
             #expect(m.contains(",baseband=on") == radio && m.contains(",imei=\(imei)") == radio)
-            #expect(config.argv.contains("user,id=cell0,guestfwd=tcp:10.0.2.100:3128-cmd:nc") == radio)
+            #expect(config.argv.contains("user,id=cell0,guestfwd=tcp:10.0.2.100:3128-unix-connect:/p") == radio)
             #expect(config.argv.contains("ios-baseband.sim-present=off") == radio)
         }
     }
@@ -600,9 +600,11 @@ extension BootTests {
                 guestPackage: nil,
                 serial: "null",
                 audio: [],
-                netdev: "user,id=wifi0,guestfwd=tcp:10.0.2.100:3128-cmd:x"
+                netdev: "user,id=wifi0,guestfwd=tcp:10.0.2.100:3128-unix-connect:/x"
             )
-            #expect(proxied.argv.contains("user,id=cell0,guestfwd=tcp:10.0.2.100:3128-cmd:x") == (board == .m68))
+            #expect(
+                proxied.argv.contains("user,id=cell0,guestfwd=tcp:10.0.2.100:3128-unix-connect:/x") == (board == .m68)
+            )
         }
     }
 

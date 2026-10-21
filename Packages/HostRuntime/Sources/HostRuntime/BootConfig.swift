@@ -57,7 +57,7 @@ public nonisolated struct BootConfig: Codable, Sendable, Equatable {
 public nonisolated struct WebProxyEndpoint: Codable, Sendable, Equatable {
     /// The device's web-proxy.conf: routing read per connection; the CA, cache and location beside it.
     public var config: String
-    /// The Unix socket the guestfwd's `nc -U` reaches.
+    /// The Unix socket the guestfwd connects each guest connection to.
     public var socket: String
     public init(config: String, socket: String) {
         self.config = config

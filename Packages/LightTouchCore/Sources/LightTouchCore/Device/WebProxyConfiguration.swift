@@ -91,10 +91,9 @@ public struct WebProxyConfiguration: Codable, Equatable {
             socket: NSTemporaryDirectory() + "ltm-proxy-" + String(hash, radix: 16) + ".sock"
         )
     }
-    /// The guest's 10.0.2.100:3128: slirp runs one `nc` per connection into the helper's proxy (WebProxy.swift).
+    /// The guest's 10.0.2.100:3128: slirp, in the helper, connects each guest connection to the helper's proxy
+    /// socket (WebProxy.swift); no process per connection. A comma in the path is doubled, as QEMU's options escape it.
     public static func guestForward(socket: String) -> String {
-        func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
-        return ",guestfwd=tcp:10.0.2.100:3128-cmd:"
-            + ("/usr/bin/nc -U " + quote(socket)).replacingOccurrences(of: ",", with: ",,")
+        ",guestfwd=tcp:10.0.2.100:3128-unix-connect:" + socket.replacingOccurrences(of: ",", with: ",,")
     }
 }
