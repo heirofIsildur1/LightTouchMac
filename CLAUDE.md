@@ -36,7 +36,8 @@ what to do and not do on a shared Mac.
 - Before booting emulators, `scripts/host-ready` prints `READY …` (exit 0) or `WAIT <why>` (exit 1: load, all three
   emulator slots taken, or disk); `sessions` holds a slot for its run and waits for one when none is free.
 - A new test must fail with the fix reverted; say so in the commit.
-- Before committing Swift: `swift-format lint -r <changed paths>` stays quiet.
+- The pre-commit hook formats staged Swift and C (`scripts/format --staged`; `scripts/bootstrap` turns it on). When
+  it refuses a partly staged file, run the command it prints. `xcrun swift-format lint -r <changed paths>` stays quiet.
 
 ## Commits
 

@@ -9,6 +9,10 @@
 # (scripts/build-*.sh, qemu-ios contrib/export-guest-artifacts.sh) and the pins (build-support/sources.json).
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The pre-commit formatter (scripts/hooks/pre-commit) and blame's skip list of reformat commits (optional: a worktree
+# on an older branch has none, and blame would fail without the file).
+git -C "$ROOT" config core.hooksPath scripts/hooks &&
+    git -C "$ROOT" config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'
 missing=0
 need() { missing=1; printf 'missing: %s\n    %s\n' "$1" "$2"; }
 

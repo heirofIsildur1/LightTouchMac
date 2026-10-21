@@ -32,11 +32,12 @@ lines = [
     "",
     "private let declaredMachineOptions: [String: Set<String>] = [",
 ]
+# No trailing commas, as swift-format writes it (.swift-format), so the hook leaves the file as written here.
+entries = []
 for (board, _), properties in zip(machines, replies):
-    lines.append(f'    "{board}": [')
-    lines += [f'        "{name}",' for name in sorted({p["name"] for p in properties} - {"type"})]
-    lines.append("    ],")
-lines.append("]")
+    names = sorted({p["name"] for p in properties} - {"type"})
+    entries.append(f'    "{board}": [\n' + ",\n".join(f'        "{name}"' for name in names) + "\n    ]")
+lines += [",\n".join(entries), "]"]
 open(out, "w").write("\n".join(lines) + "\n")
 EOF
 echo "$OUT"
