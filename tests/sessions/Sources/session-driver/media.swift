@@ -8,8 +8,16 @@ import HostServiceClient
 // from the databases Music and Photos read: before the import, after it, and with Music open on every boot.
 
 /// Each file prepared, staged and committed as the app's MediaImport does; emits `mediaImport`. The songs' and
-/// videos' titles, for the library read.
-@MainActor func importMedia(_ d: Device, agent: GuestAgent, files: [String], tools: String) async -> [String] {
+/// videos' titles, for the library read. A song's cover on 3.x and 4.0 to 4.2.1, where the purchase-folder insert takes
+/// it, is counted in the artwork cache that version's MusicLibrary reads (`coverRows`): 3.x's one in Purchases, 4.x's
+/// beside the song (8C148 -[MLTrack mobileArtworkCacheFolder]); 5.x on keep covers in the library itself.
+@MainActor func importMedia(
+    _ d: Device,
+    agent: GuestAgent,
+    files: [String],
+    tools: String,
+    version: String
+) async -> [String] {
     var titles: [String] = []
     let guest = GuestServices(agent: agent)
     for file in files {
@@ -34,6 +42,12 @@ import HostServiceClient
                 localHelper: { local },
                 metadata: metadata
             )
+            if case .song(let song) = media, song.artwork != nil,
+                let cache = purchaseArtworkCache(version: version, staging: id)
+            {
+                fields["coverCache"] = cache
+                fields["coverRows"] = await artworkRows(d, agent: agent, cache: cache)
+            }
         } catch let error as GuestAgentError {
             fields["ok"] = false
             // The helper's last line names the refusal; the whole output goes beside the run's logs.
@@ -61,6 +75,35 @@ import HostServiceClient
     }
     try? await Task.sleep(for: .seconds(20))
     emit("musicOpened", ["device": d.name, "app": opened, "front": (try? await agent.frontmost().bundleID) ?? ""])
+}
+
+/// The folder of the ArtworkCache MusicLibrary reads a purchase's cover from on this version, or nil where covers
+/// don't go through it (5.x on, and 4.3's ML3 importer).
+func purchaseArtworkCache(version: String, staging: String) -> String? {
+    let parts = version.split(separator: ".").compactMap { Int($0) }
+    switch (parts.first ?? 0, parts.count > 1 ? parts[1] : 0) {
+    case (3, _): return "/var/mobile/Media/Purchases/MobileArtworkDB"
+    case (4, 0...2): return "/var/mobile/Media/LightTouch/\(staging)/MobileArtworkDB"
+    default: return nil
+    }
+}
+
+/// The rows of `cache`'s artwork.db (each a rendered format of a cover), read on the Mac; 0 when there is none.
+@MainActor func artworkRows(_ d: Device, agent: GuestAgent, cache: String) async -> Int {
+    guard let data = try? await agent.get(cache + "/artwork.db", limit: 16 << 20) else { return 0 }
+    let local = d.dir.appendingPathComponent("artwork-\(UUID().uuidString).db")
+    try? data.write(to: local)
+    defer { try? FileManager.default.removeItem(at: local) }
+    let p = Process()
+    let out = Pipe()
+    p.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+    p.arguments = [local.path, "SELECT count(*) FROM artwork"]
+    p.standardOutput = out
+    p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return 0 }
+    let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    p.waitUntilExit()
+    return Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
 }
 
 /// Songs and videos per title in the music library (ML3's MediaLibrary.sqlitedb from 5.x, else iTunes Library.itlp's

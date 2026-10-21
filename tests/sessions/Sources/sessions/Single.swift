@@ -619,6 +619,13 @@ func judgeMedia(_ r: Report, _ d: String, events: Events, reboot: Bool, major: I
             "\(d): \(e.string("destination") ?? "?") imports “\(e.string("title") ?? e.string("file") ?? "?")” in "
                 + "\(format(e.double("seconds"), 0)) s" + (e.string("error").map { ": \($0)" } ?? "")
         )
+        if let cache = e.string("coverCache") {
+            r.check(
+                (e.int("coverRows") ?? 0) > 0,
+                "\(d): “\(e.string("title") ?? "?")”'s cover is in the artwork cache Music reads it from (\(cache): "
+                    + "\(e.int("coverRows") ?? 0) formats)"
+            )
+        }
     }
     let counts = events.find("mediaCount", ["device": d])
     guard let before = counts.first(where: { $0.string("stage") == "before" }) else {

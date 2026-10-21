@@ -589,7 +589,13 @@ nonisolated enum WiFiProbe {
         if let media = s.media, asks {
             if generation == 1 {
                 await mediaCounts(d, agent: guestAgent, generation: generation, stage: "before", titles: [])
-                mediaTitles = await importMedia(d, agent: guestAgent, files: media, tools: s.mediaTools ?? "")
+                mediaTitles = await importMedia(
+                    d,
+                    agent: guestAgent,
+                    files: media,
+                    tools: s.mediaTools ?? "",
+                    version: lock?.productVersion ?? ""
+                )
                 await mediaCounts(d, agent: guestAgent, generation: generation, stage: "after", titles: mediaTitles)
             }
             // Music loads (and checks) the library; on 4.x it deleted one whose signature didn't hold.
