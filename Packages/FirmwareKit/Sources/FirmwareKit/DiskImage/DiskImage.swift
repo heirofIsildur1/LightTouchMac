@@ -41,7 +41,8 @@ public enum DiskImage {
 
     // MARK: argv (pure)
 
-    /// `mount` false: attach the device only (nobrowse). `mount` true: mount where Finder shows it, owners off.
+    /// `mount` false: attach the device only (nobrowse). `mount` true: mount where Finder shows it, owners off,
+    /// nosuid and nodev (hdiutil mounts a disk image's volumes so itself).
     static func attachCommand(_ image: URL, readOnly: Bool, mount: Bool, backend: Backend) -> [String] {
         switch backend {
         case .hdiutil:
@@ -49,7 +50,7 @@ public enum DiskImage {
                 + (mount ? ["-owners", "off", "-noverify", "-noautoopen"] : ["-nomount", "-nobrowse"]) + [image.path]
         case .diskutil:
             return ["/usr/sbin/diskutil", "image", "attach", "--plist"] + (readOnly ? ["--readOnly"] : [])
-                + (mount ? ["--mountOptions", "noowners"] : ["--noMount", "--nobrowse"]) + [image.path]
+                + (mount ? ["--mountOptions", "noowners,nosuid,nodev"] : ["--noMount", "--nobrowse"]) + [image.path]
         }
     }
 

@@ -36,7 +36,7 @@ public nonisolated enum N45Migration {
                 _ = try N45Board.seedSystemConfiguration(m)
                 let rootHome = N45Board.rootLibrary + "/Preferences/SystemConfiguration"
                 if N45Board.scPrefs(m) != rootHome {
-                    try? FileManager.default.removeItem(at: m.appendingPathComponent(rootHome))
+                    try? DevicePath.remove(m.appendingPathComponent(rootHome))
                 }
             }
             try await StoppedVolumeEdit.commit(device: device, id: session.id, policy: policy, log: log)
@@ -66,7 +66,7 @@ public nonisolated enum N45Migration {
             let board = (try? DeviceRecord.object(bytes))?["board"] as? String,
             HostRuntime.Board(rawValue: board)?.soc == .s5l8900,
             let lock = (try? DeviceLock.read(base: paths.base)) ?? nil, let recipe = lock.recipeVersion,
-            !FileManager.default.fileExists(atPath: paths.overlay.appendingPathComponent(stamp).path)
+            !FileManager.default.fileExists(atPath: paths.overlay.appendingPathComponent(stamp).path)  // host file
         else { return nil }
         if let step = FirmwareWire.admissionRecipeSteps[board]?[recipe] { return step }
         let version = lock.entry?["content"]?["version"]?.string ?? ""

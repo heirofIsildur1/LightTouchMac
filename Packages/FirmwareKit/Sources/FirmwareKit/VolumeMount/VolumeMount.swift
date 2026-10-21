@@ -3,15 +3,17 @@
 // The disk-image operations (attach, detach, resize) go through DiskImage; mount/unmount, newfs_hfs and
 // fsck_hfs are run here.
 //
-//   try await VolumeMount.withMounted(image, at: mountPoint) { root in ... }   // attach + diskutil mount (noowners,
-//                                                                        // nobrowse); then junk removed, unmount
+//   try await VolumeMount.withMounted(image, at: mountPoint) { root in ... }   // attach + diskutil mount (nobrowse,
+//                                                                        // nosuid, nodev); then junk removed, unmount
 //                                                                        // (retried), fsck_hfs -fn, detach
 //   try await VolumeMount.makeHFS(image, size: bytes, name: "Data")            // sparse, case-sensitive, journaled
 //   try await VolumeMount.grow(image, toBytes: n)                              // resize + alternate header fix
 //
 // The mount is noowners: everything written lands as the host user and chown is refused, so owners are
 // patched offline afterwards with HFSPlusVolume.setOwner. Write files in place (never replace them by
-// rename) so an existing file keeps its catalog record and Apple's owner.
+// rename) so an existing file keeps its catalog record and Apple's owner. A device's volume holds what the device
+// wrote, links included: files on it are read and written through DevicePath, from the root these hand out (its
+// real path), and it is mounted nosuid and nodev.
 
 import Foundation
 
@@ -31,13 +33,14 @@ public enum VolumeMount {
     ) async throws -> T {
         try Task.checkCancellation()
         try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: true)
+        let mountPoint = try DevicePath.real(mountPoint)
         let journal = (try? HFSPlusVolume(image).journalSnapshot()) ?? nil
         let dev = try await attach(image)
         let value: T
         do {
             try await run(
                 "/usr/sbin/diskutil",
-                ["mount", "-mountOptions", "nobrowse", "-mountPoint", mountPoint.path, dev]
+                ["mount", "-mountOptions", "nobrowse,nosuid,nodev", "-mountPoint", mountPoint.path, dev]
             )
             try Task.checkCancellation()
             value = try await body(mountPoint)
@@ -105,11 +108,12 @@ public enum VolumeMount {
 
     /// Attaches `image` and mounts it at `mountPoint` (created if needed) out of Finder's sidebar and Desktop
     /// (nobrowse), owners ignored, for a Finder window opened on the folder (hiddenOptions). Detaching the device
-    /// unmounts it.
+    /// unmounts it. The mount point it returns is the folder's real path (DevicePath).
     public static func attachHidden(_ image: URL, at mountPoint: URL, readOnly: Bool = false) async throws
         -> DiskImage.Attached
     {
         try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: true)
+        let mountPoint = try DevicePath.real(mountPoint)
         let dev = try await DiskImage.attach(image, readOnly: readOnly).device
         do {
             do {
@@ -131,6 +135,19 @@ public enum VolumeMount {
             throw error
         }
         return DiskImage.Attached(device: dev, mountPoint: mountPoint.path)
+    }
+
+    /// `image` attached hidden on the folder `path` of the device volume mounted at `volume` (a data volume on its
+    /// system volume's private/var): a folder on that volume, reached without following a link, never one a link
+    /// there leads to.
+    public static func attachHidden(_ image: URL, on volume: String, at path: String, readOnly: Bool = false)
+        async throws -> DiskImage.Attached
+    {
+        let folder = URL(fileURLWithPath: volume).appendingPathComponent(path)
+        guard DevicePath.isDirectory(folder) else {
+            throw FirmwareError(.unsupported, "\(folder.path): not a folder on the volume (links are not followed)")
+        }
+        return try await attachHidden(image, at: folder, readOnly: readOnly)
     }
 
     /// Detaches `dev`, retrying; with `force`, the retries force it.

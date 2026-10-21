@@ -77,13 +77,22 @@ public enum TrustStore1x {
         return Data(out)
     }
 
-    /// Adds (or replaces) `certificate` as an anchor in the trust store at `store`.
+    /// Adds (or replaces) `certificate` as an anchor in the trust store at `store` on the device's volume. SQLite
+    /// edits a host copy (DevicePath.read), written back in place (DevicePath.write), so it opens nothing there.
     static func addAnchor(_ certificate: Data, to store: URL) throws {
+        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("TrustStore-\(UUID().uuidString)")
+        try DevicePath.read(store).write(to: copy)  // host file
+        defer { for suffix in ["", "-journal"] { unlink(copy.path + suffix) } }  // host file
+        try addAnchor(certificate, copy: copy, name: store.path)
+        try DevicePath.write(Data(contentsOf: copy), store)  // host file
+    }
+
+    private static func addAnchor(_ certificate: Data, copy: URL, name: String) throws {
         let subject = try normalizedSubject(certificate)
         var db: OpaquePointer?
-        guard sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
+        guard sqlite3_open_v2(copy.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {  // host file
             sqlite3_close(db)
-            throw FirmwareError(.unsupported, "\(store.path): not a trust store")
+            throw FirmwareError(.unsupported, "\(name): not a trust store")
         }
         defer { sqlite3_close(db) }
         var stmt: OpaquePointer?
@@ -95,7 +104,7 @@ public enum TrustStore1x {
                 &stmt,
                 nil
             ) == SQLITE_OK
-        else { throw FirmwareError(.unsupported, "\(store.path): no tsettings table") }
+        else { throw FirmwareError(.unsupported, "\(name): no tsettings table") }
         defer { sqlite3_finalize(stmt) }
         let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
         for (i, blob) in [Data(Insecure.SHA1.hash(data: certificate)), subject, emptySettings, certificate].enumerated()
@@ -105,7 +114,7 @@ public enum TrustStore1x {
             }
         }
         guard sqlite3_step(stmt) == SQLITE_DONE else {
-            throw FirmwareError(.unsupported, "\(store.path): \(String(cString: sqlite3_errmsg(db)))")
+            throw FirmwareError(.unsupported, "\(name): \(String(cString: sqlite3_errmsg(db)))")
         }
     }
 
@@ -123,7 +132,7 @@ public enum TrustStore1x {
     ) async throws -> Bool {
         let sha1 = Insecure.SHA1.hash(data: certificate).hexString
         func storageKey() throws -> String? {
-            let record = try DeviceRecord.object(Data(contentsOf: DeviceRecord.url(device)))
+            let record = try DeviceRecord.object(Data(contentsOf: DeviceRecord.url(device)))  // host file
             guard HostRuntime.Board(rawValue: record["board"] as? String ?? "")?.soc == .s5l8900 else {
                 throw FirmwareError(.unsupported, "trust anchors are written into 1.x devices only")
             }
@@ -136,10 +145,10 @@ public enum TrustStore1x {
             return owner.paths?.overlay.appendingPathComponent(".trust-anchor")
         }
         let markerURL = device.appendingPathComponent(marker)
-        if let data = try? Data(contentsOf: markerURL),
+        if let data = try? Data(contentsOf: markerURL),  // host file
             let m = try? JSONSerialization.jsonObject(with: data) as? [String: String],
             m["sha1"] == sha1, m["key"] == (try storageKey()),
-            let stamp = try overlayStamp(), (try? String(contentsOf: stamp, encoding: .utf8)) == sha1
+            let stamp = try overlayStamp(), (try? String(contentsOf: stamp, encoding: .utf8)) == sha1  // host file
         {
             return false
         }
@@ -161,7 +170,7 @@ public enum TrustStore1x {
             withJSONObject: ["sha1": sha1, "key": try storageKey() ?? ""],
             options: [.sortedKeys]
         )
-        try record.write(to: markerURL, options: .atomic)
+        try record.write(to: markerURL, options: .atomic)  // host file
         return true
     }
 }

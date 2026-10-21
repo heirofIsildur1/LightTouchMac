@@ -477,10 +477,10 @@ extension DeviceServices {
                 var ages: [String: Double] = [:]
                 for report in reports {
                     ages[report.path] = now - (report.modified?.timeIntervalSince1970 ?? now)
-                    if let copyTo {
-                        try report.data.write(
-                            to: copyTo.appendingPathComponent((report.path as NSString).lastPathComponent)
-                        )
+                    // the device names the report: a plain name, made new in the folder (never through a link there)
+                    let name = (report.path as NSString).lastPathComponent
+                    if let copyTo, !name.isEmpty, !name.hasPrefix("."), !name.contains("/") {
+                        try report.data.write(to: copyTo.appendingPathComponent(name), options: .withoutOverwriting)
                     }
                 }
                 return ages

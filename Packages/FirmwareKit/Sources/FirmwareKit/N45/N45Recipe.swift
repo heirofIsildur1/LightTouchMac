@@ -63,17 +63,13 @@ final class N45Board: Board {
         var made: [String] = []
         for job in jobs.sorted() {
             let url = m.appendingPathComponent(SystemEdits.daemons + "/" + job)
-            guard
-                let d = (try? Data(contentsOf: url)).flatMap({
-                    try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
-                })
-            else { continue }
+            guard let d = DevicePath.dictionary(url) else { continue }
             for key in ["StandardOutPath", "StandardErrorPath"] {
                 guard let path = d[key] as? String, path.hasPrefix("/") else { continue }
                 var dir = ((path as NSString).deletingLastPathComponent as NSString).substring(from: 1)
                 if dir.hasPrefix("var/") { dir = "private/" + dir }
                 guard !dir.isEmpty, !made.contains(dir),
-                    !FileManager.default.fileExists(atPath: m.appendingPathComponent(dir).path)
+                    !DevicePath.exists(m.appendingPathComponent(dir))
                 else { continue }
                 try SystemEdits.mkdirs(m.appendingPathComponent(dir))
                 made.append(dir)
@@ -87,7 +83,7 @@ final class N45Board: Board {
     /// sleep, which Home or Hold wakes. Set in `prefs` (volume-relative) when SpringBoard names it; true if set.
     static func bakeNoIdleSleep(_ m: URL, prefs: String) throws -> Bool {
         let key = "SBDisableIdleSleep"
-        guard let sb = try? Data(contentsOf: m.appendingPathComponent(N72Board.springBoard), options: .alwaysMapped),
+        guard let sb = try? DevicePath.read(m.appendingPathComponent(N72Board.springBoard)),
             sb.range(of: Data((key + "\0").utf8)) != nil
         else { return false }
         try SystemEdits.seedPlist(m.appendingPathComponent(prefs)) { $0[key] = true }
@@ -98,10 +94,8 @@ final class N45Board: Board {
     /// Whose Library SpringBoard reads its preferences from: mobile (501) when its launchd job says so (1.1.3 on), else root.
     static func springBoardUser(_ m: URL) -> (library: String, uid: UInt32) {
         let job = m.appendingPathComponent(SystemEdits.daemons + "/com.apple.SpringBoard.plist")
-        let plist = (try? Data(contentsOf: job)).flatMap {
-            try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
-        }
-        return plist?["UserName"] as? String == "mobile" ? ("private/var/mobile/Library", 501) : (rootLibrary, 0)
+        return DevicePath.dictionary(job)?["UserName"] as? String == "mobile"
+            ? ("private/var/mobile/Library", 501) : (rootLibrary, 0)
     }
     static let openGLESExports = "opengles-1x.exports"
     /// Where configd keeps its SCPreferences. While everything runs as root (1.0 to 1.1.2), SystemConfiguration opens
@@ -140,9 +134,7 @@ final class N45Board: Board {
         }
         let wifi = m.appendingPathComponent(wifiPrefs)
         var known =
-            (try? Data(contentsOf: wifi)).flatMap {
-                try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
-            } ?? [:]
+            DevicePath.dictionary(wifi) as? [String: Any] ?? [:]
         if known["AllowEnable"] == nil { known["AllowEnable"] = wifiKnownNetwork["AllowEnable"] }
         let list = known["List of known networks"] as? [[String: Any]] ?? []
         if !list.contains(where: { $0["SSID_STR"] as? String == "qemu-ios" }) {
@@ -243,7 +235,7 @@ final class N45Board: Board {
 
     func bootFiles(_ c: Recipe.Context) throws {
         let ipsw = c.ipsw
-        let iboot = try Data(contentsOf: c.decFile("iBoot.bin"))
+        let iboot = try Data(contentsOf: c.decFile("iBoot.bin"))  // host file
         kcPath = try N72Board.kernelcachePath(iboot)
         guard let kc = try BuildComponents.load(ipsw, board: c.e.board)["KernelCache"] else {
             throw FirmwareError(.unsupported, "\(c.e.id): the IPSW names no KernelCache")
@@ -255,13 +247,13 @@ final class N45Board: Board {
             let body = try Apple8900.body(ipsw.read(n))
             images[try IMG2.Header(body).type] = body
         }
-        try N45NOR.build(identity: ident.filled("the identity"), images: images).write(to: c.file("nor.bin"))
-        try iboot.write(to: c.file("iBoot.bin"))
+        try N45NOR.build(identity: ident.filled("the identity"), images: images).write(to: c.file("nor.bin"))  // host file
+        try iboot.write(to: c.file("iBoot.bin"))  // host file
         derived = [
             "kernelcache_path": kcPath, "kernelcache_member": kcMember, "nor_images": N45NOR.order,
             "boot_args": N45NOR.bootArgs,
             "kernel": N72Board.firstMatch(
-                try Data(contentsOf: c.decFile("kernelcache.mach")),
+                try Data(contentsOf: c.decFile("kernelcache.mach")),  // host file
                 /Darwin Kernel Version [^\x00]+/
             ) ?? NSNull(),
             "iboot": N72Board.firstMatch(iboot, /iBoot-[0-9.]+/) ?? "?",
@@ -302,16 +294,15 @@ final class N45Board: Board {
         var owners: [(UInt32, String)] = [(0, kcPath), (0, SystemEdits.lockdownd)]
         let (activation, removed) = try await VolumeMount.withMounted(volume, at: c.work.appendingPathComponent("mnt"))
         { m -> (Activation.Result, [String]) in
-            let fm = FileManager.default
             let at = { (rel: String) in m.appendingPathComponent(rel) }
             try SystemEdits.put(Data(N72Board.fstabRW.utf8), at(SystemEdits.fstab))
             try SystemEdits.mkdirs(at(kcPath).deletingLastPathComponent())
             // 1.0 ships only the restore kernelcache in the IPSW (RestoreKernelCaches "kernelcache.restore.*");
             // its system volume carries the one iBoot boots, where iBoot loads it: kept.
-            if !(Self.restoreOnly(kcMember) && fm.fileExists(atPath: at(kcPath).path)) {
+            if !(Self.restoreOnly(kcMember) && DevicePath.exists(at(kcPath))) {
                 try c.ipsw.extract(kcMember, to: at(kcPath))
             }
-            let jobs = try fm.contentsOfDirectory(atPath: at(SystemEdits.daemons).path).filter {
+            let jobs = try DevicePath.contents(at(SystemEdits.daemons)).filter {
                 $0.hasSuffix(".plist")
             }
             try c.fit.check(Self.keptDaemonsFit(jobs), required: false, outcome: "the rest removed as planned")
@@ -320,7 +311,7 @@ final class N45Board: Board {
                 recipe.options["appsync"] == true ? "the 1.x recipe has no AppSync" : "appsync off"
             )
             let removed = Self.removedDaemons(jobs, iPhone: iPhone)
-            for n in removed { try fm.removeItem(at: at(SystemEdits.daemons + "/" + n)) }
+            for n in removed { try DevicePath.remove(at(SystemEdits.daemons + "/" + n)) }
             owners += try Self.makeLogDirs(m, jobs: jobs.filter { !removed.contains($0) }).map { (0, $0) }
             for d in ["", "/AddressBook", "/Lockdown", "/Preferences"] {
                 try SystemEdits.mkdirs(at(Self.rootLibrary + d))
@@ -354,7 +345,7 @@ final class N45Board: Board {
             let prefs = try N72Board.bakePrefs(m, dir: user.library + "/Preferences")
             derived["prefs"] =
                 try Self.bakeNoIdleSleep(m, prefs: sbPrefs) ? prefs + "; SBDisableIdleSleep (no deep sleep)" : prefs
-            if fm.fileExists(atPath: at(sbPrefs).path) { owners.append((user.uid, sbPrefs)) }
+            if DevicePath.exists(at(sbPrefs)) { owners.append((user.uid, sbPrefs)) }
             if let l = try SystemEdits.seedLanguage(
                 at("private/var"),
                 tag: c.o.language,
@@ -450,12 +441,12 @@ final class N45Board: Board {
 
     nonisolated(nonsending) func store(_ c: Recipe.Context) async throws {
         let volume = try self.volume.filled("the system volume")
-        let fil = try N45NAND.filID(iBoot: Data(contentsOf: c.file("iBoot.bin")))
+        let fil = try N45NAND.filID(iBoot: Data(contentsOf: c.file("iBoot.bin")))  // host file
         let (written, meta) = try N45NAND.write(volume: volume, out: c.nand, filID: fil, banks: banks, bbtMap: iPhone)
         c.log(
             "\(written) filesystem pages, \(meta) metadata pages generated (NAND signature 0x\(String(fil, radix: 16)))"
         )
-        try FileManager.default.removeItem(at: volume)
+        try FileManager.default.removeItem(at: volume)  // host file
     }
 
     func lock(_ c: Recipe.Context) throws -> [String: Any] {

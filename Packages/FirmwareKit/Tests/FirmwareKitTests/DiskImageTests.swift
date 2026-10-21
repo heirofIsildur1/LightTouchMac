@@ -32,7 +32,8 @@ import Testing
         #expect(
             DiskImage.attachCommand(img, readOnly: true, mount: true, backend: .diskutil)
                 == [
-                    "/usr/sbin/diskutil", "image", "attach", "--plist", "--readOnly", "--mountOptions", "noowners",
+                    "/usr/sbin/diskutil", "image", "attach", "--plist", "--readOnly", "--mountOptions",
+                    "noowners,nosuid,nodev",
                     "/tmp/v.img",
                 ]
         )

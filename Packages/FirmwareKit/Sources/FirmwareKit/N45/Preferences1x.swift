@@ -20,7 +20,7 @@ public enum Preferences1x {
         policy: StorageRecordPolicy = .standalone,
         log: (String) -> Void = { _ in }
     ) async throws -> Bool {
-        let record = try DeviceRecord.object(Data(contentsOf: DeviceRecord.url(device)))
+        let record = try DeviceRecord.object(Data(contentsOf: DeviceRecord.url(device)))  // host file
         guard HostRuntime.Board(rawValue: record["board"] as? String ?? "")?.soc == .s5l8900 else {
             throw FirmwareError(.unsupported, "preferences are written into stopped 1.x devices only")
         }
@@ -31,7 +31,7 @@ public enum Preferences1x {
             defer { withExtendedLifetime(owner) {} }
             return owner.paths?.overlay.appendingPathComponent(stamp)
         }
-        if let url = try stampURL(), (try? String(contentsOf: url, encoding: .utf8)) == digest { return false }
+        if let url = try stampURL(), (try? String(contentsOf: url, encoding: .utf8)) == digest { return false }  // host file
         let session = try await StoppedVolumeEdit.begin(device: device, policy: policy, log: log)
         do {
             let point = session.image.deletingLastPathComponent().appendingPathComponent("preferences-mount")

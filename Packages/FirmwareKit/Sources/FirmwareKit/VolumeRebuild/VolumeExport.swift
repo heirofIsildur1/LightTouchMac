@@ -143,7 +143,7 @@ public enum VolumeExport {
                 }
                 let mnt = out.appendingPathComponent(".mnt-\(v.name)")
                 try await VolumeMount.withMounted(v.image, at: mnt) { root in
-                    _ = fm.createFile(atPath: root.appendingPathComponent(".metadata_never_index").path, contents: nil)
+                    try DevicePath.write(Data(), root.appendingPathComponent(".metadata_never_index"))
                 }
                 try? fm.removeItem(at: mnt)
                 result.append(
@@ -185,13 +185,15 @@ public enum VolumeExport {
                 let t = Date()
                 let image = URL(fileURLWithPath: vols[i].image)
                 let a =
-                    if let root {
+                    if let root, vols[i].volume == "data", let system = vols.first(where: { $0.volume == "system" }) {
                         try await VolumeMount.attachHidden(
                             image,
-                            at: vols[i].volume == "data" && vols.contains { $0.volume == "system" }
-                                ? root.appendingPathComponent("private/var") : root,
+                            on: system.mountPoint ?? root.path,
+                            at: "private/var",
                             readOnly: true
                         )
+                    } else if let root {
+                        try await VolumeMount.attachHidden(image, at: root, readOnly: true)
                     } else {
                         try await DiskImage.attach(image, readOnly: true, mount: true)
                     }

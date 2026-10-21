@@ -178,7 +178,11 @@ public enum StoppedVolumeEdit {
             let attached = try await VolumeMount.attachHidden(session.image, at: root)
             if let data = session.data {
                 do {
-                    _ = try await VolumeMount.attachHidden(data, at: root.appendingPathComponent("private/var"))
+                    _ = try await VolumeMount.attachHidden(
+                        data,
+                        on: attached.mountPoint ?? root.path,
+                        at: "private/var"
+                    )
                 } catch {
                     try? await eject(edit)
                     throw error
@@ -521,23 +525,23 @@ public enum StoppedVolumeEdit {
         guard checkedResult.ok else { throw FirmwareError(.internal, "edited metadata failed filesystem validation") }
     }
     private static func restoreMissingAttributes(from source: URL, to destination: URL, compressed: Bool) throws {
-        let size = listxattr(source.path, nil, 0, XATTR_NOFOLLOW)
+        let size = listxattr(source.path, nil, 0, XATTR_NOFOLLOW_ANY)
         // macOS refuses a content-protected file (6.x on); its key wrapped the old contents, not the replacement's
         if size < 0, errno == EACCES || errno == EPERM { return }
         guard size >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         var names = [CChar](repeating: 0, count: size)
         if size == 0 { return }
-        guard listxattr(source.path, &names, size, XATTR_NOFOLLOW) == size else { throw POSIXError(.EIO) }
+        guard listxattr(source.path, &names, size, XATTR_NOFOLLOW_ANY) == size else { throw POSIXError(.EIO) }
         for bytes in names.split(separator: 0) {
             let name = String(decoding: bytes.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             if name == "com.apple.decmpfs" || compressed && name == "com.apple.ResourceFork" { continue }
-            if getxattr(destination.path, name, nil, 0, 0, XATTR_NOFOLLOW) >= 0 { continue }
+            if getxattr(destination.path, name, nil, 0, 0, XATTR_NOFOLLOW_ANY) >= 0 { continue }
             guard errno == ENOATTR else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            let count = getxattr(source.path, name, nil, 0, 0, XATTR_NOFOLLOW)
+            let count = getxattr(source.path, name, nil, 0, 0, XATTR_NOFOLLOW_ANY)
             guard count >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             var value = [UInt8](repeating: 0, count: count)
-            guard getxattr(source.path, name, &value, count, 0, XATTR_NOFOLLOW) == count,
-                setxattr(destination.path, name, value, count, 0, XATTR_NOFOLLOW) == 0
+            guard getxattr(source.path, name, &value, count, 0, XATTR_NOFOLLOW_ANY) == count,
+                setxattr(destination.path, name, value, count, 0, XATTR_NOFOLLOW_ANY) == 0
             else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
