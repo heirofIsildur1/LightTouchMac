@@ -227,4 +227,78 @@ import Testing
             }
         }
     }
+
+    /// A thin armv6 Mach-O: dyld info naming an export trie, a linked image, and (last, so a cut can end inside it)
+    /// a symbol table of two symbols.
+    static func machO() -> [UInt8] {
+        func word(_ v: UInt32) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
+        let dylib = Array("/usr/lib/libSystem.B.dylib".utf8) + [0, 0]
+        let strings = Array("\0_main\0_printf\0".utf8)
+        let symtab = 28 + 48 + 24 + dylib.count + 24
+        let trie = symtab + 24 + strings.count
+        var cmds = word(0x8000_0022) + word(48) + [UInt8](repeating: 0, count: 32) + word(UInt32(trie)) + word(8)
+        cmds += word(0xC) + word(UInt32(24 + dylib.count)) + word(24) + word(0) + word(0) + word(0) + dylib
+        cmds += word(2) + word(24) + word(UInt32(symtab)) + word(2) + word(UInt32(symtab + 24))
+        cmds += word(UInt32(strings.count))
+        let header = [0xFEED_FACE, 12, 6, 2, 3, UInt32(cmds.count), 0x85].flatMap(word)
+        let symbols = word(1) + [0x0F, 1, 0, 0] + word(0x1000) + word(7) + [0x01, 0, 0, 1] + word(0)  // _main, _printf
+        return header + cmds + symbols + strings + [0, 1, 0x5F, 0, 5, 0, 0, 0]
+    }
+
+    /// FitCheck's in-memory Mach-O reader over the Mach-O above, flipped and cut: its load commands, linked
+    /// images, re-exports, symbols and dyld info.
+    @Test func machOImagesThrowOnCorruption() throws {
+        let clean = Self.machO()
+        let m = try #require(MachO32(clean))
+        #expect(m.dylibs().map(\.name) == ["/usr/lib/libSystem.B.dylib"])
+        #expect(m.symbols().map(\.name) == ["_main", "_printf"])
+        for b in Self.flipped(clean, in: 0..<clean.count, count: 3000, seed: 7) + Self.cut(clean, clean.count) {
+            guard let m = MachO32.slice(Data(b), arch: "armv6")?.image else { continue }
+            _ = (m.dylibs(), m.reexported(), m.symbols())
+            for c in m.commands where c.cmd == MachO32.lcDyldInfoOnly {
+                _ = try? (m.u32(c.off + 40), m.u32(c.off + 44))
+            }
+        }
+    }
+
+    /// TrustStore1xTests' certificate, flipped and cut, and one whose empty TBSCertificate ends the data, through
+    /// TrustStore1x.normalizedSubject's DER walk.
+    @Test func certificatesThrowOnCorruption() throws {
+        let clean = [UInt8](TrustStore1xTests.certificate)
+        #expect(try TrustStore1x.normalizedSubject(Data(clean)).count == TrustStore1xTests.subjectContent.count)
+        for b in Self.flipped(clean, in: 0..<clean.count, count: 3000, seed: 8) + Self.cut(clean, clean.count)
+            + [[0x30, 0x02, 0x30, 0x00]]
+        {
+            _ = try? TrustStore1x.normalizedSubject(Data(b))
+        }
+    }
+
+    /// An img3 of a 4-byte TYPE tag and `last` (magic as stored, data), its header's sizeNoPack covering both.
+    static func img3(_ last: (String, [UInt8])) -> [UInt8] {
+        func word(_ v: Int) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
+        func tag(_ magic: String, _ data: [UInt8]) -> [UInt8] {
+            Array(magic.utf8) + word(12 + data.count) + word(data.count) + data
+        }
+        let tags = tag("EPYT", Array("illb".utf8)) + tag(last.0, last.1)
+        return [0x33, 0x67, 0x6D, 0x49] + word(0x14 + tags.count) + word(tags.count) + word(0) + word(0) + tags
+    }
+
+    /// N72NOR.wrapSHSH's walk to an LLB's SHSH tag, and N72Board.productionKBAG's read of a KBAG tag, over img3s
+    /// flipped and cut.
+    @Test func img3TagsThrowOnCorruption() throws {
+        let key = Data(count: 16)
+        var signed = Self.img3(("HSHS", [UInt8](repeating: 7, count: 128)))
+        #expect(try N72NOR.wrapSHSH(&signed, key: key))
+        let clean = Self.img3(("HSHS", [UInt8](repeating: 7, count: 128)))
+        for var b in Self.flipped(clean, in: 0..<clean.count, count: 2000, seed: 9) + Self.cut(clean, clean.count) {
+            _ = try? N72NOR.wrapSHSH(&b, key: key)
+        }
+        let kbag = Self.img3(("GABK", [1, 0, 0, 0, 128, 0, 0, 0] + [UInt8](repeating: 9, count: 32)))
+        let t = try #require(try IMG3.tags(Data(kbag))["KBAG"])
+        #expect(try N72Board.productionKBAG(Data(kbag), t, name: "t") == [UInt8](repeating: 9, count: 32))
+        for b in Self.flipped(kbag, in: 0..<kbag.count, count: 2000, seed: 10) + Self.cut(kbag, kbag.count) {
+            guard let t = try? IMG3.tags(Data(b))["KBAG"], t.dataLength >= 40 else { continue }
+            _ = try? N72Board.productionKBAG(Data(b), t, name: "t")
+        }
+    }
 }

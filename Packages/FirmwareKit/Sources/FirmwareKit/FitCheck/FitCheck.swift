@@ -8,6 +8,7 @@
 // The recipes record every Fit in the lock ("fit"); a piece that does not fit fails the prepare, or, where the
 // piece is optional, is left out with a warning event.
 
+import BinaryParsing
 import Foundation
 
 public enum FitCheck {
@@ -243,13 +244,10 @@ public enum FitCheck {
             guard onDisk, let d = data(followed), let m = MachO32.slice(d, arch: arch)?.image else { return nil }
             var out = Set(m.symbols().filter { MachO32.isExport($0.type) }.map(\.name))
             for r in m.reexported() { out.formUnion(exports(r) ?? []) }
-            if let info = m.commands.first(where: { $0.cmd == MachO32.lcDyldInfo || $0.cmd == MachO32.lcDyldInfoOnly })
+            if let info = m.commands.first(where: { $0.cmd == MachO32.lcDyldInfo || $0.cmd == MachO32.lcDyldInfoOnly }),
+                let at = try? m.u32(info.off + 40), let size = try? m.u32(info.off + 44)
             {
-                m.b.withUnsafeBytes { b in
-                    out.formUnion(
-                        MachO32.trieReexports(b, at: Int(le32(m.b, info.off + 40)), size: Int(le32(m.b, info.off + 44)))
-                    )
-                }
+                m.b.withUnsafeBytes { b in out.formUnion(MachO32.trieReexports(b, at: Int(at), size: Int(size))) }
             }
             return out
         }
@@ -402,21 +400,36 @@ struct MachO32 {
     let commands: [(cmd: UInt32, off: Int)]
 
     init?(_ b: [UInt8]) {
-        guard b.count >= 28, le32(b, 0) == 0xFEED_FACE, le32(b, 4) == 12 else { return nil }
-        self.b = b
-        filetype = le32(b, 12)
-        flags = le32(b, 24)
-        var cmds: [(UInt32, Int)] = []
-        var off = 28
-        for _ in 0..<le32(b, 16) {
-            guard off + 8 <= b.count else { return nil }
-            cmds.append((le32(b, off), off))
-            let size = Int(le32(b, off + 4))
-            guard size >= 8 else { return nil }
-            off += size
+        // mach_header: magic, cputype (ARM), cpusubtype, filetype, ncmds, sizeofcmds, flags; then the load commands
+        let header = try? b.withParserSpan { s -> (UInt32, UInt32, [(UInt32, Int)])? in
+            guard try UInt32(parsingLittleEndian: &s) == 0xFEED_FACE, try UInt32(parsingLittleEndian: &s) == 12 else {
+                return nil
+            }
+            try s.seek(toRelativeOffset: 4)
+            let filetype = try UInt32(parsingLittleEndian: &s)
+            let ncmds = try UInt32(parsingLittleEndian: &s)
+            try s.seek(toRelativeOffset: 4)
+            let flags = try UInt32(parsingLittleEndian: &s)
+            var cmds: [(UInt32, Int)] = []
+            var off = s.startPosition
+            for _ in 0..<ncmds {
+                var c = try s.seeking(toAbsoluteOffset: off)
+                cmds.append((try UInt32(parsingLittleEndian: &c), off))
+                let size = Int(try UInt32(parsingLittleEndian: &c))
+                guard size >= 8 else { return nil }
+                off += size
+            }
+            return (filetype, flags, cmds)
         }
-        commands = cmds
+        guard let (filetype, flags, commands) = header else { return nil }
+        self.b = b
+        self.filetype = filetype
+        self.flags = flags
+        self.commands = commands
     }
+
+    /// The little-endian word at `o`, or the readers' error past the image.
+    func u32(_ o: Int) throws -> UInt32 { try b.withParserSpan { s throws(ParsingError) in try s.le32(at: o) } }
 
     /// The slice a CPU of `arch` runs: the exact subtype, else (armv7) an armv6 or ARM_ALL one.
     static func slice(_ d: Data, arch: String) -> (image: MachO32, arch: String)? {
@@ -455,8 +468,8 @@ struct MachO32 {
     }
 
     func name(_ off: Int) -> String {
-        let start = off + Int(le32(b, off + 8))
-        guard start < b.count else { return "" }
+        guard let name = try? u32(off + 8), off + Int(name) < b.count else { return "" }
+        let start = off + Int(name)
         let end = b[start...].firstIndex(of: 0) ?? b.count
         return String(decoding: b[start..<end], as: UTF8.self)
     }
@@ -485,10 +498,10 @@ struct MachO32 {
     }
 
     func symbols() -> [(name: String, type: UInt8, desc: UInt16)] {
-        guard let st = commands.first(where: { $0.cmd == 2 }) else { return [] }
-        let symoff = Int(le32(b, st.off + 8))
-        let nsyms = Int(le32(b, st.off + 12))
-        let stroff = Int(le32(b, st.off + 16))
+        // LC_SYMTAB: symoff, nsyms, stroff
+        guard let st = commands.first(where: { $0.cmd == 2 }),
+            let (symoff, nsyms, stroff) = try? (Int(u32(st.off + 8)), Int(u32(st.off + 12)), Int(u32(st.off + 16)))
+        else { return [] }
         var out: [(String, UInt8, UInt16)] = []
         for i in 0..<nsyms {
             let e = symoff + 12 * i

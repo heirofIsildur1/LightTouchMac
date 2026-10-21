@@ -6,6 +6,7 @@
 // DER. Checked on M68 1A543a: with the row, SecTrustEvaluate gives 4 (unspecified) for a WebProxyCA-shaped
 // chain and Safari opens HTTPS through a TLS 1.0 relay; without it, 3 (deny).
 
+import BinaryParsing
 import CryptoKit
 import FirmwareSchema
 import Foundation
@@ -26,54 +27,45 @@ public enum TrustStore1x {
         """.utf8
     )
 
-    /// A DER element at `o`: (tag, header length, content length).
-    private static func element(_ d: [UInt8], _ o: Int) throws -> (tag: UInt8, header: Int, length: Int) {
-        guard o + 1 < d.count else { throw FirmwareError(.unsupported, "certificate truncated") }
-        var length = Int(d[o + 1])
-        var header = 2
+    /// The DER element `s` starts with: its tag and its content's range; `s` moves past it.
+    private static func element(_ s: inout ParserSpan) throws -> (tag: UInt8, content: ParserRange) {
+        let tag = try UInt8(parsing: &s)
+        var length = Int(try UInt8(parsing: &s))
         if length & 0x80 != 0 {
             let n = length & 0x7f
-            guard n <= 3, o + 2 + n <= d.count else { throw FirmwareError(.unsupported, "certificate length") }
-            length = d[(o + 2)..<(o + 2 + n)].reduce(0) { $0 << 8 | Int($1) }
-            header = 2 + n
+            guard n <= 3 else { throw FirmwareError(.unsupported, "certificate length") }
+            length = 0
+            for _ in 0..<n { length = length << 8 | Int(try UInt8(parsing: &s)) }
         }
-        guard o + header + length <= d.count else { throw FirmwareError(.unsupported, "certificate truncated") }
-        return (d[o], header, length)
+        return (tag, try s.sliceRange(byteCount: length))
     }
 
     /// The certificate's subject Name content, normalized as 1.x stores it.
     static func normalizedSubject(_ certificate: Data) throws -> Data {
         let d = [UInt8](certificate)
-        var o = try element(d, 0).header  // Certificate
-        o += try element(d, o).header  // TBSCertificate
-        if d[o] == 0xa0 {
-            let e = try element(d, o)
-            o += e.header + e.length
-        }  // version
-        for _ in 0..<4 {
-            let e = try element(d, o)
-            o += e.header + e.length
-        }  // serial, signature, issuer, validity
-        let name = try element(d, o)
-        var out = Array(d[(o + name.header)..<(o + name.header + name.length)])
-        // Walk the RDNs: SET { SEQUENCE { OID, value } }; uppercase PrintableString (0x13) values in place.
-        var p = 0
-        while p < out.count {
-            let set = try element(out, p)
-            var q = p + set.header
-            while q < p + set.header + set.length {
-                let atv = try element(out, q)
-                let oid = try element(out, q + atv.header)
-                let v = q + atv.header + oid.header + oid.length
-                let value = try element(out, v)
-                if value.tag == 0x13 {
-                    for i in (v + value.header)..<(v + value.header + value.length) where (0x61...0x7a).contains(out[i])
-                    { out[i] -= 0x20 }
-                }
-                q += atv.header + atv.length
-            }
-            p += set.header + set.length
+        let name = try parsing(d, "certificate") { s in
+            var certificate = try s.seeking(toRange: try element(&s).content)
+            var tbs = try certificate.seeking(toRange: try element(&certificate).content)
+            if try tbs.byte(at: 0) == 0xa0 { _ = try element(&tbs) }  // version
+            for _ in 0..<4 { _ = try element(&tbs) }  // serial, signature, issuer, validity
+            return try element(&tbs).content
         }
+        var out = Array(d[name.lowerBound..<name.upperBound])
+        // Walk the RDNs: SET { SEQUENCE { OID, value } }; uppercase PrintableString (0x13) values in place.
+        let printable = try parsing(out, "certificate subject") { s in
+            var values: [Range<Int>] = []
+            while !s.isEmpty {
+                var set = try s.seeking(toRange: try element(&s).content)
+                while !set.isEmpty {
+                    var atv = try set.seeking(toRange: try element(&set).content)
+                    _ = try element(&atv)  // the OID
+                    let value = try element(&atv)
+                    if value.tag == 0x13 { values.append(value.content.lowerBound..<value.content.upperBound) }
+                }
+            }
+            return values
+        }
+        for r in printable { for i in r where (0x61...0x7a).contains(out[i]) { out[i] -= 0x20 } }
         return Data(out)
     }
 

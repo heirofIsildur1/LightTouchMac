@@ -18,6 +18,7 @@
 // (data protection). With gles_shim the front end replaces OpenGLES once FitCheck.glesFrontEnd fits (else the prepare
 // fails) and SpringBoard gets CA_ENABLE_OGL=1.
 
+import BinaryParsing
 import CryptoKit
 import Foundation
 
@@ -324,6 +325,18 @@ final class N72Board: Board {
         return path
     }
 
+    /// The IV and key of the img3 `d`'s KBAG tag `t` when it is production and AES-128: its data is the type (1),
+    /// the key size (128), the IV and the key.
+    static func productionKBAG(_ d: Data, _ t: IMG3.Tag, name: String) throws -> [UInt8]? {
+        try parsing(d, "\(name): KBAG") { s in
+            var k = try s.seeking(toAbsoluteOffset: t.offset + 12)
+            guard try UInt32(parsingLittleEndian: &k) == 1, try UInt32(parsingLittleEndian: &k) == 128 else {
+                return nil
+            }
+            return try [UInt8](parsing: &k, byteCount: 32)
+        }
+    }
+
     /// KBAG || IV-key for NOR, normal boot and stock restore (the emulated AES engine's GID table).
     static func gidBlobs(_ ipsw: IPSWArchive, entry: FirmwareEntry) throws -> (Data, [String]) {
         let prefix = "Firmware/all_flash/all_flash.\(entry.board).production/"
@@ -339,9 +352,8 @@ final class N72Board: Board {
             else { continue }
             let d = try ipsw.read(n)
             guard let t = try IMG3.tags(d)["KBAG"], t.dataLength >= 40 else { continue }
-            let b = [UInt8](d)
-            guard le32(b, t.offset + 12) == 1, le32(b, t.offset + 16) == 128 else { continue }  // production, AES-128
-            out += b[t.offset + 20..<t.offset + 52] + iv + key
+            guard let kbag = try productionKBAG(d, t, name: name) else { continue }
+            out += kbag + iv + key
             names.append(name)
         }
         return (out, names)

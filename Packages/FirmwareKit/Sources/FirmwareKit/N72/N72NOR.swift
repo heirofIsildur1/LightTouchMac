@@ -7,6 +7,7 @@
 //   N72NOR.order                       // the stock image set, in the stock order
 //   try N72NOR.type(of: img3)          // "illb", "ibot", ...
 
+import BinaryParsing
 import Foundation
 import zlib
 
@@ -87,25 +88,27 @@ public enum N72NOR {
 
     /// Encrypts the SHSH tag (past sigCheckArea, so no digest covers it) under the UID-derived key.
     static func wrapSHSH(_ b: inout [UInt8], key: Data) throws -> Bool {
-        let nopack = Int(le32(b, 8))
-        var off = img3Header
-        while off + 12 <= img3Header + nopack {
-            let total = Int(le32(b, off + 4))
-            let dlen = Int(le32(b, off + 8))
-            if total == 0 { break }
-            if b[off..<off + 4].elementsEqual("HSHS".utf8), dlen % 16 == 0 {
-                let enc = try AESCBC.crypt(
-                    Data(b[off + 12..<off + 12 + dlen]),
-                    iv: Data(count: 16),
-                    key: key,
-                    decrypt: false
-                )
-                b.replaceSubrange(off + 12..<off + 12 + dlen, with: enc)
-                return true
+        // the tags past the header, within its sizeNoPack: magic, total length, data length, data
+        let shsh = try parsing(b, "NOR image") { s -> Range<Int>? in
+            let nopack = Int(try s.le32(at: 8))
+            var off = img3Header
+            while off + 12 <= img3Header + nopack {
+                var tag = try s.seeking(toAbsoluteOffset: off)
+                let magic = try [UInt8](parsing: &tag, byteCount: 4)
+                let total = Int(try UInt32(parsingLittleEndian: &tag))
+                let dlen = Int(try UInt32(parsingLittleEndian: &tag))
+                if total == 0 { break }
+                if magic.elementsEqual("HSHS".utf8), dlen % 16 == 0 {
+                    return try tag.sliceRange(byteCount: dlen).lowerBound..<off + 12 + dlen
+                }
+                off += total
             }
-            off += total
+            return nil
         }
-        return false
+        guard let shsh else { return false }
+        let enc = try AESCBC.crypt(Data(b[shsh]), iv: Data(count: 16), key: key, decrypt: false)
+        b.replaceSubrange(shsh, with: enc)
+        return true
     }
 
     /// synth_base: IMG2 + SysCfg + nvram for the identity, an empty image area.
