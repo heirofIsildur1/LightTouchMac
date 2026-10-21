@@ -10,9 +10,11 @@ QEMU_BUILD_DIR = $(QEMU_IOS_DIR)/build-w1-native
 
 // scripts/vendor's directory for the current pins: what Archive copies into the app (Frameworks, the tools in
 // MacOS, Resources/Guest, Device and licenses) and the libimobiledevice headers and libraries the services helper
-// links. scripts/vendor writes Vendor.xcconfig (VENDOR_DIR); Local.xcconfig, also gitignored, overrides
-// anything here.
-VENDOR_DIR = $(HOME)/Developer/ltm-vendor.noindex/run-scripts-vendor
+// links. The services helper's first phase (scripts/vendor-check) points the gitignored build/vendor at the current
+// pins' directory, or fails the build saying to run scripts/vendor. Vendor.xcconfig (an older scripts/vendor wrote
+// it) and Local.xcconfig, both gitignored, may set VENDOR_DIR or anything else here; the check holds an overridden
+// VENDOR_DIR to the current pins too.
+VENDOR_DIR = $(SRCROOT)/build/vendor
 
 // The build number (CFBundleVersion) is the commit count, stamped into the app's Info.plist by its
 // "Build Number" phase at every build; this is only what the helpers' embedded Info.plists carry.

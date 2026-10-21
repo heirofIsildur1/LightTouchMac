@@ -25,17 +25,11 @@ func checkout(_ name: String) -> URL {
     return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
 }
 
-/// scripts/vendor's directory for the current pins (Configuration/Vendor.xcconfig).
+/// scripts/vendor's directory for the current pins (`scripts/vendor-check --print`), nil if there is none.
 func vendorDirectory() -> URL? {
-    guard
-        let text = try? String(
-            contentsOf: repository.appendingPathComponent("Configuration/Vendor.xcconfig"),
-            encoding: .utf8
-        ),
-        let line = text.split(separator: "\n").first(where: { $0.hasPrefix("VENDOR_DIR") }),
-        let value = line.split(separator: "=", maxSplits: 1).last
-    else { return nil }
-    return URL(fileURLWithPath: value.trimmingCharacters(in: .whitespaces))
+    let path = output("/bin/bash", [repository.appendingPathComponent("scripts/vendor-check").path, "--print"])
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return path.isEmpty ? nil : URL(fileURLWithPath: path)
 }
 
 /// The executables and resources a run boots with: a built app's (`--app`), or a Debug build of the helper, the
@@ -67,7 +61,7 @@ struct Tools {
             )
         } else {
             guard let vendor = vendorDirectory() else {
-                die("no Configuration/Vendor.xcconfig: run scripts/vendor (or pass --app)")
+                die("no vendor directory for the current pins: run scripts/vendor (about 15 minutes), or pass --app")
             }
             let built = build(work: work)
             tools = Tools(

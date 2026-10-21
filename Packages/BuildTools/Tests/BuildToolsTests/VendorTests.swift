@@ -106,4 +106,29 @@ struct VendorTests {
         let own = try packed("current", age: 1000)
         #expect(Vendor.previousBuiltIn(current, root: root)?.resolvingSymlinksInPath() == own.resolvingSymlinksInPath())
     }
+
+    /// Xcode finds the vendor directory with scripts/vendor-check, which keys it in bash as scripts/vendor does in
+    /// Swift: the same key for this checkout, and both move when a keyed file does and not for .build or .DS_Store.
+    @Test func vendorCheckKeysAsScriptsVendorDoes() throws {
+        let repository = URL(fileURLWithPath: #filePath).appendingPathComponent("../../../../..").standardized
+        let dir = try scratch()
+        defer { remove(dir) }
+        let vendor = Vendor(root: dir)
+        for name in Vendor.keyed + ["build-support/patches", "scripts/vendor-check"] {
+            try vendor.copy(repository.appendingPathComponent(name), dir.appendingPathComponent(name))
+        }
+        let check = { try output(["/bin/bash", dir.appendingPathComponent("scripts/vendor-check").path, "--key"]) }
+        #expect(try check() == vendor.pinKey())
+        #expect(try Vendor(root: repository).pinKey() == vendor.pinKey())
+        let first = try check()
+        for name in ["Packages/BuildTools/Sources/.build/x", "Packages/BuildTools/Sources/a/.DS_Store"] {
+            try touch(dir.appendingPathComponent(name))
+        }
+        #expect(try check() == first && vendor.pinKey() == first)
+        for name in ["build-support/patches/new.patch", "Packages/ReleaseChecks/Sources/New.swift"] {
+            try touch(dir.appendingPathComponent(name))
+            #expect(try check() == vendor.pinKey())
+            #expect(try check() != first)
+        }
+    }
 }

@@ -218,7 +218,7 @@
 		A1D0C0DE32000000000000005 /* LightTouchServices */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A1D0C0DE32000000000000008;
-			buildPhases = (A1D0C0DE32000000000000006, A1D0C0DE32000000000000007);
+			buildPhases = (A1D0C0DE3200000000000000C, A1D0C0DE32000000000000006, A1D0C0DE32000000000000007);
 			buildRules = (); dependencies = ();
 			fileSystemSynchronizedGroups = (A1D0C0DE3200000000000000B);
 			name = LightTouchServices; productName = LightTouchServices;
@@ -344,6 +344,16 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		A1D0C0DE3200000000000000C /* Vendor Directory */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			files = ();
+			inputPaths = ();
+			name = "Vendor Directory";
+			outputPaths = ();
+			shellPath = /bin/sh;
+			shellScript = "# The first phase of the first target that reads VENDOR_DIR: find the current pins' vendor directory, or fail.\nexec \"$SRCROOT/scripts/vendor-check\"\n";
+		};
 		A1D0C0DE3A000000000000040 /* Build Number */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -395,7 +405,7 @@
  SWIFT_APPROACHABLE_CONCURRENCY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = SM75355Y6R;
  ENABLE_HARDENED_RUNTIME = YES; PRODUCT_NAME = "$(TARGET_NAME)"; ENABLE_DEBUG_DYLIB = NO;
  GENERATE_INFOPLIST_FILE = YES; OTHER_LDFLAGS = "-limobiledevice-1.0 -lplist-2.0"; PRODUCT_BUNDLE_IDENTIFIER = gold.samhenri.LightTouchMac.LightTouchServices; SKIP_INSTALL = YES; CODE_SIGN_ENTITLEMENTS = Configuration/Tool.entitlements;
- SWIFT_OBJC_BRIDGING_HEADER = LightTouchServices/Lockdown/Lockdown.h;
+ SWIFT_OBJC_BRIDGING_HEADER = LightTouchServices/Lockdown/Lockdown.h; ENABLE_USER_SCRIPT_SANDBOXING = NO;
  HEADER_SEARCH_PATHS = ("$(VENDOR_DIR)/include", /opt/homebrew/include, /usr/local/include);
  LIBRARY_SEARCH_PATHS = ("$(VENDOR_DIR)/Frameworks", /opt/homebrew/lib, /usr/local/lib); }; };
 		A1D0C0DE3200000000000000A = {isa = XCBuildConfiguration; name = Release; buildSettings = {
@@ -403,7 +413,7 @@
  SWIFT_APPROACHABLE_CONCURRENCY = YES; CODE_SIGN_STYLE = Manual; CODE_SIGN_IDENTITY = "Developer ID Application"; DEVELOPMENT_TEAM = SM75355Y6R;
  ENABLE_HARDENED_RUNTIME = YES; PRODUCT_NAME = "$(TARGET_NAME)"; ENABLE_DEBUG_DYLIB = NO;
  GENERATE_INFOPLIST_FILE = YES; OTHER_LDFLAGS = "-limobiledevice-1.0 -lplist-2.0"; PRODUCT_BUNDLE_IDENTIFIER = gold.samhenri.LightTouchMac.LightTouchServices; SKIP_INSTALL = YES; CODE_SIGN_ENTITLEMENTS = Configuration/Tool.entitlements;
- SWIFT_OBJC_BRIDGING_HEADER = LightTouchServices/Lockdown/Lockdown.h;
+ SWIFT_OBJC_BRIDGING_HEADER = LightTouchServices/Lockdown/Lockdown.h; ENABLE_USER_SCRIPT_SANDBOXING = NO;
  HEADER_SEARCH_PATHS = ("$(VENDOR_DIR)/include", /opt/homebrew/include, /usr/local/include);
  LIBRARY_SEARCH_PATHS = ("$(VENDOR_DIR)/Frameworks", /opt/homebrew/lib, /usr/local/lib); }; };
 		A1D0C0DE3100000000000010 /* Debug configuration for PBXNativeTarget "LightTouchDevice" */ = {

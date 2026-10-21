@@ -64,8 +64,7 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
 
 1. **`scripts/vendor`**, once per pin change (`build-support/sources.json`, `dependencies.json`, the patches or the
    native recipes). It builds what Xcode can't, from the pins, into `~/Developer/ltm-vendor.noindex/<pin-hash>/`
-   (`.noindex` keeps Spotlight out; `LTM_VENDOR_ROOT` moves it; nothing deletes it) and points
-   `Configuration/Vendor.xcconfig` (`VENDOR_DIR`) at it: the native dependencies, usbmuxd and QEMU for arm64 and
+   (`.noindex` keeps Spotlight out; `LTM_VENDOR_ROOT` moves it; nothing deletes it): the native dependencies, usbmuxd and QEMU for arm64 and
    x86_64, merged universal with final install names
    (`Frameworks/`, `MacOS/`), the guest tools and the developer SSH payload packed into
    `Resources/Guest/guest.aar`, the SecureROMs and the built-in iPod (`Resources/Device/`), the licenses and
@@ -73,7 +72,12 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    prepares the built-in iPod again. Inputs: `ARMV6_SDK` (default
    `~/Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk`), `LTM_ASSETS` (the SecureROMs, default
    `~/Developer/qemu-ios-files`), the n72ap-7E18 IPSW in the app's IPSW cache, and the network for the pinned
-   source archives. Firmware and the iPhoneOS SDK are never downloaded or redistributed.
+   source archives. Firmware and the iPhoneOS SDK are never downloaded or redistributed. Xcode finds the directory
+   itself: the services helper's first phase (`scripts/vendor-check`) keys the pins as `scripts/vendor` does, points
+   the gitignored `build/vendor` (the default `VENDOR_DIR`) at that directory, and fails the build with "run
+   scripts/vendor" when there is none, rather than build with another pin's. `LTM_VENDOR_ROOT` counts for Debug builds
+   only. A `VENDOR_DIR` in `Configuration/Vendor.xcconfig` (which scripts/vendor still writes) or `Local.xcconfig`
+   is held to the current pins the same way.
 2. **Xcode ▸ Product ▸ Archive** (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID). The archive's
    Copy Files phases bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity
    and the hardened runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`).
@@ -233,10 +237,10 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `Packages/ReleaseChecks/` | The checks of a built app (`Release.xctestplan`): signatures, entitlements, slices and load closure, bundle hygiene, the bundled tools, boots through the bundle |
 | `Packages/DeviceServices/` | One device's stock lockdown services: `HostServiceWire` (the request/event protocol, errors, timeouts, device paths, the Home screen layout) and `HostServiceClient` (the app's `DeviceServices` calls, `HostServiceWorkers`, `NotificationProxy`) |
 | `Packages/FirmwareKit/` | `FirmwareKit` (IPSW → device), `FirmwareSchema` (the wire types, `StorageCapacity`, `DeveloperTools`, `GuestArchive`: what the app links), the `firmwarekit` CLI (`Sources/FirmwareKitCLI`), `CActivation` |
-| `scripts/` | `vendor` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `release`, `check-export` |
+| `scripts/` | `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `release`, `check-export` |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
-| `Configuration/` | `Shared.xcconfig` (with the gitignored `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` |
+| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Vendor.xcconfig` and `Local.xcconfig`), `LightTouchDevice.entitlements` |
 | `Models/` | The 3D device models and their lighting (`Resources/Models/` in the app) |
 | `LightTouchServices/` | The services helper: `Engine/` (libimobiledevice: installation_proxy, AFC, springboardservices, notification_proxy and lockdown on one `run` kernel, the serial gate and deadlines), and the lockdown writes (`Lockdown/`) it runs as child processes |
 | `tools/activation/` | Sam's activation tool (its `build/` output is ignored) |
