@@ -1,28 +1,62 @@
 #!/bin/bash
 # An archive to the release download, the command-line route (Organizer's is Distribute, then scripts/check-export):
 #
-#     scripts/release path/to/X.xcarchive [--dry-run | --amore]
+#     scripts/release path/to/X.xcarchive [--dry-run] [--amore --notes path/to/notes.md [--publish]]
 #
 # 1. export the app for Developer ID (Configuration/ExportOptions.plist)   2. zip it   3. notarize the zip
-# (notarytool, keychain profile ltm-notary; on Invalid, print the log)   4. staple the app and validate the ticket
+# (notarytool; on Invalid, print the log)   4. staple the app and validate the ticket
 # 5. zip the stapled app: LightTouchMac-universal.zip and SHA256SUMS naming it, beside the exported app
 # 6. the Release plan's static checks on the stapled app (as an export: Gatekeeper and the ticket too)
 # 7. the Release plan's boots: the built-in iPod, and a fresh `firmwarekit create` of one firmware per preparation
-#    route, each booted (ReleaseBootTests; its IPSWs from the app's cache, a missing one fails the release).
-# 8. with --amore, upload the stapled app to Amore as a draft (`amore release --draft`: a DMG, notarized and uploaded;
-#    it doesn't re-sign the app); publishing it updates the appcast Sparkle reads. Without it, the zip is for the
+#    route, each booted (ReleaseBootTests; its IPSWs from the app's cache, a missing one fails the release). A
+#    failed boot run is run once more, saying so; a second failure stops.
+# 8. with --amore: Amore builds a DMG of the stapled app (`amore release -o`, unsigned, not notarized; it doesn't
+#    re-sign the app), which is signed with the app's Developer ID identity, notarized, stapled and checked by
+#    Gatekeeper, then uploaded as a draft with the notes; the CDN's copy must match it byte for byte. --publish
+#    publishes the draft, which updates the appcast Sparkle reads, and checks the appcast's item for the build: the
+#    notes and an edSignature of the CDN's DMG valid for the app's SUPublicEDKey. Without --amore, the zip is for the
 #    GitHub release as before.
-# --dry-run skips 3 and 4 (and the export-only checks); LTM_RELEASE_SKIP_PREPARE=1 with --dry-run also skips 7's
-# prepare matrix. Run from a shell that sees the ltm-notary profile.
+# --dry-run skips 3, 4 and 8's signing, notarizing and uploading (and the export-only checks);
+# LTM_RELEASE_SKIP_PREPARE=1 with --dry-run also skips 7's prepare matrix.
+#
+# Notarization uses an App Store Connect API key when one is configured, else the ltm-notary keychain profile
+# (scripts/release-common.sh). LTM_SIGN_IDENTITY overrides the DMG's signing identity (default: the exported app's Authority).
 set -euo pipefail
-ARCHIVE="${1:?usage: scripts/release path/to/X.xcarchive [--dry-run | --amore]}"
-DRY=0; [[ "${2:-}" == "--dry-run" ]] && DRY=1
-AMORE=0; [[ "${2:-}" == "--amore" ]] && AMORE=1
+usage() { echo "FAIL $* (usage: scripts/release path/to/X.xcarchive [--dry-run] [--amore --notes notes.md [--publish]]) -"; exit 2; }
+ARCHIVE="${1:-}"; [[ -n "$ARCHIVE" && "$ARCHIVE" != --* ]] || usage "no archive"
+shift
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/release-common.sh"
+DRY=0; AMORE=0; PUBLISH=0; NOTES=""
+while (( $# )); do
+    case "$1" in
+        --dry-run) DRY=1 ;;
+        --amore) AMORE=1 ;;
+        --publish) PUBLISH=1 ;;
+        --notes) NOTES="${2:-}"; [[ -n "$NOTES" ]] || usage "--notes takes a file"; shift ;;
+        *) usage "unknown argument $1" ;;
+    esac
+    shift
+done
+(( AMORE )) || [[ -z "$NOTES" ]] || usage "--notes is for --amore"
+(( AMORE )) || (( ! PUBLISH )) || usage "--publish is for --amore"
+if (( AMORE )); then
+    [[ -n "$NOTES" ]] || usage "--amore needs --notes"
+    why="$(notes_problem "$NOTES")"; [[ -z "$why" ]] || usage "$why"
+fi
+[[ -d "$ARCHIVE" ]] || usage "no archive at $ARCHIVE"
 SKIP_PREPARE="${LTM_RELEASE_SKIP_PREPARE:-0}"
 if [[ "$SKIP_PREPARE" == 1 ]] && (( ! DRY )); then
     echo "FAIL LTM_RELEASE_SKIP_PREPARE=1 is for --dry-run only; a release runs the prepare matrix -"; exit 2
 fi
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+why="$(notary_config)" || usage "$why"
+notary_config  # again in this shell for NOTARY; the subshell above only caught the message
+if [[ "$NOTARY_FROM" == keychain ]]; then
+    echo "== notary: keychain profile ltm-notary (no API key configured)"
+else
+    echo "== notary: App Store Connect API key (from $NOTARY_FROM)"
+fi
 ARCHIVE="$(cd "$(dirname "$ARCHIVE")" && pwd)/$(basename "$ARCHIVE")"
 OUT="$(dirname "$ARCHIVE")/$(basename "$ARCHIVE" .xcarchive)-export"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ltm-release.XXXXXX")"
@@ -30,6 +64,18 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/ltm-release.XXXXXX")"
 trap '(( $? )) || rm -rf "$WORK"' EXIT
 fail() { echo "FAIL $* $WORK"; exit 1; }
 step() { echo "== $*"; }
+# notarize FILE NAME: submit and wait; anything but Accepted prints the log and fails.
+notarize() {
+    xcrun notarytool submit "$1" "${NOTARY[@]}" --wait --output-format json > "$WORK/$2.json" || true
+    local id status
+    id="$(plutil -extract id raw -o - "$WORK/$2.json" 2>/dev/null || true)"
+    status="$(plutil -extract status raw -o - "$WORK/$2.json" 2>/dev/null || true)"
+    echo "submission $id: $status"
+    if [[ "$status" != "Accepted" ]]; then
+        [[ -n "$id" ]] && xcrun notarytool log "$id" "${NOTARY[@]}" >&2
+        fail "notarization of $2 ${status:-did not complete} ($(cat "$WORK/$2.json"))"
+    fi
+}
 
 step "export"
 rm -rf "$OUT"
@@ -46,15 +92,7 @@ if (( DRY )); then
     echo "== notarize, staple: skipped (--dry-run)"
 else
     step "notarize"
-    xcrun notarytool submit "$WORK/submit.zip" --keychain-profile ltm-notary --wait --output-format json > "$WORK/submit.json" \
-        || true
-    ID="$(plutil -extract id raw -o - "$WORK/submit.json" 2>/dev/null || true)"
-    STATUS="$(plutil -extract status raw -o - "$WORK/submit.json" 2>/dev/null || true)"
-    echo "submission $ID: $STATUS"
-    if [[ "$STATUS" != "Accepted" ]]; then
-        [[ -n "$ID" ]] && xcrun notarytool log "$ID" --keychain-profile ltm-notary >&2
-        fail "notarization ${STATUS:-did not complete} ($(cat "$WORK/submit.json"))"
-    fi
+    notarize "$WORK/submit.zip" app
     step "staple"
     xcrun stapler staple "$APP" > /dev/null || fail "stapler staple"
     xcrun stapler validate "$APP" > /dev/null || fail "stapler validate"
@@ -79,22 +117,83 @@ release_tests() {
             xcrun xcresulttool get test-results summary --path "$WORK/$1.xcresult" 2>/dev/null \
                 | plutil -extract testFailures json -r -o - - >&2 \
                 || grep -E "recorded an issue|error:" "$WORK/$1.log" | head -20 >&2
-            fail "Release $1 checks"
+            return 1
         }
 }
 step "static checks"
-release_tests static ReleaseAppStaticTests
+release_tests static ReleaseAppStaticTests || fail "Release static checks"
 step "boots: the built-in iPod and the prepare matrix"
 [[ "$SKIP_PREPARE" == 1 ]] && echo "== prepare matrix: SKIPPED (LTM_RELEASE_SKIP_PREPARE=1, dry run)"
-release_tests boot ReleaseBootTests
+release_tests boot ReleaseBootTests || {
+    echo "== boots failed; running them once more (the failures above, the log $WORK/boot.log)"
+    release_tests boot-retry ReleaseBootTests || fail "Release boot checks (failed twice)"
+}
 if (( ! DRY )); then
     GK=$(spctl -a -vv -t exec "$APP" 2>&1) || true  # read whole: grep -q closing the pipe early fails it under pipefail
     [[ "$GK" == *'source=Notarized Developer ID'* ]] || fail "Gatekeeper: $GK"
 fi
+
+VERDICT=""
 if (( AMORE )); then
-    step "Amore"
-    amore release "$APP" --draft --non-interactive || fail "amore release"
+    INFO="$APP/Contents/Info.plist"
+    BUILD="$(plutil -extract CFBundleVersion raw -o - "$INFO")"
+    BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw -o - "$INFO")"
+    IDENTITY="${LTM_SIGN_IDENTITY:-$(codesign -dvv "$APP" 2>&1 | sed -n 's/^Authority=//p')}"
+    IDENTITY="${IDENTITY%%$'\n'*}"  # the leaf: the first Authority
+    [[ -n "$IDENTITY" ]] || fail "no signing identity for the DMG (the app has no Authority; set LTM_SIGN_IDENTITY)"
+    CHECK=(swift "$ROOT/scripts/release-helper.swift")
+    if (( DRY )); then
+        echo "== Amore: skipped (--dry-run): build $BUILD's DMG, signed by $IDENTITY, notarized, a draft with $NOTES$( (( PUBLISH )) && echo ", published")"
+    else
+        step "Amore DMG"
+        DMG_DIR="$OUT/amore"
+        rm -rf "$DMG_DIR"
+        amore release "$APP" -o "$DMG_DIR" --skip-notarization --non-interactive > "$WORK/amore-dmg.log" 2>&1 \
+            || { tail -20 "$WORK/amore-dmg.log" >&2; fail "amore release -o"; }
+        DMG="$(find "$DMG_DIR" -maxdepth 1 -name '*.dmg' | head -1)"
+        [[ -f "$DMG" ]] || fail "no DMG in $DMG_DIR"
+        codesign --sign "$IDENTITY" --timestamp "$DMG" || fail "codesign the DMG"
+        notarize "$DMG" dmg
+        xcrun stapler staple "$DMG" > /dev/null || fail "stapler staple the DMG"
+        spctl -a -t open --context context:primary-signature "$DMG" 2> "$WORK/dmg-spctl.log" \
+            || fail "Gatekeeper rejects the DMG: $(cat "$WORK/dmg-spctl.log")"
+
+        step "Amore upload (draft)"
+        amore release "$DMG" --draft --skip-notarization --non-interactive --release-notes "$(cat "$NOTES")" \
+            --format json > "$WORK/amore.json" 2>&1 || { tail -20 "$WORK/amore.json" >&2; fail "amore release --draft"; }
+        # The id: from the upload's answer, else from the CLI's cache of the app's releases (which the list refreshes).
+        amore releases list --bundle-id "$BUNDLE_ID" > /dev/null 2>&1 || true
+        CACHED=()
+        while IFS= read -r f; do CACHED+=("$f"); done < <(ls -t "$HOME/Library/Caches/amore/fsCachedData/"* 2>/dev/null || true)
+        read -r RELEASE_ID URL < <("${CHECK[@]}" release "$BUILD" "$BUNDLE_ID" "$WORK/amore.json" ${CACHED[@]+"${CACHED[@]}"}) \
+            || fail "no Amore release id for build $BUILD"
+        echo "Amore release $RELEASE_ID: $URL"
+        curl -fsSL --retry 3 -o "$WORK/cdn.dmg" "$URL" || fail "download $URL"
+        LOCAL_SUM="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+        [[ "$(shasum -a 256 "$WORK/cdn.dmg" | cut -d' ' -f1)" == "$LOCAL_SUM" ]] || fail "the CDN's DMG is not $DMG"
+        spctl -a -t open --context context:primary-signature "$WORK/cdn.dmg" 2> "$WORK/cdn-spctl.log" \
+            || fail "Gatekeeper rejects the CDN's DMG: $(cat "$WORK/cdn-spctl.log")"
+        echo "CDN DMG sha256 $LOCAL_SUM, accepted by Gatekeeper"
+        VERDICT=" amore $RELEASE_ID draft"
+
+        if (( PUBLISH )); then
+            step "Amore publish"
+            amore releases update "$RELEASE_ID" --bundle-id "$BUNDLE_ID" --published true > "$WORK/publish.log" 2>&1 \
+                || { cat "$WORK/publish.log" >&2; fail "amore releases update --published true"; }
+            FEED="$(plutil -extract SUFeedURL raw -o - "$INFO")"
+            KEY="$(plutil -extract SUPublicEDKey raw -o - "$INFO")"
+            # The appcast can lag the publish by a little.
+            for try in 1 2 3 4 5 6; do
+                curl -fsSL -o "$WORK/appcast.xml" "$FEED" \
+                    && "${CHECK[@]}" appcast "$WORK/appcast.xml" "$BUILD" "$KEY" "$WORK/cdn.dmg" "$NOTES" 2> "$WORK/appcast.log" \
+                    && break
+                (( try < 6 )) || fail "appcast: $(cat "$WORK/appcast.log")"
+                sleep 10
+            done
+            VERDICT=" amore $RELEASE_ID published"
+        fi
+    fi
 fi
 
 cat "$OUT/SHA256SUMS"
-echo "PASS release$( (( DRY )) && echo " (dry run)") $ZIP"
+echo "PASS release$( (( DRY )) && echo " (dry run)")$VERDICT $ZIP"

@@ -490,22 +490,23 @@ struct KBootTests {
     static let recorded: [(String, String, String, String)] = [
         (
             "k48ap-7B500", "018-8374-001-ramdisk.dmg",
-            "71f2b5c862f4b2445bcb085071c2b6264f36e0750ea701d2d9a588f0b6d97423",
-            "5f921d8a7dfa60f9203c653d7524cbcc23bbfe4f4402858e4ebafe54a5eb754f"
+            "0a61765e96e1b0b517206d89d9bad8e0e037d72cbda011696214bf6fa4f63a90",
+            "3b2d402061379132be46283a335bcaf079179088a57ebdf622d968c719ed09b2"
         ),
         (
             "k48ap-8C148", "038-0024-002-ramdisk.dmg",
-            "b983e3f72a757f3c7581c1d55cb7b5432550935d4fba5ebe4ea64560bcd6f98e",
-            "fc3e36b72520d33cabad48d58385d1787d1a55510164e4a7d771eb8810117324"
+            "1c3e0d521e23a951c30c35ff0f306767468d5bec25bfdcf0fbd68ff79e42719c",
+            "bddd3c67d79efa9747a4ac12f0080b477f21c17a78d96a76800ad0c4aa1d420b"
         ),
         (
             "k48ap-7B367", "018-7225-009-ramdisk.dmg",
-            "9df137569c86ad51d814f1da56ac33bf178f8763b27f96fdd4784b95a652770e",
-            "94703af6dbba02cc7ba691bfecaa6801662345d5e18a135e5384126bec31d495"
+            "2bad2b498e7fca57f32f747fd2bf274681f1d008dd06a5fd9c165b191f56c6be",
+            "a68995bb8b64a8f646834dbfb89cbec088cfd2386ef47bc30be8898d6c00c7b8"
         ),
     ]
 
-    /// The whole Swift chain (IPSW -> FirmwareDecryptor -> KBoot) against the recorded digests of the Python chain's kboot.bin.
+    /// The whole Swift chain (IPSW -> FirmwareDecryptor -> KBoot) against kboot.bin's recorded digests: the Swift chain's own,
+    /// whose iPad rows boot (the Python chain's went stale with the 10-08 identity changes).
     @Test(
         .enabled(if: FixtureRequirements.corpusEnabled, "Firmware corpus test; set FK_TEST_CORPUS=1 to run"),
         arguments: recorded
