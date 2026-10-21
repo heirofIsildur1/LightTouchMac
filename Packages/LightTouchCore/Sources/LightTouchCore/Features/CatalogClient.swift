@@ -282,6 +282,14 @@ public enum CatalogClient {
         }
     }
 
+    /// Where an archived copy may come from: Legacy Store itself (baseURL's scheme and host) or the Internet Archive
+    /// it links to, over https. Anything else the catalog names (another scheme, another host) is refused.
+    static func acceptsDownload(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return false }
+        if scheme == baseURL.scheme?.lowercased(), host == baseURL.host?.lowercased() { return true }
+        return scheme == "https" && (host == "archive.org" || host.hasSuffix(".archive.org"))
+    }
+
     /// Revalidate each selection, then let URLSession stream the transfer to
     /// disk — unless the library already holds the copy (its checksum), in
     /// which case the file is a clone of that, with no transfer. A failed or
@@ -323,6 +331,10 @@ public enum CatalogClient {
             if let stored = known ?? details?.md5.flatMap(IPALibrary.stored(md5:)) {
                 try IPALibrary.clone(stored, to: file)
             } else if let details {
+                guard acceptsDownload(current.downloadURL) else {
+                    log("Legacy Store: refused download_url \(current.downloadURL.absoluteString)")
+                    throw CatalogError.invalidCopy("Legacy Store named a download Light Touch doesn’t accept.")
+                }
                 let delegate = CatalogDownloadProgress(report: progress)
                 let (temporary, response) = try await URLSession.shared.download(
                     for: request(current.downloadURL),

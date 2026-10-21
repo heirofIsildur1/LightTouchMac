@@ -10,6 +10,11 @@ extension SharedState {
     /// response shapes (tests/fixtures/store-compat).
     @Suite struct CatalogClientTests {
         nonisolated static let body = Data(String(repeating: "catalog download fixture\n", count: 4096).utf8)
+        /// Copies whose download_url is neither the store's own origin nor the Internet Archive over https.
+        nonisolated static let refusedDownloads = [
+            "881": "https://elsewhere.test/ipa/881", "882": "http://ia800.us.archive.org/ipa/882",
+            "883": "file:///ipa/883",
+        ]
 
         /// tests/fixtures/catalog-server.py: one fixture app per ipa_id, its copy record, two versions and the archive.
         nonisolated static func fixtureServer(_ request: URLComponents) -> LegacyStoreStub.Reply {
@@ -18,7 +23,8 @@ extension SharedState {
                 [
                     "name": "Fixture App", "bundle_id": "test.fixture", "developer": "Fixture", "version": "1.0",
                     "min_os": "3.0",
-                    "size": body.count, "ipa_id": Int(id)!, "download_url": "http://catalog.test/ipa/" + id,
+                    "size": body.count, "ipa_id": Int(id)!,
+                    "download_url": refusedDownloads[id] ?? "http://catalog.test/ipa/" + id,
                     "app_url": "http://catalog.test/app/test.fixture",
                 ]
             }
@@ -80,6 +86,18 @@ extension SharedState {
                     #expect(try Data(contentsOf: file) == Self.body)
                     #expect(file.path.hasPrefix(work.appendingPathComponent("catalog-123-").path))
                     try FileManager.default.removeItem(at: file.deletingLastPathComponent())
+
+                    for id in Self.refusedDownloads.keys.sorted() {
+                        let copy = try await CatalogClient.compatibleCopy(Int(id)!)
+                        do {
+                            _ = try await CatalogClient.download(copy) { _ in }
+                            Issue.record("\(copy.downloadURL) was downloaded")
+                        } catch CatalogError.invalidCopy {}
+                    }
+                    #expect(
+                        !LegacyStoreStub.requests.contains { $0.path.hasPrefix("/ipa/88") },
+                        "a refused download_url was requested"
+                    )
 
                     let bad = try await CatalogClient.compatibleCopy(666)
                     await #expect(throws: CatalogError.self) { try await CatalogClient.download(bad) { _ in } }
