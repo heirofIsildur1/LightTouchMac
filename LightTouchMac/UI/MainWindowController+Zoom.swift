@@ -23,15 +23,21 @@ extension MainWindowController {
         syncZoomControls()
     }
 
-    /// Gray out a direction there is no room left in.
+    /// Gray out a direction there is no room left in, on every zoom item in the toolbar.
     func syncZoomControls() {
+        for item in window?.toolbar?.items ?? [] where item.itemIdentifier == .zoom {
+            if let control = item.view as? NSSegmentedControl { syncZoomControl(control) }
+        }
+    }
+
+    private func syncZoomControl(_ control: NSSegmentedControl) {
         let screen = deviceVC?.screen
-        zoomControl.setEnabled(
+        control.setEnabled(
             screen.map { $0.zoomContext.canStep(from: $0.zoomPoints, direction: -1) } ?? false,
             forSegment: 0
         )
-        zoomControl.setEnabled(screen != nil, forSegment: 1)
-        zoomControl.setEnabled(
+        control.setEnabled(screen != nil, forSegment: 1)
+        control.setEnabled(
             screen.map { $0.zoomContext.canStep(from: $0.zoomPoints, direction: 1) } ?? false,
             forSegment: 2
         )
@@ -52,36 +58,9 @@ extension MainWindowController {
     @objc func zoomToFit(_ sender: Any?) { apply(.fit) }
     @objc func zoomPixelAccurate(_ sender: Any?) { apply(.pixelAccurate) }
 
-    func configureZoomControl() {
-        // Out, zoom to fit, in. Momentary, because all are commands rather than states
-        // to sit in — which state you are in is the menu's job, where the
-        // checkmarks live.
-        zoomControl.segmentCount = 3
-        zoomControl.trackingMode = .momentary
-        zoomControl.segmentStyle = .separated
-        let symbols = [
-            ("minus.magnifyingglass", "Zoom Out", "⌘−"),
-            ("arrow.up.left.and.down.right.magnifyingglass", "Zoom to Fit", "⌘0"),
-            ("plus.magnifyingglass", "Zoom In", "⌘+"),
-        ]
-        for (index, (symbol, label, key)) in symbols.enumerated() {
-            zoomControl.setImage(
-                NSImage(systemSymbolName: symbol, accessibilityDescription: label),
-                forSegment: index
-            )
-            zoomControl.setToolTip("\(label) (\(key))", forSegment: index)
-        }
-        zoomControl.target = self
-        zoomControl.action = #selector(zoomSegmentClicked(_:))
-        zoomControl.sizeToFit()
-    }
-
     func makeZoomToolbarItem() -> NSToolbarItem {
-        let item = NSToolbarItem(itemIdentifier: .zoom)
-        item.label = "Zoom"
-        item.paletteLabel = "Zoom"
-        item.toolTip = "Change the device’s size"
-        item.view = zoomControl
+        let item = NSToolbarItem.zoom(target: self, action: #selector(zoomSegmentClicked(_:)))
+        if let control = item.view as? NSSegmentedControl { syncZoomControl(control) }
         return item
     }
 

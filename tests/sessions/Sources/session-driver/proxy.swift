@@ -70,6 +70,7 @@ nonisolated enum ProxyProbe {
         WebProxyConfiguration.guestForward(socket: endpoint.socket) + (p.domain.map { ",domainname=\($0)" } ?? "")
     let cache = GuestAgentCache()
     var agent: GuestAgent { GuestAgent(link: d.process.link, cache: cache) }
+    var forks: ForkWatch?
     func localTool(_ name: String) throws -> Data {
         guard
             let tool = try GuestPackage.package(in: URL(fileURLWithPath: p.itpack), board: "n72ap", build: "7E18")?.1[
@@ -84,6 +85,8 @@ nonisolated enum ProxyProbe {
     func boot(_ generation: Int) async {
         do { try d.boot(generation: generation) } catch { fail("boot \(generation): \(error)") }
         await waitLit(d, ipad ? 0.2 : 0.03, 240)
+        // From the helper's hello on (its pid), before the guest has a network.
+        if generation == 1 { forks = ForkWatch(pid: d.helloPID ?? d.process.link.pid) }
         await waitUSB(d, expecting: ipad ? "iPad1,1" : "iPod2,1", 300)
         let alive = await agent.waitAlive(seconds: 90)
         let packaged = d.process.status?.guestPackage != nil
@@ -288,6 +291,9 @@ nonisolated enum ProxyProbe {
         d.screenshot("safari-https")
     }
     emit("safari", ["device": d.name, "launched": launched])
+    // Every proxy connection so far (the fetches, the route, Safari's page) reached the helper without it starting a
+    // process: slirp connects them to the proxy's socket itself (WebProxyConfiguration.guestForward).
+    emit("forks", ["device": d.name, "watched": forks != nil, "count": forks?.count ?? -1])
     // A restart on the same overlay: the trust runs again (idempotent, silent); unlocked, the home screen, no profile screen.
     _ = try? await d.process.link.request(.agent(request: "\(UUID().uuidString) halt \n", deadline: 0), timeout: 5)
     let quit = Date()
@@ -311,4 +317,34 @@ nonisolated enum ProxyProbe {
     d.serial?.finish()
     emit("done")
     exit(0)
+}
+
+/// How many processes `pid` forks from now on (kqueue NOTE_FORK; forks between two reads may count once, so a
+/// lower bound): the helper starts none while the guest uses the web proxy.
+final class ForkWatch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var forks = 0
+
+    init?(pid: pid_t) {
+        let queue = kqueue()
+        var change = kevent(
+            ident: UInt(pid),
+            filter: Int16(EVFILT_PROC),
+            flags: UInt16(EV_ADD | EV_CLEAR),
+            fflags: UInt32(NOTE_FORK) | UInt32(NOTE_EXIT),
+            data: 0,
+            udata: nil
+        )
+        guard pid > 0, queue >= 0, kevent(queue, &change, 1, nil, 0, nil) == 0 else { return nil }
+        Thread.detachNewThread { [self] in
+            var event = kevent()
+            while kevent(queue, nil, 0, &event, 1, nil) >= 0 {
+                if event.fflags & UInt32(NOTE_FORK) != 0 { lock.withLock { forks += 1 } }
+                if event.fflags & UInt32(NOTE_EXIT) != 0 { break }
+            }
+            close(queue)
+        }
+    }
+
+    var count: Int { lock.withLock { forks } }
 }

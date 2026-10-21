@@ -1,7 +1,7 @@
 // The web proxy for one device, in its helper (the process whose QEMU owns the
 // guest's sockets). The guest's PAC or itproxy setting sends every request to
-// 10.0.2.100:3128; that guestfwd runs `/usr/bin/nc -U SOCKET`
-// (WebProxyConfiguration.guestForward), so each guest connection arrives here.
+// 10.0.2.100:3128; slirp connects each connection there to SOCKET from this
+// process (WebProxyConfiguration.guestForward), so each guest connection arrives here.
 //
 // Routing is CONFIG (web-proxy.conf), read per connection: `direct`, `off`, or
 // `archive` and a yyyyMMdd date. Upstream is URLSession (HTTP/2, the Mac's

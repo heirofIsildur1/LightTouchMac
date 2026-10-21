@@ -147,7 +147,7 @@ struct BootRecipeTests {
     }
 
     @Test func theWifiNetdevBothWaysAndWhatTheHelperReadsFromIt() {
-        let fwd = ",guestfwd=tcp:10.0.2.100:3128-cmd:/usr/bin/nc -U /tmp/p.sock"
+        let fwd = ",guestfwd=tcp:10.0.2.100:3128-unix-connect:/tmp/p.sock"
         #expect(
             BootRecipe.wifiNetdev(guestForward: fwd, restricted: false) == "user,id=wifi0" + fwd + ",lan=off",
             "the default refuses the LAN"
@@ -172,14 +172,14 @@ struct BootRecipeTests {
         )
         #expect(argv(BootRecipe.wifiNetdev(guestForward: fwd, restricted: false, localNetwork: true)).wifiLocalNetwork)
         #expect(
-            !argv("user,id=wifi0,guestfwd=tcp:10.0.2.100:3128-cmd:/usr/bin/nc -U /tmp/restrict=on").wifiRestricted,
+            !argv("user,id=wifi0,guestfwd=tcp:10.0.2.100:3128-unix-connect:/tmp/restrict=on").wifiRestricted,
             "a path containing restrict=on"
         )
     }
 
     /// An iPhone's cell0 follows wifi0's lan=, and with no wifi0 given (networking off) still starts off the LAN.
     @Test func anIPhonesCell0StaysOffTheLANLikeWifi0() {
-        let fwd = ",guestfwd=tcp:10.0.2.100:3128-cmd:/usr/bin/nc -U /tmp/p.sock"
+        let fwd = ",guestfwd=tcp:10.0.2.100:3128-unix-connect:/tmp/p.sock"
         let m68 = DeviceInfo(
             machine: "iphone2g",
             board: "m68ap",

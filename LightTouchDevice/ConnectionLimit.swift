@@ -1,6 +1,7 @@
 // How many of a listener's connections are served at once (WebProxy). Each guest connection to the web proxy is a
-// thread here and, on slirp's side, an `nc` process, so a guest opening connections without end would take the
-// user's process and thread limits; past the cap a connection is closed at once, which ends its `nc` too.
+// thread here and a socket pair in this process (slirp connects it to the proxy's socket), so a guest opening
+// connections without end would take the user's thread limit; past the cap a connection is closed at once, which
+// closes the guest's end too.
 
 import Foundation
 
