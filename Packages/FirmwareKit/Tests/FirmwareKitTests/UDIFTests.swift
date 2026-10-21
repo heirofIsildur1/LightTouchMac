@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 
@@ -42,6 +43,64 @@ import Testing
                 try await UDIF.extractRootfs(dmg: dmg!, to: raw)
             }
             #expect(try Oracle.sha256(file: raw) == fw.rawVolume)
+        }
+    }
+}
+
+/// UDIFReader against hdiutil convert -format UDTO (the oracle; test only), byte for byte over every partition
+/// but the free-space ones, which hdiutil fills from whatever its buffer last held (the same bytes every run).
+@Suite(.serialized) struct UDIFReaderTests {
+    /// SHA-256 of `raw` over the sectors of every blkx entry of `dmg` not named Apple_Free.
+    static func digest(_ raw: URL, _ dmg: URL) throws -> String {
+        let d = try Data(contentsOf: dmg)
+        let koly = [UInt8](d.suffix(512))
+        let xml = d[Int(be64(koly, 0xD8))..<Int(be64(koly, 0xD8) + be64(koly, 0xE0))]
+        let plist = try PropertyListSerialization.propertyList(from: xml, format: nil) as? [String: Any]
+        let blkx = (plist?["resource-fork"] as? [String: Any])?["blkx"] as? [[String: Any]] ?? []
+        let r = try Data(contentsOf: raw)
+        var h = SHA256()
+        for b in blkx where !((b["Name"] as? String) ?? "").contains("Apple_Free") {
+            let m = [UInt8](b["Data"] as? Data ?? Data())
+            let first = Int(be64(m, 8)) * 512
+            h.update(data: r[first..<first + Int(be64(m, 16)) * 512])
+        }
+        #expect(blkx.count > 1)
+        return h.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// zlib (UDZO), ADC (UDCO) and raw (UDRO) block tables, each with zero-fill runs.
+    @Test(arguments: ["UDZO", "UDCO", "UDRO"]) func matchesHdiutil(_ format: String) async throws {
+        try await Oracle.withTemp { dir in
+            let src = dir.appendingPathComponent("src")
+            try FileManager.default.createDirectory(at: src, withIntermediateDirectories: true)
+            var rng = SystemRandomNumberGenerator()
+            try Data((0..<3_000_000).map { _ in UInt8.random(in: 0...255, using: &rng) })
+                .write(to: src.appendingPathComponent("noise"))
+            try Data(String(repeating: "hello\n", count: 300_000).utf8).write(to: src.appendingPathComponent("text"))
+            let dmg = dir.appendingPathComponent("t.dmg")
+            try await DiskImage.run([
+                "/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.path, "-fs", "HFS+", "-volname", "T",
+                "-format", format, dmg.path,
+            ])
+            let ours = dir.appendingPathComponent("ours")
+            try UDIFReader.convertToRaw(dmg, to: ours)
+            let theirs = dir.appendingPathComponent("theirs")
+            try await DiskImage.convertToRaw(dmg, to: theirs, backend: .hdiutil)
+            #expect(try Self.digest(ours, dmg) == Self.digest(theirs, dmg))
+        }
+    }
+
+    /// A decrypted IPSW root filesystem (n72ap 7E18, from the local decrypt cache): the volume UDIF.extractRootfs
+    /// takes out through UDIFReader is the one recorded from hdiutil's conversion.
+    @Test(.enabled(if: FixtureRequirements.corpusEnabled, "Firmware corpus test; set FK_TEST_CORPUS=1 to run"))
+    func rootFilesystemMatchesTheRecordedVolume() async throws {
+        let fw = Oracle.firmware("n72ap-7E18")
+        let dmg = try #require(fw.cache).appendingPathComponent("rootfs.dmg")
+        guard Oracle.exists(dmg) else { try FixtureRequirements.missing(dmg.path) }
+        try await Oracle.withTemp { dir in
+            let ours = dir.appendingPathComponent("ours")
+            try await UDIF.extractRootfs(dmg: dmg, to: ours, backend: .writer)
+            #expect(try Oracle.sha256(file: ours) == fw.rawVolume)
         }
     }
 }

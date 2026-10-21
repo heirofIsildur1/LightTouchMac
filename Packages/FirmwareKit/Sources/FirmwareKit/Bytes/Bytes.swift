@@ -12,6 +12,27 @@ func be32(_ b: [UInt8], _ o: Int) -> UInt32 {
     UInt32(b[o]) << 24 | UInt32(b[o + 1]) << 16 | UInt32(b[o + 2]) << 8 | UInt32(b[o + 3])
 }
 
+func be16(_ b: [UInt8], _ o: Int) -> UInt16 { UInt16(b[o]) << 8 | UInt16(b[o + 1]) }
+func le64(_ b: [UInt8], _ o: Int) -> UInt64 { UInt64(le32(b, o)) | UInt64(le32(b, o + 4)) << 32 }
+func be64(_ b: [UInt8], _ o: Int) -> UInt64 { UInt64(be32(b, o)) << 32 | UInt64(be32(b, o + 4)) }
+
+/// `v`, big-endian (HFS+), at `o`.
+func putBE16(_ b: inout [UInt8], _ o: Int, _ v: UInt16) {
+    b[o] = UInt8(v >> 8)
+    b[o + 1] = UInt8(v & 0xFF)
+}
+
+/// `v`, big-endian (HFS+), at `o`.
+func putBE32(_ b: inout [UInt8], _ o: Int, _ v: UInt32) {
+    for k in 0..<4 { b[o + k] = UInt8(truncatingIfNeeded: v >> (24 - 8 * k)) }
+}
+
+/// `v`, big-endian (HFS+), at `o`.
+func putBE64(_ b: inout [UInt8], _ o: Int, _ v: UInt64) {
+    putBE32(&b, o, UInt32(v >> 32))
+    putBE32(&b, o + 4, UInt32(truncatingIfNeeded: v))
+}
+
 /// `v`'s low 16 bits, little-endian, at `o`.
 func put16(_ b: inout [UInt8], _ o: Int, _ v: Int) {
     b[o] = UInt8(v & 0xFF)

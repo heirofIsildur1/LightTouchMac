@@ -218,6 +218,14 @@ public final class HFSPlusVolume {
         guard let x = try decmpfsHeader(r.cnid) else {
             throw FirmwareError(.unsupported, "\(r.name): compressed, no decmpfs attribute")
         }
+        return try Self.decmpfs(x, name: r.name) {
+            guard let rf = r.resource else { return [] }
+            return try read(rf, fileID: r.cnid, resource: true, offset: 0, count: Int(rf.logicalSize))
+        }
+    }
+
+    /// The content of a compressed file from its com.apple.decmpfs attribute `x` and, for type 4, its resource fork.
+    static func decmpfs(_ x: [UInt8], name: String, resourceFork: () throws -> [UInt8]) throws -> [UInt8] {
         let type = le32(x, 4)
         let size = Int(le64(x, 8))
         func inflate(_ c: ArraySlice<UInt8>, _ max: Int) throws -> [UInt8] {
@@ -226,17 +234,15 @@ public final class HFSPlusVolume {
             let z = Array(c.dropFirst(2))  // zlib header; COMPRESSION_ZLIB is raw deflate
             var out = [UInt8](repeating: 0, count: max)
             let n = compression_decode_buffer(&out, max, z, z.count, nil, COMPRESSION_ZLIB)
-            guard n > 0 || max == 0 else { throw FirmwareError(.unsupported, "\(r.name): bad decmpfs zlib data") }
+            guard n > 0 || max == 0 else { throw FirmwareError(.unsupported, "\(name): bad decmpfs zlib data") }
             return Array(out.prefix(n))
         }
         var out: [UInt8]
         switch type {
         case 3: out = try inflate(x[16...], size)
         case 4:
-            guard let rf = r.resource, rf.logicalSize >= 260 else {
-                throw FirmwareError(.unsupported, "\(r.name): no compressed resource fork")
-            }
-            let fork = try read(rf, fileID: r.cnid, resource: true, offset: 0, count: Int(rf.logicalSize))
+            let fork = try resourceFork()
+            guard fork.count >= 260 else { throw FirmwareError(.unsupported, "\(name): no compressed resource fork") }
             let base = Int(be32(fork, 0)) + 4
             let n = Int(le32(fork, base))
             out = []
@@ -245,14 +251,14 @@ public final class HFSPlusVolume {
                 let off = base + Int(le32(fork, base + 4 + 8 * k))
                 let len = Int(le32(fork, base + 8 + 8 * k))
                 guard off + len <= fork.count else {
-                    throw FirmwareError(.unsupported, "\(r.name): decmpfs block past the fork")
+                    throw FirmwareError(.unsupported, "\(name): decmpfs block past the fork")
                 }
                 out += try inflate(fork[off..<off + len], min(1 << 16, size - out.count))
             }
-        default: throw FirmwareError(.unsupported, "\(r.name): decmpfs type \(type)")
+        default: throw FirmwareError(.unsupported, "\(name): decmpfs type \(type)")
         }
         guard out.count == size else {
-            throw FirmwareError(.unsupported, "\(r.name): decompressed \(out.count) of \(size) bytes")
+            throw FirmwareError(.unsupported, "\(name): decompressed \(out.count) of \(size) bytes")
         }
         return out
     }
@@ -703,15 +709,4 @@ public final class HFSPlusVolume {
             }
         }
     }
-}
-
-private func be16(_ b: [UInt8], _ o: Int) -> UInt16 { UInt16(b[o]) << 8 | UInt16(b[o + 1]) }
-private func le64(_ b: [UInt8], _ o: Int) -> UInt64 { UInt64(le32(b, o)) | UInt64(le32(b, o + 4)) << 32 }
-private func be64(_ b: [UInt8], _ o: Int) -> UInt64 { UInt64(be32(b, o)) << 32 | UInt64(be32(b, o + 4)) }
-/// `v`, big-endian (HFS+), at `o`.
-private func putBE32(_ b: inout [UInt8], _ o: Int, _ v: UInt32) {
-    b[o] = UInt8(v >> 24)
-    b[o + 1] = UInt8(v >> 16 & 0xFF)
-    b[o + 2] = UInt8(v >> 8 & 0xFF)
-    b[o + 3] = UInt8(v & 0xFF)
 }

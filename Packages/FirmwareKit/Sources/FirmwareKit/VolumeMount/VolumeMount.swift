@@ -18,6 +18,13 @@
 import Foundation
 
 public enum VolumeMount {
+    /// How volumes are edited: `kernel`, attached and mounted through the stock tools (the default), or `writer`,
+    /// offline through HFSPlusWriter and UDIFReader. FIRMWAREKIT_HFS=writer|kernel overrides.
+    public enum Backend: String, Sendable { case kernel, writer }
+
+    public static let backend: Backend =
+        ProcessInfo.processInfo.environment["FIRMWAREKIT_HFS"].flatMap(Backend.init) ?? .kernel
+
     /// What macOS drops on a mounted volume; removed from its root before unmounting.
     public static let junk = [".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", ".DS_Store"]
 

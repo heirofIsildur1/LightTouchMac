@@ -172,10 +172,6 @@ public enum Activation {
     }
 }
 
-private func putBE32(_ b: inout [UInt8], _ offset: Int, _ value: UInt32) {
-    for i in 0..<4 { b[offset + i] = UInt8(truncatingIfNeeded: value >> (24 - i * 8)) }
-}
-
 /// Mach-O header checks for the guest helpers, through MachOKit: thin/fat files, their slices' cpu, load
 /// commands and LC_CODE_SIGNATURE.
 enum MachOSignature {
