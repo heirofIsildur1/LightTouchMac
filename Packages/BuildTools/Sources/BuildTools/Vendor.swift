@@ -56,26 +56,28 @@ public struct Vendor {
     static let guestTools = [
         "it_pbd", "it_prefs", "it_msmquiet.dylib", "it_seal", "it_keybag", "libappsync.dylib",
         "OpenGLES", "gles-names.h", "OpenGLES-1x", "opengles-1x.exports", "armv6.itpack", "armv7.itpack",
-        "sblaunch", "sbdlicon", "it_agent", "it_typein.dylib", "it_keybag-armv6",
+        "sblaunch", "sbdlicon", "it_agent", "it_typein.dylib", "it_keybag-armv6"
     ]
     static let guestPackageMinSerial = 16
     static let tools = [
-        "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources", "Packages/ReleaseChecks/Sources",
+        "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources", "Packages/ReleaseChecks/Sources"
     ]
     static let keyed =
         [
             "build-support/sources.json", "build-support/dependencies.json", "scripts/build-package-native.sh",
             "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh", developerImages,
+            "build-support/checks"
         ] + tools
     static let staticKeyed = [
         "scripts/build-static-deps.sh", "build-support/dependencies.json",
+        "build-support/patches/libplist-bin-limits.patch",
         "Packages/BuildTools/Sources/BuildTools/DependencySources.swift",
-        "Packages/BuildTools/Sources/BuildTools/Records.swift",
+        "Packages/BuildTools/Sources/BuildTools/Records.swift"
     ]
     // The built-in iPod is prepared again when any of these change (firmwarekit, the helper it boots).
     static let deviceSources = [
         "Packages/FirmwareKit/Sources", "Packages/FirmwareKit/Package.swift", "Packages/HostRuntime/Sources",
-        "LightTouchDevice", "Packages/DeviceRuntime",
+        "LightTouchDevice", "Packages/DeviceRuntime"
     ]
 
     public init(root: URL) { self.root = root }
@@ -155,7 +157,7 @@ public struct Vendor {
         let commit = pin("qemu-ios")["commit"] ?? ""
         if !files.fileExists(atPath: tree.path) {
             try run([
-                "/usr/bin/git", "-C", checkout("qemu-ios").path, "worktree", "add", "--detach", "-q", tree.path, commit,
+                "/usr/bin/git", "-C", checkout("qemu-ios").path, "worktree", "add", "--detach", "-q", tree.path, commit
             ])
         }
         guard try output(["git", "-C", tree.path, "rev-parse", "HEAD"]) == commit else {
@@ -184,7 +186,7 @@ public struct Vendor {
             try files.createDirectory(at: slice.deletingLastPathComponent(), withIntermediateDirectories: true)
             let e = env([
                 "LTM_ARCH": arch, "QEMU_IOS_DIR": qemu.path,
-                "LTM_STATIC_DEPS": staticRoot.appendingPathComponent("prefix").path,
+                "LTM_STATIC_DEPS": staticRoot.appendingPathComponent("prefix").path
             ])
             if !Self.staticComplete(staticRoot) {
                 remove(staticRoot)
@@ -207,7 +209,7 @@ public struct Vendor {
             [
                 "/bin/bash", scripts.appendingPathComponent("build-iboot32patcher.sh").path,
                 work.appendingPathComponent("native/arm64/src").path,
-                universal.appendingPathComponent("build/iBoot32Patcher").path,
+                universal.appendingPathComponent("build/iBoot32Patcher").path
             ],
             log: work.appendingPathComponent("logs/universal.log"),
             environment: env(["LTM_ARCH": Self.archs.joined(separator: " ")])
@@ -291,7 +293,7 @@ public struct Vendor {
         let scratch = work.appendingPathComponent("firmwarekit-build")
         let swift = [
             "swift", "build", "-c", "release", "--package-path",
-            root.appendingPathComponent("Packages/FirmwareKit").path, "--scratch-path", scratch.path,
+            root.appendingPathComponent("Packages/FirmwareKit").path, "--scratch-path", scratch.path
         ]
         try run(swift, log: log)
         let bin = try output(swift + ["--show-bin-path"])
@@ -301,7 +303,7 @@ public struct Vendor {
                 root.appendingPathComponent("LightTouchMac.xcodeproj").path, "-target", "LightTouchDevice",
                 "-configuration", "Release", "SYMROOT=\(work.path)/xcode", "COMPILER_INDEX_STORE_ENABLE=NO",
                 "OBJROOT=\(work.path)/xcode/obj", "-clonedSourcePackagesDirPath", "\(work.path)/xcode/packages",
-                "CODE_SIGNING_ALLOWED=NO", "build",
+                "CODE_SIGNING_ALLOWED=NO", "build"
             ],
             log: log
         )
@@ -362,7 +364,7 @@ public struct Vendor {
                 "--cache", device.appendingPathComponent("cache").path, "--guest-tools", guestTools.path,
                 "--helper", stage.appendingPathComponent("MacOS/LightTouchDevice").path,
                 // The firmware's own language, region and keyboard, whatever the building Mac's.
-                "--language", "en-US", "--keyboards", "",
+                "--language", "en-US", "--keyboards", ""
             ],
             log: log,
             environment: clean
@@ -376,7 +378,7 @@ public struct Vendor {
             [
                 stage.appendingPathComponent("MacOS/firmwarekit").path, "pack-base", "--base",
                 device.appendingPathComponent("out").path,
-                "--out", blob.path,
+                "--out", blob.path
             ] + reuse,
             log: log,
             environment: clean
@@ -458,14 +460,14 @@ public struct Vendor {
         try run(
             ["/usr/bin/cc", "-O2", "-Wall"] + Self.archs.flatMap { ["-arch", $0] } + [
                 "-mmacosx-version-min=\(Self.minos)",
-                qemu.appendingPathComponent("contrib/macos-app/ipod-helper.c").path, "-lz", "-o", helper.path,
+                qemu.appendingPathComponent("contrib/macos-app/ipod-helper.c").path, "-lz", "-o", helper.path
             ],
             log: toolsLog
         )
         for source in [
             universal.appendingPathComponent("build/usbmuxd/src/usbmuxd"),
             universal.appendingPathComponent("build/iBoot32Patcher/iBoot32Patcher"),
-            universal.appendingPathComponent("static/prefix/bin/inetcat"), helper,
+            universal.appendingPathComponent("static/prefix/bin/inetcat"), helper
         ] {
             let target = tools.appendingPathComponent(source.lastPathComponent)
             try files.copyItem(at: source.resolvingSymlinksInPath(), to: target)
@@ -482,7 +484,7 @@ public struct Vendor {
                 try run(
                     [
                         "/usr/bin/dsymutil", path.path, "-o",
-                        dsyms.appendingPathComponent("\(path.lastPathComponent).dSYM").path,
+                        dsyms.appendingPathComponent("\(path.lastPathComponent).dSYM").path
                     ],
                     log: toolsLog
                 )
@@ -570,7 +572,7 @@ public struct Vendor {
         try run(
             [
                 "/usr/bin/aa", "archive", "-d", packed.path, "-o", res.appendingPathComponent("Guest/guest.aar").path,
-                "-exclude-field", "uid,gid,flg,mtm,btm,ctm", "-exclude-name", ".DS_Store",
+                "-exclude-field", "uid,gid,flg,mtm,btm,ctm", "-exclude-name", ".DS_Store"
             ],
             log: toolsLog
         )
@@ -586,7 +588,7 @@ public struct Vendor {
         let licenses = res.appendingPathComponent("licenses")
         for source in [
             universal.appendingPathComponent("prefix/share/licenses"),
-            universal.appendingPathComponent("static/prefix/share/licenses"),
+            universal.appendingPathComponent("static/prefix/share/licenses")
         ] where files.fileExists(atPath: source.path) {
             try run(["/usr/bin/ditto", source.path, licenses.path])
         }
@@ -667,7 +669,7 @@ public struct Vendor {
         var components: [String: Any] = [
             "qemu-ios": String((qemuPin["commit"] ?? "").prefix(10)),
             "usbmuxd": String((usbPin["commit"] ?? "").prefix(10)),
-            "guest tools": "\(guestPackage["version"] ?? "") (serial \(guestPackage["serial"] ?? ""))",
+            "guest tools": "\(guestPackage["version"] ?? "") (serial \(guestPackage["serial"] ?? ""))"
         ]
         for package in try readJSON(root.appendingPathComponent("build-support/dependencies.json"))["packages"]
             as? [[String: Any]] ?? []
@@ -690,7 +692,7 @@ public struct Vendor {
                 "host_architectures": Self.archs, "firmware": ["bootroms_sha256": roms],
                 "guest_manifest_sha256": try sha256(guestRoot.appendingPathComponent("manifest.json")),
                 "xcode": try output(["xcodebuild", "-version"]),
-                "macos_sdk": try output(["xcrun", "--sdk", "macosx", "--show-sdk-version"]),
+                "macos_sdk": try output(["xcrun", "--sdk", "macosx", "--show-sdk-version"])
             ],
             to: res.appendingPathComponent("build-inputs.json")
         )

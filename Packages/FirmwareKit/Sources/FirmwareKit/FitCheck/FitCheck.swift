@@ -137,7 +137,7 @@ public enum FitCheck {
             return out
         }()
         static let precedentBinaries = [
-            "sbin/launchd", "System/Library/CoreServices/SpringBoard.app/SpringBoard", "usr/libexec/lockdownd",
+            "sbin/launchd", "System/Library/CoreServices/SpringBoard.app/SpringBoard", "usr/libexec/lockdownd"
         ]
 
         private var exportMemo: [String: Set<String>?] = [:]

@@ -80,7 +80,7 @@ import Testing
             let dmg = dir.appendingPathComponent("t.dmg")
             try await DiskImage.run([
                 "/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.path, "-fs", "HFS+", "-volname", "T",
-                "-format", format, dmg.path,
+                "-format", format, dmg.path
             ])
             let ours = dir.appendingPathComponent("ours")
             try UDIFReader.convertToRaw(dmg, to: ours)

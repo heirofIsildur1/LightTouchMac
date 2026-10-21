@@ -15,7 +15,7 @@ import Testing
                 "DeviceMap": [["BoardConfig": "n72ap", "Platform": "s5l8720x"]],
                 "KernelCachesByPlatform": ["s5l8720x": ["Release": "kernelcache.release.s5l8720x"]],
                 "SystemRestoreImages": ["User": "rootfs.dmg"],
-                "RestoreRamDisks": ["User": "018-4166-1.dmg", "Update": "018-4177-1.dmg"],
+                "RestoreRamDisks": ["User": "018-4166-1.dmg", "Update": "018-4177-1.dmg"]
             ]
             let metadata = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
             try metadata.write(to: dir.appendingPathComponent("Restore.plist"))
@@ -44,7 +44,7 @@ import Testing
             try K48Oracle.sh(
                 [
                     "/usr/bin/zip", "-q", "-r", "fixture.ipsw", "Restore.plist", "Firmware",
-                    "rootfs.dmg", "kernelcache.release.s5l8720x", "018-4166-1.dmg", "018-4177-1.dmg",
+                    "rootfs.dmg", "kernelcache.release.s5l8720x", "018-4166-1.dmg", "018-4177-1.dmg"
                 ],
                 cwd: dir
             )

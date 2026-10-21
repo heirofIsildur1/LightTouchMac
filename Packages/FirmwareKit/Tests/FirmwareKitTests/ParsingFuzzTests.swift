@@ -155,7 +155,7 @@ import Testing
             let dmg = dir.appendingPathComponent("t.dmg")
             try await DiskImage.run([
                 "/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.path, "-fs", "HFS+", "-volname", "T",
-                "-format", "UDZO", dmg.path,
+                "-format", "UDZO", dmg.path
             ])
             let clean = [UInt8](try Data(contentsOf: dmg))
             let koly = Array(clean.suffix(512))

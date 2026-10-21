@@ -293,7 +293,7 @@ import Testing
             try Data(String(repeating: "compress me ", count: 100_000).utf8).write(to: src)
             try await VolumeMount.withMounted(img, at: dir.appendingPathComponent("mnt")) { m in
                 _ = try await DiskImage.run([
-                    "/usr/bin/ditto", "--hfsCompression", src.path, m.appendingPathComponent("f").path,
+                    "/usr/bin/ditto", "--hfsCompression", src.path, m.appendingPathComponent("f").path
                 ])
             }
             func flags() throws -> (record: UInt16, owner: UInt8, cnid: UInt32) {

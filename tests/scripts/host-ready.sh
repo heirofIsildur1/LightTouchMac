@@ -13,6 +13,8 @@ perl -e 'use Fcntl ":flock"; open F, ">>", $ARGV[0]; flock(F, LOCK_EX); sleep 30
 holder=$!
 sleep 1
 check "a held slot is WAIT, exit 1" 'out="$("$SRC/scripts/host-ready")"; [[ $? == 1 && "$out" == "WAIT all 1 emulator slots taken"* ]]'
+check "one reason has no separator after it" '[[ "$("$SRC/scripts/host-ready")" == "WAIT all 1 emulator slots taken ($T)" ]]'
+check "two reasons are joined by \"; \"" '[[ "$(LTM_HOST_MIN_DISK_GB=100000000 "$SRC/scripts/host-ready")" == "WAIT all 1 emulator slots taken ($T); "*" GB free under ~/Developer (want 100000000; scripts/clean)" ]]'
 kill "$holder"
 wait "$holder" 2>/dev/null
 check "a slot whose holder died is READY" '"$SRC/scripts/host-ready" >/dev/null'

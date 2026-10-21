@@ -121,7 +121,7 @@ public enum N72NOR {
         try writeSysCfg(&nor, id)
         let bank = try nvramBank([
             ("debug-uarts", "1"), ("btaddr", (id["bt-mac"] ?? "").uppercased()),
-            ("wifiaddr", (id["wifi-mac"] ?? "").uppercased()),
+            ("wifiaddr", (id["wifi-mac"] ?? "").uppercased())
         ])
         nor.replaceSubrange(nvram..<nvram + nvramBank, with: bank)
         put32(&nor, 0x30, crc(nor[0..<0x30]))
@@ -133,7 +133,7 @@ public enum N72NOR {
         nor.replaceSubrange(sysCfg..<sysCfg + 4, with: Array("gfCS".utf8))
         for (i, v) in [0xC8, 0x2000, 0x0001_0001, 0, 4].enumerated() { put32(&nor, sysCfg + 4 + 4 * i, UInt32(v)) }
         for (i, (tag, key)) in [
-            ("Mod#", "model-number"), ("Regn", "region-info"), ("SrNm", "serial-number"), ("Batt", "battery-serial"),
+            ("Mod#", "model-number"), ("Regn", "region-info"), ("SrNm", "serial-number"), ("Batt", "battery-serial")
         ].enumerated() {
             let value = Array((id[key] ?? "").utf8)
             guard value.count <= 16 else { throw FirmwareError(.unsupported, "\(key) is longer than a SysCfg value") }

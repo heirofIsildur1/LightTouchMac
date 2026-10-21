@@ -23,7 +23,7 @@ enum FitFixture {
         "n90ap-10A5316k": Oracle.appCache.appendingPathComponent(
             "adc3ec213dd10dad9e6cf5f89029a4e6aa115a35/90fc8eb2bf33e08769f3533ad538eba91830c29b47d94cb9ddb45432479694dc/rootfs.dmg"
         ),
-        "n90ap-11D257": Oracle.path("Developer/qemu-ios-files/n90/11D257/dec/rootfs.dmg"),
+        "n90ap-11D257": Oracle.path("Developer/qemu-ios-files/n90/11D257/dec/rootfs.dmg")
     ]
     static func arch(_ id: String) -> String { id.hasPrefix("n72") ? "armv6" : "armv7" }
     static let springBoard = "System/Library/CoreServices/SpringBoard.app/SpringBoard"
@@ -33,7 +33,7 @@ enum FitFixture {
     /// What a guest binary's load check reads: the precedent executables, libSystem, the shared cache, SystemVersion.
     static func stock(_ id: String) -> [String] {
         FitCheck.Firmware.precedentBinaries + [
-            "usr/lib/libSystem.B.dylib", SystemEdits.dyldCache(arch(id)), GuestPackage.systemVersion,
+            "usr/lib/libSystem.B.dylib", SystemEdits.dyldCache(arch(id)), GuestPackage.systemVersion
         ]
     }
 
@@ -120,7 +120,7 @@ enum FitFixture {
     ) throws {
         let entries = edit(try GuestPack.read(src))
         let index = try JSONSerialization.data(withJSONObject: [
-            "format": 1, "entries": entries.map { ["name": $0.name, "size": $0.data.count] },
+            "format": 1, "entries": entries.map { ["name": $0.name, "size": $0.data.count] }
         ])
         let stream = try (entries.reduce(Data()) { $0 + $1.data } as NSData).compressed(using: .zlib) as Data
         var length = UInt32(index.count).littleEndian
@@ -254,10 +254,10 @@ enum FitFixture {
                 FitCheck.openGLES, FitCheck.quartzCore, FitCheck.coreImage, FitCheck.ioSurface,
                 FitCheck.ioMobileFramebuffer,
                 FitCheck.sgxEngine, "System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
-                "System/Library/Frameworks/Foundation.framework/Foundation", "usr/lib/libobjc.A.dylib",
+                "System/Library/Frameworks/Foundation.framework/Foundation", "usr/lib/libobjc.A.dylib"
             ] + FitCheck.coreSurfaces
         for id in [
-            "k48ap-7B500", "k48ap-8C148", "k48ap-9A5220p", "k48ap-9B206", "n72ap-5F138", "n72ap-7E18", "n72ap-8C148",
+            "k48ap-7B500", "k48ap-8C148", "k48ap-9A5220p", "k48ap-9B206", "n72ap-5F138", "n72ap-7E18", "n72ap-8C148"
         ] {
             try await Oracle.withTemp { dir in
                 guard let v = try await FitFixture.volume(id, FitFixture.stock(id) + files, in: dir) else {
@@ -309,7 +309,7 @@ enum FitFixture {
             FitCheck.openGLES, FitCheck.quartzCore, FitCheck.coreImage, FitCheck.ioSurface,
             FitCheck.ioMobileFramebuffer, FitCheck.sgxEngine,
             "System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
-            "System/Library/Frameworks/Foundation.framework/Foundation", "usr/lib/libobjc.A.dylib",
+            "System/Library/Frameworks/Foundation.framework/Foundation", "usr/lib/libobjc.A.dylib"
         ]
         try await Oracle.withTemp { dir in
             guard let v = try await FitFixture.volume(id, FitFixture.stock(id) + files, in: dir) else {
@@ -433,7 +433,7 @@ enum FitFixture {
             (
                 "n90ap-11D257", FitFixture.deviceOMatic, true,
                 "UNSUPPORTED_FAILURE_BODY through CFUserNotificationCreate"
-            ),
+            )
         ] {
             try await Oracle.withTemp { dir in
                 guard let v = try await FitFixture.volume(id, FitFixture.stock(id) + [program], in: dir) else {
@@ -563,7 +563,7 @@ enum FitFixture {
             )
         }
         for (id, modernFits) in [
-            ("n72ap-7E18", true), ("n72ap-8C148", nil), ("n72ap-7A341", false), ("n72ap-5F138", false),
+            ("n72ap-7E18", true), ("n72ap-8C148", nil), ("n72ap-7A341", false), ("n72ap-5F138", false)
         ] {
             try await Oracle.withTemp { dir in
                 guard let v = try await FitFixture.volume(id, FitFixture.stock(id), in: dir) else {
@@ -647,7 +647,7 @@ enum FitFixture {
             ("k48ap-7B500", [true, true, true]), ("k48ap-8C148", [true, true, true]),
             ("k48ap-9B206", [true, true, true]),
             ("n72ap-5F138", [true, false, false]), ("n72ap-7E18", [true, false, false]),
-            ("n72ap-8C148", [true, true, true]),
+            ("n72ap-8C148", [true, true, true])
         ] {
             try await Oracle.withTemp { dir in
                 guard let v = try await FitFixture.volume(id, Array(readers), in: dir) else {
@@ -672,7 +672,7 @@ enum FitFixture {
             ("k48ap-7B500", ipad, [], true), ("k48ap-9B206", ipad, [], true),
             ("k48ap-8C148", [["LK_ENABLE_OGL"]], [], false),
             ("n72ap-5F138", N72Board.sbSwitches, [], true), ("n72ap-7E18", N72Board.sbSwitches, [], true),
-            ("n72ap-8C148", N72Board.sbSwitches, [], true),
+            ("n72ap-8C148", N72Board.sbSwitches, [], true)
         ]
         for (id, switches, also, fits) in cases {
             try await Oracle.withTemp { dir in
@@ -705,7 +705,7 @@ enum FitFixture {
             [
                 ("172e8297af74b91971a802e6ad137c891f553099", false),
                 ("68b613f78581d36eab96aa5a007001dff142baa3", false),
-                ("8717b3bedc925b587566442ad375aa65d857e79a", true), ("ad9b607439250f2337fe132890dadc4c487beca8", false),
+                ("8717b3bedc925b587566442ad375aa65d857e79a", true), ("ad9b607439250f2337fe132890dadc4c487beca8", false)
             ].map {
                 (Oracle.ipadCache.appendingPathComponent($0.0 + "/kernelcache.mach"), KBoot.defaultBootArgs, $0.1)
             }
@@ -713,7 +713,7 @@ enum FitFixture {
                 ("c3c700be49ad227d1152188e7c1e46b8958fd1e4", false),
                 ("9af5625ea34acdd8abeb6fce71a72651d0c815d5", false),
                 ("0f7fc76d9b9aa826b5ab14be9821a315d3d9dc42", false),
-                ("5f4f5c01eda2f811f73167e7d1f82dbeed82367b", true), ("b9efddc7bb4350c237a8d3846af61bbfc8a2f647", true),
+                ("5f4f5c01eda2f811f73167e7d1f82dbeed82367b", true), ("b9efddc7bb4350c237a8d3846af61bbfc8a2f647", true)
             ].map {
                 (Oracle.ipodCache.appendingPathComponent($0.0 + "/kernelcache.mach"), pair, $0.1 ? nil : false)
             }
@@ -766,7 +766,7 @@ enum FitFixture {
             (
                 "k48ap-7B500", Oracle.ipadCache.appendingPathComponent("68b613f78581d36eab96aa5a007001dff142baa3"),
                 Oracle.firmware("k48ap-7B500").ipsw
-            ),
+            )
         ] {
             guard Oracle.exists(cache.appendingPathComponent("kernelcache.mach")), Oracle.exists(ipsw) else { continue }
             try Oracle.withTemp { dir in
@@ -845,7 +845,7 @@ enum FitFixture {
     func iPadKernelcacheWhereIBootLoadsIt() throws {
         for sha in [
             "172e8297af74b91971a802e6ad137c891f553099", "68b613f78581d36eab96aa5a007001dff142baa3",
-            "8717b3bedc925b587566442ad375aa65d857e79a", "ad9b607439250f2337fe132890dadc4c487beca8",
+            "8717b3bedc925b587566442ad375aa65d857e79a", "ad9b607439250f2337fe132890dadc4c487beca8"
         ] {
             let u = Oracle.ipadCache.appendingPathComponent(sha + "/iBoot.bin")
             guard Oracle.exists(u) else { continue }
@@ -897,7 +897,7 @@ enum FitFixture {
     static let appSyncFiles = [
         "usr/libexec/installd", "usr/libexec/mobile_installation_proxy", SystemEdits.installdJob,
         SystemEdits.daemons + "/com.apple.installd.plist",
-        "System/Library/Lockdown/Services.plist",
+        "System/Library/Lockdown/Services.plist"
     ]
 
     /// The installation service's volume for `id`: its program, everything it links, the jobs, the precedent binaries.

@@ -645,7 +645,7 @@ public final class HFSPlusVolume {
     /// space, then the offsets of the records and of the free space, from the node's end.
     func zeroBTreeSlack() throws {
         for (fork, id) in [
-            (catalogFork, Self.catalogID), (extentsFork, Self.extentsID), (attributesFork, Self.attributesID),
+            (catalogFork, Self.catalogID), (extentsFork, Self.extentsID), (attributesFork, Self.attributesID)
         ] where fork.logicalSize > 0 {
             let t = try btree(fork, fileID: id)
             for node in 0..<(Int(fork.logicalSize) / t.nodeSize) {

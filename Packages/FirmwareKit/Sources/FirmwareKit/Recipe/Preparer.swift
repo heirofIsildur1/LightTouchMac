@@ -171,7 +171,7 @@ public enum Preparer {
     ) throws -> (OneShot, String) {
         var config: [String: Any] = [
             "boot": ["argv": argv, "environment": [String: String](), "machine": machine],
-            "serialLog": serial.path, "timeout": timeout,
+            "serialLog": serial.path, "timeout": timeout
         ]
         if let stop { config["stopMarker"] = stop }
         if let stopPattern { config["stopPattern"] = stopPattern }

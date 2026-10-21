@@ -16,72 +16,71 @@ import Testing
         let img = URL(fileURLWithPath: "/tmp/v.img")
         let raw = ["-imagekey", "diskimage-class=CRawDiskImage"]
         #expect(
-            DiskImage.attachCommand(img, readOnly: false, mount: false, backend: .hdiutil)
+            DiskImage.attachCommand(img, readOnly: false, backend: .hdiutil)
                 == ["/usr/bin/hdiutil", "attach", "-plist"] + raw + ["-nomount", "-nobrowse", "/tmp/v.img"]
         )
         #expect(
-            DiskImage.attachCommand(img, readOnly: true, mount: true, backend: .hdiutil)
+            DiskImage.attachCommand(img, readOnly: true, backend: .hdiutil)
                 == ["/usr/bin/hdiutil", "attach", "-plist"] + raw + [
-                    "-readonly", "-owners", "off", "-noverify", "-noautoopen", "/tmp/v.img",
+                    "-readonly", "-nomount", "-nobrowse", "/tmp/v.img"
                 ]
         )
         #expect(
-            DiskImage.attachCommand(img, readOnly: false, mount: false, backend: .diskutil)
+            DiskImage.attachCommand(img, readOnly: false, backend: .diskutil)
                 == ["/usr/sbin/diskutil", "image", "attach", "--plist", "--noMount", "--nobrowse", "/tmp/v.img"]
         )
         #expect(
-            DiskImage.attachCommand(img, readOnly: true, mount: true, backend: .diskutil)
+            DiskImage.attachCommand(img, readOnly: true, backend: .diskutil)
                 == [
-                    "/usr/sbin/diskutil", "image", "attach", "--plist", "--readOnly", "--mountOptions",
-                    "noowners,nosuid,nodev",
-                    "/tmp/v.img",
+                    "/usr/sbin/diskutil", "image", "attach", "--plist", "--readOnly", "--noMount", "--nobrowse",
+                    "/tmp/v.img"
                 ]
         )
         #expect(
             DiskImage.detachCommand("/dev/disk9", force: false, backend: .hdiutil) == [
-                "/usr/bin/hdiutil", "detach", "/dev/disk9",
+                "/usr/bin/hdiutil", "detach", "/dev/disk9"
             ]
         )
         #expect(
             DiskImage.detachCommand("/dev/disk9", force: true, backend: .hdiutil) == [
-                "/usr/bin/hdiutil", "detach", "/dev/disk9", "-force",
+                "/usr/bin/hdiutil", "detach", "/dev/disk9", "-force"
             ]
         )
         #expect(
             DiskImage.detachCommand("/dev/disk9", force: false, backend: .diskutil) == [
-                "/usr/sbin/diskutil", "eject", "/dev/disk9",
+                "/usr/sbin/diskutil", "eject", "/dev/disk9"
             ]
         )
         #expect(
             DiskImage.detachCommand("/dev/disk9", force: true, backend: .diskutil) == [
-                "/usr/sbin/diskutil", "unmountDisk", "force", "/dev/disk9",
+                "/usr/sbin/diskutil", "unmountDisk", "force", "/dev/disk9"
             ]
         )
         #expect(
             DiskImage.resizeCommand(img, bytes: 1 << 30, slack: 4096, backend: .hdiutil) == [
-                "/usr/bin/hdiutil", "resize", "-sectors", "2097152",
+                "/usr/bin/hdiutil", "resize", "-sectors", "2097152"
             ] + raw + ["/tmp/v.img"]
         )
         #expect(
             DiskImage.resizeCommand(img, bytes: 1 << 30, slack: 0, backend: .diskutil) == [
-                "/usr/sbin/diskutil", "image", "resize", "--size", "1073741824", "/tmp/v.img",
+                "/usr/sbin/diskutil", "image", "resize", "--size", "1073741824", "/tmp/v.img"
             ]
         )
         #expect(
             DiskImage.resizeCommand(img, bytes: 1 << 30, slack: 4096, backend: .diskutil) == [
-                "/usr/sbin/diskutil", "image", "resize", "--size", "1073737728", "/tmp/v.img",
+                "/usr/sbin/diskutil", "image", "resize", "--size", "1073737728", "/tmp/v.img"
             ]
         )
         let dmg = URL(fileURLWithPath: "/tmp/a.dmg")
         let out = URL(fileURLWithPath: "/tmp/w/raw")
         #expect(
             DiskImage.convertCommand(dmg, raw: out, backend: .hdiutil) == [
-                "/usr/bin/hdiutil", "convert", "/tmp/a.dmg", "-format", "UDTO", "-quiet", "-o", "/tmp/w/raw",
+                "/usr/bin/hdiutil", "convert", "/tmp/a.dmg", "-format", "UDTO", "-quiet", "-o", "/tmp/w/raw"
             ]
         )
         #expect(
             DiskImage.convertCommand(dmg, raw: out, backend: .diskutil) == [
-                "/usr/sbin/diskutil", "image", "create", "from", "--format", "RAW", "/tmp/a.dmg", "/tmp/w/raw.raw",
+                "/usr/sbin/diskutil", "image", "create", "from", "--format", "RAW", "/tmp/a.dmg", "/tmp/w/raw.raw"
             ]
         )
     }
@@ -208,7 +207,7 @@ import Testing
             try Data("hello\n".utf8).write(to: src.appendingPathComponent("f"))
             try await DiskImage.run([
                 "/usr/bin/hdiutil", "create", "-quiet", "-format", "UDZO", "-fs", "HFS+", "-layout", "SPUD",
-                "-srcfolder", src.path, "-o", dmg.path,
+                "-srcfolder", src.path, "-o", dmg.path
             ])
             var raws: [Data] = []
             for b in try await Self.backends() {

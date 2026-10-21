@@ -180,7 +180,7 @@ public enum Recipe {
         if o.stopAfterVolumes {
             let survey: [String: Any] = [
                 "entry": e.id, "build": e.build, "board": e.board, "fit": c.fit.object,
-                "guest_package": c.guestPackage?.object ?? NSNull(), "warnings": c.warnings,
+                "guest_package": c.guestPackage?.object ?? NSNull(), "warnings": c.warnings
             ]
             // the volume images the recipe built (system.img, data.img or volume.img) kept beside it, for inspection
             let volumes = c.o.out.appendingPathComponent("volumes")
@@ -227,7 +227,7 @@ public enum Recipe {
             "preparation": PreparationChanges.serial,
             "entry": [
                 "id": e.id, "sha256": Preparer.sha256(try entryJSON.encode(e)),
-                "content": try JSONSerialization.jsonObject(with: entryJSON.encode(e)),
+                "content": try JSONSerialization.jsonObject(with: entryJSON.encode(e))
             ],
             "build": e.build, "product_version": restore.productVersion, "product_type": e.productType,
             "board": e.board,
@@ -240,7 +240,7 @@ public enum Recipe {
                             ($0, try Preparer.digest(o.guestTools.appendingPathComponent($0), SHA256()))
                         }
                     )
-                ],
+                ]
             ],
             "inputs": [
                 "ipsw": ["path": o.ipsw.path, "sha1": c.sha1], "decrypted": dec.path, "identity": "identity.json",
@@ -248,15 +248,15 @@ public enum Recipe {
                 "rootfs": "rootfs.dmg", "guest_tools": o.guestTools.path, "lockdown": NSNull(),
                 // create's choices beyond the entry, for preparing the base again (LockedPreparation.plan)
                 "language": opt(o.language), "keyboards": opt(o.keyboards),
-                "sibling": opt(o.sibling.map { ["entry": $0.entry.id, "ipsw": $0.ipsw.path] }),
+                "sibling": opt(o.sibling.map { ["entry": $0.entry.id, "ipsw": $0.ipsw.path] })
             ],
             "identity": [
                 "seed": c.seed, "udid": ident.udid ?? "",
-                "sha256": try Preparer.digest(c.file("identity.json"), SHA256()),
+                "sha256": try Preparer.digest(c.file("identity.json"), SHA256())
             ],
             "outputs": ["nand": ["path": "nand", "listing_sha256": c.listing, "built_listing_sha256": c.built]],
             "guest_package": opt(c.guestPackage?.object),
-            "fit": c.fit.object,
+            "fit": c.fit.object
         ]
         let lock = merged(shared, try board.lock(c))
         try fm.removeItem(at: c.work)

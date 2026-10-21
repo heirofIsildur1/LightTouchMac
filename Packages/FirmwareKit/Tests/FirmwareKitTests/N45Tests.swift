@@ -14,7 +14,7 @@ import Testing
     /// generate_nor.c's SysCfg values, so the whole 1 MiB compares.
     static let devos50 = UnitIdentity(fields: [
         ("model-number", .string("MA623")), ("region-info", .string("B/LL")),
-        ("serial-number", .string("ABCDEFG")), ("battery-serial", .string("690476146348")),
+        ("serial-number", .string("ABCDEFG")), ("battery-serial", .string("690476146348"))
     ])
 
     @Test(.enabled(if: FixtureRequirements.corpusEnabled, "Firmware corpus test; set FK_TEST_CORPUS=1 to run"))
@@ -477,14 +477,14 @@ import Testing
             "com.apple.mDNSResponder.plist", "com.apple.mobile.lockdown.plist", "com.apple.notifyd.plist",
             "com.apple.SpringBoard.plist", "com.apple.syslogd.plist", "com.apple.update.plist",
             "com.apple.usbptpd.plist",
-            "coreaudiod.plist",
+            "coreaudiod.plist"
         ]
         let removed = N45Board.removedDaemons(jobs)
         #expect(!removed.contains("com.apple.mDNSResponder.plist"), "\(removed)")
         #expect(
             removed == [
                 "com.apple.BTServer.plist", "com.apple.DumpPanic.plist", "com.apple.crashreporterd.plist",
-                "com.apple.daily.plist", "com.apple.iapd.plist", "com.apple.syslogd.plist", "com.apple.update.plist",
+                "com.apple.daily.plist", "com.apple.iapd.plist", "com.apple.syslogd.plist", "com.apple.update.plist"
             ]
         )
         // The iPhone keeps BTServer (the M68's Bluetooth chip answers; without it SpringBoard stalls app launches).

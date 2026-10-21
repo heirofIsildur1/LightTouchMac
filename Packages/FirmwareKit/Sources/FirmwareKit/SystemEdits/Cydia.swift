@@ -45,7 +45,7 @@ extension SystemEdits {
         static let files = [
             (name: "freeze.tar.gz", sha1: "c943e5ece72b7b71da589c22663a8f9b3b3d1190"),
             (name: "cydiasubstrate.tar", sha1: "264f47938acc09e6cc2890a3cc7c7988a6822da3"),
-            (name: "cydiahttpatch.tar", sha1: "3a1302c6294fe290c6d52186dd4fe56cda7fd661"),
+            (name: "cydiahttpatch.tar", sha1: "3a1302c6294fe290c6d52186dd4fe56cda7fd661")
         ]
         static let name = files[0].name, noStash = ".cydia_no_stash"
         static let metadata = "private/var/lib/cydia/metadata.plist"
@@ -55,7 +55,7 @@ extension SystemEdits {
         /// CydiaAddSource keys them).
         static let sources = [
             "http://apt.thebigboss.org/repofiles/cydia/", "http://modmyi.saurik.com/",
-            "http://zodttd.saurik.com/repo/cydia/",
+            "http://zodttd.saurik.com/repo/cydia/"
         ]
         static let substrateMajors = 3...6
         static let springBoardPrefs = "private/var/mobile/Library/Preferences/com.apple.springboard.plist"
@@ -63,7 +63,7 @@ extension SystemEdits {
             "Library/MobileSubstrate/DynamicLibraries/patcyh.dylib",
             "Library/MobileSubstrate/DynamicLibraries/patcyh.plist", "usr/lib/libpatcyh.dylib",
             "private/var/lib/dpkg/info/com.saurik.patcyh.list", "private/var/lib/dpkg/info/com.saurik.patcyh.postrm",
-            "private/var/lib/dpkg/info/com.saurik.patcyh.extrainst_",
+            "private/var/lib/dpkg/info/com.saurik.patcyh.extrainst_"
         ]
 
         /// The bootstrap in `dir`, with the packages beside it, each downloaded there first when it is missing or
@@ -143,7 +143,7 @@ extension SystemEdits {
         let major = majorVersion(v)
         let packages = [
             (Cydia.files[0].name, true), (Cydia.files[1].name, Cydia.substrateMajors.contains(major)),
-            (Cydia.files[2].name, major == 3),
+            (Cydia.files[2].name, major == 3)
         ].filter(\.1).map { bootstrap.deletingLastPathComponent().appendingPathComponent($0.0) }
         var entries: [String] = []
         var special: [(path: String, mode: UInt16)] = []

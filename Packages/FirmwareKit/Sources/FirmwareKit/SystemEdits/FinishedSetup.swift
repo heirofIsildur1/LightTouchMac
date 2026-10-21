@@ -26,7 +26,7 @@ extension SystemEdits {
         guard major >= 5 else { return [] }
         var buddy: [String: Any] = [
             "SetupDone": true, "SetupFinishedAllSteps": true, "RestoreChoice": true, "PBTCPresented": true,
-            "PBDiagnosticsPresented": true, "WiFiPresented": true, "Language": language, "Locale": locale,
+            "PBDiagnosticsPresented": true, "WiFiPresented": true, "Language": language, "Locale": locale
         ]
         let off: [String: Any]
         var buddyLocal: [String: Any]
@@ -41,20 +41,20 @@ extension SystemEdits {
             ark = [
                 "com.apple.purplebuddy-SetupState": "SetupUsingAssistant",
                 "com.apple.mobile.user_preferences-UserSetLanguage": true,
-                "com.apple.mobile.user_preferences-UserSetLocale": true,
+                "com.apple.mobile.user_preferences-UserSetLocale": true
             ]
         default:
             buddy.merge(
                 [
                     "AppleIDPB5Presented": true, "PasscodePresented": true, "SetupVersion": 5,
-                    "SetupState": "SetupUsingAssistant", "AppleIDForceUpgrade": false,
+                    "SetupState": "SetupUsingAssistant", "AppleIDForceUpgrade": false
                 ]
             ) { $1 }
             buddyLocal = ["LocationServices2Presented": true, "CloudConfigPresented": true]
             off = ["LocationServicesEnabledIn7.0": 0]
             ark = [
                 "-ActivationStateAcknowledged": true, "com.apple.mobile.chaperone-NotSoFresh": true,
-                "-FirstPurpleBuddyCompletion": Int(now.timeIntervalSince1970),
+                "-FirstPurpleBuddyCompletion": Int(now.timeIntervalSince1970)
             ]
             // Setup's cloud configuration step, through ManagedConfiguration: without the record, 7.x's
             // PSSetupAssistantNeedsToRun brings Setup back for it (Wi-Fi, then Welcome) on every boot.
@@ -63,18 +63,18 @@ extension SystemEdits {
                     "mobile/Library/ConfigurationProfiles/CloudConfigurationDetails.plist",
                     [
                         "AllowPairing": true, "CloudConfigurationUIComplete": true, "IsSupervised": false,
-                        "PostSetupProfileWasInstalled": false,
+                        "PostSetupProfileWasInstalled": false
                     ]
                 ),
                 (
                     "mobile/Library/Preferences/com.apple.mobile.user_preferences.plist",
                     ["UserSetLanguage": true, "UserSetLocale": true]
-                ),
+                )
             ]
         }
         return [
             (purpleBuddy, buddy), (purpleBuddyLocal, buddyLocal), (locationd, off), (locationdLocal, off),
-            (dataArk, ark),
+            (dataArk, ark)
         ] + extra
     }
 

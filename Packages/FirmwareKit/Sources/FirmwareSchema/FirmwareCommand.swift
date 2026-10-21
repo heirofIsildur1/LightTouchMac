@@ -99,7 +99,7 @@ public enum FirmwareCommand {
                     "entry": entry, "catalog": catalog, "id": id, "ipsw": ipsw, "out": out, "seed": seed,
                     "helper": helper, "cache": cache, "guest-tools": guestTools, "sibling-entry": siblingEntry,
                     "sibling-ipsw": siblingIpsw, "stop-after": stopAfter?.rawValue,
-                    "language": language, "keyboards": keyboards,
+                    "language": language, "keyboards": keyboards
                 ]) + (glTest ? ["--gl-test"] : []) + (skipSetup ? ["--skip-setup"] : [])
                 + (jailbreak ? ["--jailbreak"] : [])
         }
@@ -221,7 +221,7 @@ public enum FirmwareCommand {
                 + options([
                     "device": device, "action": action.rawValue, "session": session,
                     "record-policy": recordPolicy.rawValue, "cert": cert, "mount-point": mountPoint, "cache": cache,
-                    "prefs": prefs,
+                    "prefs": prefs
                 ])
         }
     }
@@ -254,7 +254,7 @@ public enum FirmwareCommand {
             ["mount"]
                 + options([
                     "device": device, "volume": volume.rawValue, "out": out, "root": root,
-                    "record-policy": recordPolicy.rawValue,
+                    "record-policy": recordPolicy.rawValue
                 ])
         }
     }
@@ -272,7 +272,7 @@ public enum FirmwareCommand {
         public var arguments: [String] {
             ["export"]
                 + options([
-                    "device": device, "volume": volume.rawValue, "out": out, "record-policy": recordPolicy.rawValue,
+                    "device": device, "volume": volume.rawValue, "out": out, "record-policy": recordPolicy.rawValue
                 ])
         }
     }
@@ -382,7 +382,7 @@ public enum FirmwareCommand {
             ["developer-offer"]
                 + options([
                     "offer": offer, "payload": payload, "state": state, "instance": instance, "public-key": publicKey,
-                    "serial": String(serial),
+                    "serial": String(serial)
                 ])
         }
     }
@@ -401,6 +401,6 @@ public enum FirmwareCommand {
     public static let all: [any FirmwareCommandLine.Type] = [
         Create.self, UnpackBase.self, PackBase.self, BootAdmit.self, Edit.self, Mount.self, Export.self,
         Unmount.self, CachePrune.self, DetachImages.self, VerifyKeys.self, Fit.self, Unwrap.self, Fetch.self,
-        DeveloperOffer.self, DeveloperAudit.self,
+        DeveloperOffer.self, DeveloperAudit.self
     ]
 }

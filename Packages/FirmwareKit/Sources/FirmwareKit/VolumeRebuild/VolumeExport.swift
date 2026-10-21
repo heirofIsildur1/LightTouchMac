@@ -195,7 +195,7 @@ public enum VolumeExport {
                     } else if let root {
                         try await VolumeMount.attachHidden(image, at: root, readOnly: true)
                     } else {
-                        try await DiskImage.attach(image, readOnly: true, mount: true)
+                        try await VolumeMount.attachVisible(image, readOnly: true)
                     }
                 vols[i].device = a.device
                 vols[i].mountPoint = a.mountPoint

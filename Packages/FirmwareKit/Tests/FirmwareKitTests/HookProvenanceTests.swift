@@ -52,7 +52,7 @@ struct HookProvenanceTests {
                     "usr/lib/dyld", FitCheck.openGLES, FitCheck.quartzCore, FitCheck.coreImage, FitCheck.ioSurface,
                     FitCheck.ioMobileFramebuffer, FitCheck.sgxEngine,
                     "System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
-                    "System/Library/Frameworks/Foundation.framework/Foundation", "usr/lib/libobjc.A.dylib",
+                    "System/Library/Frameworks/Foundation.framework/Foundation", "usr/lib/libobjc.A.dylib"
                 ] + FitCheck.coreSurfaces
             guard let stock = try await FitFixture.volume(id, FitFixture.stock(id) + files, in: dir) else {
                 try FixtureRequirements.missing("stock firmware \(id)")

@@ -38,7 +38,7 @@ final class N72Board: Board {
                 "com.apple.springboard.plist",
                 ["calendar-alarm": "/Applications/MobileCal.app/alarm.aiff", "lock-unlock": true]
             ),
-            ("com.apple.preferences.sounds.plist", ["keyboard": true]),
+            ("com.apple.preferences.sounds.plist", ["keyboard": true])
         ]
     }
     /// Paths the guest-tools bake creates (ipod2g_device.GUEST_TOOL_OWNERS), owner set in the catalog if present.
@@ -47,7 +47,7 @@ final class N72Board: Board {
         (0, "usr/local/bin/sbdlicon"), (0, "usr/lib/it_typein.dylib"), (0, agentJob), (0, mbx + ".stock"),
         (501, prefs + "/com.apple.mobilemail.plist"), (501, prefs + "/com.apple.springboard.plist"),
         (501, prefs + "/com.apple.preferences.sounds.plist"), (501, "private/var/mobile/Media/.lt-guest-tools-v1"),
-        (501, "private/var/mobile/Media/.lt-guest-tools-v2"), (501, "private/var/mobile/Media/.lt-guest-tools-v3"),
+        (501, "private/var/mobile/Media/.lt-guest-tools-v2"), (501, "private/var/mobile/Media/.lt-guest-tools-v3")
     ]
 
     /// The -machine options every device this recipe builds boots with (device.lock.json "machine"). hardware: the
@@ -153,7 +153,7 @@ final class N72Board: Board {
                 try Data(contentsOf: c.decFile("kernelcache.mach")),
                 /Darwin Kernel Version [^\x00]+/
             ) ?? NSNull(),
-            "iboot": Self.firstMatch(iboot, /iBoot-[0-9.]+/) ?? "?", "direct_iboot": major >= 3,
+            "iboot": Self.firstMatch(iboot, /iBoot-[0-9.]+/) ?? "?", "direct_iboot": major >= 3
         ]
         prefix = "Firmware/all_flash/all_flash.\(e.board).production/"
         let img3Members = try ipsw.names().filter { $0.hasPrefix(prefix) && $0.hasSuffix(".img3") }
@@ -267,7 +267,7 @@ final class N72Board: Board {
                 "nand": ["pages": c.nandHashes.count],
                 "nor": try Recipe.fileRecord(c, "nor.bin"),
                 "iboot": major >= 3 ? try Recipe.fileRecord(c, "iBoot.bin") as Any : NSNull(),
-                "gid_blobs": try Recipe.fileRecord(c, "gid-blobs.bin"),
+                "gid_blobs": try Recipe.fileRecord(c, "gid-blobs.bin")
             ],
             "derived": derived,
             // 3.x+ enters its decrypted iBoot directly (the bootrom rejects a personalized LLB); 2.x runs the real
@@ -276,8 +276,8 @@ final class N72Board: Board {
             // The BCM4325 CIS and NOR wifiaddr belong to the same unit. Older drivers
             // obtain the card's address before downloading its firmware.
             "machine": Self.machine.merging([
-                "wifi-mac": mac, "bt-mac": bt, "ecid": ecid,
-            ]) { _, card in card },
+                "wifi-mac": mac, "bt-mac": bt, "ecid": ecid
+            ]) { _, card in card }
         ]
     }
 
@@ -491,7 +491,7 @@ final class N72Board: Board {
                 log: c.log
             )
             report["appsync"] = [
-                line, "installation service (\(job)) DYLD_INSERT_LIBRARIES += /\(SystemEdits.appsyncPath)",
+                line, "installation service (\(job)) DYLD_INSERT_LIBRARIES += /\(SystemEdits.appsyncPath)"
             ]
             owners.append((0, SystemEdits.appsyncPath))
             if v.exists(SystemEdits.appsyncLauncherPath) {
@@ -540,7 +540,7 @@ final class N72Board: Board {
 extension N72Board {
     /// The switches the bake sets in SpringBoard's job, each under its 3.x+ (CoreAnimation) and 1.x/2.x (LayerKit) name.
     static let sbSwitches = [
-        ["CA_ENABLE_OGL", "LK_ENABLE_OGL"], ["CA_AUTO_ENABLE_OGL", "LK_AUTO_ENABLE_OGL"],
+        ["CA_ENABLE_OGL", "LK_ENABLE_OGL"], ["CA_AUTO_ENABLE_OGL", "LK_AUTO_ENABLE_OGL"]
     ]
 
     /// The baked guest tools (and it_typein in SpringBoard) that must all load for any to be installed.
@@ -603,7 +603,7 @@ extension N72Board {
         [
             (reorderTip, true), ("SBBacklightLevel2", 1.0), ("SBBacklightLevel", 1.0),
             ("SBAutoLockTime", -1), ("SBAutoDimTime", -1), ("SBHideACPower", true),
-            ("SBEnableALS", false), ("SBShowBatteryPercentage", false),
+            ("SBEnableALS", false), ("SBShowBatteryPercentage", false)
         ]
     }
 

@@ -24,7 +24,7 @@ public enum GuestPackage {
         public var object: [String: Any] {
             [
                 "family": family, "seed": seed, "version": version, "gles": gles,
-                "itpack": ["path": itpackPath, "sha256": itpackSHA256], "hooks": hooks, "jobs": jobs,
+                "itpack": ["path": itpackPath, "sha256": itpackSHA256], "hooks": hooks, "jobs": jobs
             ]
         }
     }
