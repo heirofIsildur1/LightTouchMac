@@ -18,6 +18,33 @@ struct MachOClosureTests {
         } catch { return "\(error)" }
     }
 
+    /// A zippered library (macOS and Mac Catalyst build versions, as the toolchain's Swift compatibility libraries
+    /// are) is a macOS binary at its macOS minimum; one for Mac Catalyst alone is not.
+    @Test func zipperedLibrariesAreMacOS() throws {
+        try withScratch { root in
+            let lib = root.appendingPathComponent("lib.c")
+            try "int value(void) { return 0; }\n".write(to: lib, atomically: true, encoding: .utf8)
+            let zippered = root.appendingPathComponent("zippered.dylib")
+            let catalyst = root.appendingPathComponent("catalyst.dylib")
+            try cc(
+                "-target",
+                "arm64-apple-macos14.0",
+                "-darwin-target-variant",
+                "arm64-apple-ios17.0-macabi",
+                "-dynamiclib",
+                lib.path,
+                "-o",
+                zippered.path
+            )
+            try cc("-target", "arm64-apple-ios17.0-macabi", "-dynamiclib", lib.path, "-o", catalyst.path)
+            #expect(failure { try MachOClosure.check(zippered, minimum: "14.0", arch: "arm64") } == nil)
+            #expect(
+                failure { try MachOClosure.check(catalyst, minimum: "14.0", arch: "arm64") }?
+                    .contains("not a macOS binary") == true
+            )
+        }
+    }
+
     @Test func closureMinimumsBundleRelocationAndMissingDependencies() throws {
         try withScratch { root in
             let lib = root.appendingPathComponent("lib.c")

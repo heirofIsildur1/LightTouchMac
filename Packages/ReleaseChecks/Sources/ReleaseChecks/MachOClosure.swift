@@ -23,6 +23,7 @@ public enum MachOClosure {
         guard try architectures(path).contains(arch) else { throw Failure("\(path.path): missing \(arch) slice") }
         let listing = try Shell.run(["otool", "-arch", arch, "-l", path.path]).output
         var found = Metadata()
+        var other: String?
         for block in listing.components(separatedBy: "Load command ").dropFirst() {
             func field(_ name: String) -> String? {
                 block.split(separator: "\n").lazy.map { $0.trimmingCharacters(in: .whitespaces) }
@@ -35,16 +36,15 @@ public enum MachOClosure {
             case "LC_RPATH":
                 if let rpath = named("path") { found.rpaths.append(rpath) }
             case "LC_BUILD_VERSION":
+                // a zippered binary (the toolchain's Swift compatibility libraries) also carries Mac Catalyst's
                 let platform = field("platform") ?? ""
-                guard platform == "1" || platform == "MACOS" else {
-                    throw Failure("\(path.path): not a macOS binary (platform \(platform))")
-                }
-                found.minimum = field("minos")
+                if platform == "1" || platform == "MACOS" { found.minimum = field("minos") } else { other = platform }
             case "LC_VERSION_MIN_MACOSX":
                 found.minimum = field("version")
             default: break
             }
         }
+        if found.minimum == nil, let other { throw Failure("\(path.path): not a macOS binary (platform \(other))") }
         guard found.minimum != nil else { throw Failure("\(path.path): missing macOS deployment target") }
         return found
     }
