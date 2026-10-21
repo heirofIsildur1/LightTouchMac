@@ -13,6 +13,18 @@ func die(_ message: String) -> Never {
     exit(2)
 }
 
+/// The emulator slot this run boots in (EmulatorSlot), held until it exits; a run this one starts shares it.
+nonisolated(unsafe) private var emulatorSlot: Int32 = -1
+func takeEmulatorSlot() {
+    guard emulatorSlot < 0, ProcessInfo.processInfo.environment["LTM_EMULATOR_SLOT_HELD"] == nil else { return }
+    emulatorSlot =
+        EmulatorSlot.wait {
+            print("waiting for an emulator slot (\(EmulatorSlot.count) in use, \(EmulatorSlot.directory.path))")
+            fflush(stdout)
+        }.fd
+    setenv("LTM_EMULATOR_SLOT_HELD", "1", 1)
+}
+
 /// The pinned checkout `name` (build-support/sources.json "path"; QEMU_IOS_DIR / USBMUXD_SOURCE_DIR override it).
 func checkout(_ name: String) -> URL {
     let env = ["qemu-ios": "QEMU_IOS_DIR", "usbmuxd": "USBMUXD_SOURCE_DIR"][name] ?? ""
@@ -45,6 +57,7 @@ struct Tools {
     static let teamRequirement = #"anchor apple generic and certificate leaf[subject.OU] = "SM75355Y6R""#
 
     static func resolve(_ args: Inputs, work: URL) -> Tools {
+        takeEmulatorSlot()
         let fm = FileManager.default
         let tools: Tools
         if let app = args.app {
