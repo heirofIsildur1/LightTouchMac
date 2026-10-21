@@ -1,8 +1,7 @@
 #!/bin/bash
 # Build what Xcode can't, from the pins, into a cached vendor directory that Archive copies into the app:
 #
-#     scripts/vendor               build (or reuse) ~/Developer/ltm-vendor.noindex/<pin-hash>/ and point
-#                                  Configuration/Vendor.xcconfig at it
+#     scripts/vendor               build (or reuse) ~/Developer/ltm-vendor.noindex/<pin-hash>/
 #     scripts/vendor --print       print the vendor directory for the current pins
 #
 # The layout, the inputs and the keying: Packages/BuildTools/Sources/BuildTools/Vendor.swift (`scripts/vendor --help`).

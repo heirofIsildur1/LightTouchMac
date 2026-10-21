@@ -263,7 +263,7 @@
       "url": "https://github.com/sparkle-project/Sparkle/archive/refs/tags/2.10.0.tar.gz",
       "sha256": "cf43af1f26a921a8dc0be80834b9c3038bea5fd645708d26375126cbc57c316b",
       "license": "MIT",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-13. The app depends on it up to the next major through Xcode (Package.resolved pins the version); SwiftPM fetches its signed binary framework. Light Touch > Check for Updates... and the scheduled update checks go through it."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-13. The app pins it exact through Xcode; SwiftPM fetches its signed binary framework. Light Touch > Check for Updates... and the scheduled update checks go through it."
     },
     {
       "name": "Unrar.swift",

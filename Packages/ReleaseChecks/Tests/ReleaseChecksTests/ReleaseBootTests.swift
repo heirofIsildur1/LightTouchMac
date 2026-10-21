@@ -8,11 +8,24 @@ import Testing
 /// clean shutdown): the built-in iPod, and a fresh `firmwarekit create` of one firmware per preparation route.
 @Suite(.serialized, .enabled(if: appGiven, "no app: LTM_RELEASE_APP / LTM_RELEASE_ARCHIVE (the Release plan)"))
 struct ReleaseBootTests {
-    static let builtIn = "n72ap-7E18"
-    /// One entry per distinct preparation path (Preparer.prepare's boards, K48Board's strategies): N45Board (1.x),
-    /// N72Board, K48Board by iBoot (iPad), by kboot on the A4 with 4.x data protection (iPhone 4) and by kboot on the
-    /// S5L8920 with its own NOR (iPhone 3GS). Every IPSW from the app's cache (the catalog's sha1); a missing one fails.
-    static let routes = ["n45ap-4A102", "n72ap-7E18", "k48ap-7B500", "n90ap-8A293", "n88ap-10B500"]
+    /// The built-in iPod and the routes, from Packages/ReleaseChecks/boots.json, which scripts/ship also reads to
+    /// fetch their IPSWs.
+    struct Boots: Decodable {
+        let builtIn: String
+        /// One entry per distinct preparation path (Preparer.prepare's boards, K48Board's strategies): N45Board
+        /// (1.x), N72Board, K48Board by iBoot (iPad), by kboot on the A4 with 4.x data protection (iPhone 4) and by
+        /// kboot on the S5L8920 with its own NOR (iPhone 3GS). Every IPSW from the app's cache (the catalog's sha1);
+        /// a missing one fails.
+        let routes: [String]
+    }
+    static let boots: Boots = {
+        let file = repository.appendingPathComponent("Packages/ReleaseChecks/boots.json")
+        do { return try JSONDecoder().decode(Boots.self, from: Data(contentsOf: file)) } catch {
+            fatalError("\(file.path): \(error)")
+        }
+    }()
+    static let builtIn = boots.builtIn
+    static let routes = boots.routes
     /// Emulators at once (host load).
     static let lanes = 2
 
@@ -112,7 +125,7 @@ struct ReleaseBootTests {
                 let blob = (catalog["bundled"] as! [String: String])[id]!
                 command = [
                     firmwarekit, "unpack-base", "--blob", contents.appendingPathComponent("Resources/\(blob)").path,
-                    "--out", out.path, "--seed", seed,
+                    "--out", out.path, "--seed", seed
                 ]
             } else {
                 let ipsw = try ipsw(for: id)
@@ -122,7 +135,7 @@ struct ReleaseBootTests {
                 // as the app prepares: the helper beside firmwarekit and the bundle's guest tools by default
                 command = [
                     firmwarekit, "create", "--entry", entryFile.path, "--ipsw", ipsw.path, "--out", out.path,
-                    "--cache", work.appendingPathComponent("cache").path, "--seed", seed,
+                    "--cache", work.appendingPathComponent("cache").path, "--seed", seed
                 ]
             }
             let prepared = try Shell.run(

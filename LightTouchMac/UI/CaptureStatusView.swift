@@ -24,8 +24,8 @@ final class CaptureStatusView: NSView {
     private var fileMonitor: CaptureFileMonitor?
     private var presentationID = UUID()
     private var dismissesAutomatically = false
-    /// How long a capture banner stays up unhovered (check-capture-status holds it up while it removes files).
-    static var autoDismissal: Duration = .seconds(5)
+    /// How long a capture banner stays up unhovered.
+    static let autoDismissal: Duration = .seconds(5)
     var fileURL: URL? { state.fileURL }
     var onPrimary: (() -> Void)?
     /// The capture banner's text button (showCapture's `link`).
@@ -59,7 +59,7 @@ final class CaptureStatusView: NSView {
         NSLayoutConstraint.activate([
             hosting.leadingAnchor.constraint(equalTo: leadingAnchor),
             hosting.trailingAnchor.constraint(equalTo: trailingAnchor),
-            hosting.topAnchor.constraint(equalTo: topAnchor), hosting.bottomAnchor.constraint(equalTo: bottomAnchor),
+            hosting.topAnchor.constraint(equalTo: topAnchor), hosting.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
     required init?(coder: NSCoder) { fatalError("not used") }
