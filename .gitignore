@@ -19,3 +19,7 @@ docs/
 # scripts/vendor output and local overrides
 Configuration/Vendor.xcconfig
 Configuration/Local.xcconfig
+
+# The agent tool's per-user settings and default worktree location (.claude/settings.json is shared)
+.claude/settings.local.json
+.claude/worktrees/

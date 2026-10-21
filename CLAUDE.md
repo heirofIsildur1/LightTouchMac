@@ -7,6 +7,10 @@ what to do and not do on a shared Mac.
 
 - Scratch goes under one root: `~/Developer/ltm-scratch.noindex/<task>/`. Never `/tmp/<name>`. Delete your task's
   directory when you are done; `scripts/clean` (a dry run; `--yes` acts) sweeps what is left.
+- Worktrees live under `~/Developer/ltm-worktrees.noindex/<repository>/<name>` (the hooks in `.claude/settings.json`
+  make them there, with the scratch directory `~/Developer/ltm-scratch.noindex/<name>/`); put a qemu-ios worktree
+  you need beside them. When the session ends, a worktree that is clean with every commit on a remote is removed with
+  what it owns; to drop unpushed work, `touch ~/Developer/ltm-scratch.noindex/<name>/.abandoned` (the branch stays).
 - Never modify a shared base, vendor directory or another checkout in place. Copy it into your scratch directory (or
   boot it with an overlay) and work on the copy.
 - Kill by PID only: the PID you started, or one read from a pid file. No `pkill`, `killall` or `pgrep -f` patterns;

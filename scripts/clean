@@ -4,6 +4,7 @@
 #
 #     scripts/clean [--yes] [--days N] [--snapshots]   everything below (N: scratch age, default 7)
 #     scripts/clean [--yes] --worktree PATH            one managed worktree and what it owns, if it is safe to remove
+#                                                      (its session ended: no idle wait; the agent hooks)
 #
 # Vendor directories (LTM_VENDOR_ROOT, default ~/Developer/ltm-vendor.noindex): keeps the pin key of every remaining
 #   checkout of this repository (the release worktree's among them), any a Vendor.xcconfig or build/vendor in one
@@ -11,7 +12,9 @@
 # Worktrees of this repository and the pinned qemu-ios's: only managed ones (under a repository's .claude/worktrees
 #   or LTM_WORKTREE_ROOT, default ~/Developer/ltm-worktrees.noindex), and only when unlocked, with no uncommitted or
 #   untracked file, every commit on a remote, untouched for LTM_CLEAN_IDLE_HOURS (default 24) and open in no
-#   process. `git worktree remove` without --force, then the branch. Also their scratch and DerivedData.
+#   process. `git worktree remove` without --force, then the branch. Also their scratch and DerivedData. A worktree
+#   whose scratch directory (<scratch root>/<worktree name>/) holds `.abandoned` may have commits on no remote: it is
+#   removed when clean, and its branch kept.
 # Scratch (LTM_SCRATCH_ROOT, default ~/Developer/ltm-scratch.noindex): a task directory with nothing modified in N
 #   days, or whose `.worktree` file names a worktree that is gone.
 # DerivedData of this project whose workspace is gone.
@@ -42,6 +45,8 @@ qemu_path="$(plutil -extract qemu-ios.path raw -o - "$ROOT/build-support/sources
 qemu_path="${qemu_path/#\~/$HOME}"
 QEMU="${LTM_CLEAN_QEMU:-$( [[ -d "$qemu_path" ]] && main_of "$qemu_path")}"
 QEMU_PIN="$(cd "$qemu_path" 2>/dev/null && pwd -P)"
+# one worktree: its own repository's list (this one's or qemu-ios's)
+[[ -n "$ONLY" && -d "$ONLY" ]] && { LTM="$(main_of "$ONLY")"; QEMU=""; }
 
 OPEN="$(mktemp "${TMPDIR:-/tmp}/ltm-clean.XXXXXX")"
 trap 'rm -f "$OPEN"' EXIT
@@ -70,11 +75,15 @@ worktree_verdict() {
     [[ -n "$locked" ]] && { echo "keep locked"; return; }
     [[ -d "$path" ]] || { echo "remove missing (prune)"; return; }
     [[ -z "$(GIT_OPTIONAL_LOCKS=0 git -C "$path" status --porcelain 2>/dev/null)" ]] || { echo "keep uncommitted or untracked changes"; return; }
-    [[ -z "$(git -C "$path" rev-list -n1 HEAD --not --remotes 2>/dev/null)" ]] || { echo "keep commits not on a remote"; return; }
+    is_open "$path" && { echo "keep open in a process"; return; }
+    if [[ -n "$(git -C "$path" rev-list -n1 HEAD --not --remotes 2>/dev/null)" ]]; then
+        [[ -f "$SCRATCH_ROOT/$(basename "$path")/.abandoned" ]] && { echo "remove abandoned (branch kept)"; return; }
+        echo "keep commits not on a remote"; return
+    fi
+    [[ -n "$ONLY" ]] && { echo "remove clean and landed"; return; }
     gitdir="$(git -C "$path" rev-parse --absolute-git-dir)"
     [[ -z "$(find "$gitdir/HEAD" "$gitdir/index" "$gitdir/logs" -maxdepth 1 -mmin "-$((IDLE_HOURS * 60))" 2>/dev/null | head -1)" ]] \
         || { echo "keep used in the last $IDLE_HOURS hours"; return; }
-    is_open "$path" && { echo "keep open in a process"; return; }
     echo "remove clean, landed and idle"
 }
 act() { ((YES)) && "$@"; }
@@ -99,7 +108,8 @@ for repo in "$LTM" "$QEMU"; do
                     if [[ "$verdict" == remove* ]]; then
                         removed+=("$path")
                         if [[ -d "$path" ]]; then
-                            act git -C "$repo" worktree remove "$path" && [[ -n "$branch" ]] && act git -C "$repo" branch -q -D "$branch"
+                            act git -C "$repo" worktree remove "$path" && [[ -n "$branch" && "$verdict" != *abandoned* ]] \
+                                && act git -C "$repo" branch -q -D "$branch"
                         else
                             act git -C "$repo" worktree prune
                         fi

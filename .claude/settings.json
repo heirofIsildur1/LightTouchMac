@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "WorktreeCreate": [
+      {"hooks": [{"type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/scripts/hooks/worktree\" create"}]}
+    ],
+    "WorktreeRemove": [
+      {"hooks": [{"type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/scripts/hooks/worktree\" remove"}]}
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "prompt_input_exit|logout",
+        "hooks": [{"type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/scripts/hooks/worktree\" session-end"}]
+      }
+    ]
+  }
+}
