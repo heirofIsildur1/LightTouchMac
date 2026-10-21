@@ -11,8 +11,13 @@
 // checksum): see FirmwareDecryptor.
 
 import Crypto
-import CryptoExtras
 import Foundation
+
+#if canImport(CommonCrypto)
+    import CommonCrypto
+#else
+    import CryptoExtras
+#endif
 
 public enum IMG3 {
     public struct Tag: Equatable, Sendable {
@@ -67,6 +72,9 @@ public enum IMG3 {
     }
 }
 
+/// CommonCrypto where the host has it; elsewhere swift-crypto's CryptoExtras (BoringSSL), which an Apple build leaves
+/// out: BoringSSL's error macros put each C source's absolute build path in the binary (__FILE__), which the release
+/// check refuses (it would ship the builder's home folder).
 public enum AESCBC {
     /// AES-CBC without padding; `buf` must be a multiple of 16 bytes.
     public static func crypt(_ buf: Data, iv: Data, key: Data, decrypt: Bool = true) throws -> Data {
@@ -74,11 +82,32 @@ public enum AESCBC {
             throw FirmwareError(.unsupported, "AES: key \(key.count) B, iv \(iv.count) B, data \(buf.count) B")
         }
         guard !buf.isEmpty else { return Data() }
-        let key = SymmetricKey(data: key)
-        let iv = try AES._CBC.IV(ivBytes: iv)
-        return decrypt
-            ? try AES._CBC.decrypt(buf, using: key, iv: iv, noPadding: true)
-            : try AES._CBC.encrypt(buf, using: key, iv: iv, noPadding: true)
+        #if canImport(CommonCrypto)
+            var out = Data(count: buf.count)
+            var moved = 0
+            let status = out.withUnsafeMutableBytes { o in
+                buf.withUnsafeBytes { i in
+                    key.withUnsafeBytes { k in
+                        iv.withUnsafeBytes { v in
+                            CCCrypt(
+                                CCOperation(decrypt ? kCCDecrypt : kCCEncrypt), CCAlgorithm(kCCAlgorithmAES), 0,
+                                k.baseAddress, key.count, v.baseAddress, i.baseAddress, buf.count, o.baseAddress,
+                                buf.count, &moved)
+                        }
+                    }
+                }
+            }
+            guard status == kCCSuccess, moved == buf.count else {
+                throw FirmwareError(.internal, "CCCrypt failed (\(status))")
+            }
+            return out
+        #else
+            let key = SymmetricKey(data: key)
+            let iv = try AES._CBC.IV(ivBytes: iv)
+            return decrypt
+                ? try AES._CBC.decrypt(buf, using: key, iv: iv, noPadding: true)
+                : try AES._CBC.encrypt(buf, using: key, iv: iv, noPadding: true)
+        #endif
     }
 }
 

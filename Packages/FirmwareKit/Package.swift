@@ -48,7 +48,10 @@ let package = Package(
                 .product(name: "Unrar", package: "Unrar.swift"),
                 .product(name: "BinaryParsing", package: "swift-binary-parsing"),
                 .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "CryptoExtras", package: "swift-crypto")
+                // AES-CBC off Apple platforms (AESCBC: CommonCrypto on them, which keeps BoringSSL out of the app)
+                .product(
+                    name: "CryptoExtras", package: "swift-crypto",
+                    condition: .when(platforms: [.linux, .windows, .android, .openbsd]))
             ]
         ),
         .executableTarget(
@@ -63,8 +66,7 @@ let package = Package(
             name: "FirmwareKitTests",
             dependencies: [
                 "FirmwareKit", "FirmwareSchema", .product(name: "HostRuntime", package: "HostRuntime"),
-                .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "CryptoExtras", package: "swift-crypto")
+                .product(name: "Crypto", package: "swift-crypto")
             ],
             exclude: ["iboot-trees"]  // KBootIBootTests reads them from the source tree
         )

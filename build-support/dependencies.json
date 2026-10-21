@@ -315,7 +315,7 @@
       "url": "https://github.com/apple/swift-crypto/archive/refs/tags/5.0.3.tar.gz",
       "sha256": "ab84654f5e7746b67bcaa44562ff442882e31bab573f0a1fed4c69bc54849443",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit and LightTouchCore. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras for FirmwareKit's AES-CBC (BoringSSL's AES_cbc_encrypt over the whole buffer). Never in LightTouchDevice, which loads the GPL-2.0-only emulator: DeviceRuntime and HostRuntime keep Security and CryptoKit."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit and LightTouchCore. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras (BoringSSL) for FirmwareKit's AES-CBC only off Apple platforms, where there is no CommonCrypto: BoringSSL's error macros put each C source's absolute build path into the binary, which the release check refuses. Never in LightTouchDevice, which loads the GPL-2.0-only emulator: DeviceRuntime and HostRuntime keep Security and CryptoKit."
     },
     {
       "name": "swift-asn1",
@@ -328,7 +328,7 @@
       "url": "https://github.com/apple/swift-asn1/archive/refs/tags/1.7.3.tar.gz",
       "sha256": "77add3684fd75a586529893288af51ed092c565ec0c154d2b4eedb3a6bdc294c",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Not pinned by any manifest: swift-crypto's CryptoExtras depends on it, so it is linked wherever CryptoExtras is (FirmwareKit)."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Not pinned by any manifest: swift-crypto's CryptoExtras depends on it, so it is linked wherever CryptoExtras is (FirmwareKit off Apple platforms); resolved, and its license carried, on a Mac too."
     }
   ]
 }
