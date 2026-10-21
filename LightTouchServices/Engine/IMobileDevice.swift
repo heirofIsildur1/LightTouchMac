@@ -78,8 +78,53 @@ nonisolated enum IMobileDevice {
 
     // MARK: - plist ↔ Foundation (via the XML both sides speak)
 
-    /// plist_t → Foundation. nil on any failure.
+    /// The most of a device's plist that is converted: nodes, and string, data and key bytes. A binary plist's objects
+    /// can be referenced from many places, and libplist gives every reference its own copy, so a small reply can stand
+    /// for a tree vastly larger than itself; anything over these is refused rather than written out as XML.
+    static let maxNodes = 1 << 20, maxBytes = 32 << 20
+
+    /// Whether `root`'s tree is within maxNodes and maxBytes, counted node by node, stopping at the first excess.
+    static func withinLimits(_ root: plist_t) -> Bool {
+        var nodes = 0
+        var bytes = 0
+        var pending = [root]
+        while let node = pending.popLast() {
+            nodes += 1
+            var length: UInt64 = 0
+            switch plist_get_node_type(node) {
+            case PLIST_ARRAY:
+                for index in 0..<plist_array_get_size(node) {
+                    if let item = plist_array_get_item(node, index) { pending.append(item) }
+                }
+            case PLIST_DICT:
+                var iterator: plist_dict_iter?
+                plist_dict_new_iter(node, &iterator)
+                defer { free(iterator) }
+                while true {
+                    var key: UnsafeMutablePointer<CChar>?
+                    var value: plist_t?
+                    plist_dict_next_item(node, iterator, &key, &value)
+                    if let key {
+                        bytes += strlen(key)
+                        plist_mem_free(key)
+                    }
+                    guard let value else { break }
+                    pending.append(value)
+                }
+            case PLIST_STRING: _ = plist_get_string_ptr(node, &length)
+            case PLIST_DATA: _ = plist_get_data_ptr(node, &length)
+            default: break
+            }
+            bytes += Int(clamping: length)
+            guard nodes + pending.count <= maxNodes, bytes <= maxBytes else { return false }
+        }
+        return true
+    }
+
+    /// plist_t → Foundation. nil on any failure, and for a tree over maxNodes or maxBytes. Every plist from the device
+    /// (installation_proxy, springboardservices, lockdown values, house_arrest, DeviceLink) comes through here.
     static func decode(_ node: plist_t) -> Any? {
+        guard withinLimits(node) else { return nil }
         var xml: UnsafeMutablePointer<CChar>?
         var length: UInt32 = 0
         _ = plist_to_xml(node, &xml, &length)

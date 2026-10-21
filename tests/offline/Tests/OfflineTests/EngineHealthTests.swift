@@ -111,5 +111,23 @@ extension SharedState {
                 Issue.record("no error")
             } catch is CancellationError {} catch { throw error }
         }
+
+        /// A device's plist is converted only within IMobileDevice's node and byte limits: one whose shared references
+        /// stand for millions of nodes (a few kilobytes as a binary plist) decodes to nil without being written out,
+        /// as does one whose strings and data together are over the byte limit; an ordinary reply decodes as before.
+        @Test func devicePlistsAreDecodedWithinLimits() {
+            func decoded(_ value: Any) -> Any? {
+                let node = IMDFake.node(value)
+                defer { fakePlistFree(node) }
+                return IMobileDevice.decode(node)
+            }
+            var shared: [Any] = ["x"]
+            for _ in 0..<22 { shared = [shared, shared] }  // 2^22 leaves over 23 objects
+            #expect(decoded(shared) == nil)
+            let wide = Array(repeating: Data(count: 1 << 20), count: 40)  // 40 MiB behind one Data
+            #expect(decoded(wide) == nil)
+            let apps: [Any] = [["CFBundleIdentifier": "com.example.a", "Version": 1, "Icons": [Data(count: 8)]]]
+            #expect((decoded(apps) as? [[String: Any]])?.first?["CFBundleIdentifier"] as? String == "com.example.a")
+        }
     }
 }

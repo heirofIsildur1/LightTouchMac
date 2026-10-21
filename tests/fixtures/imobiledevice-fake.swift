@@ -186,6 +186,17 @@ nonisolated enum IMDFake {
     final class Node {
         let value: Any
         init(_ value: Any) { self.value = value }
+        /// An array's items or a dictionary's entries (keys sorted), each a node of its own, as libplist's tree has
+        /// them; made once, on the first walk (IMobileDevice.withinLimits), and freed with this node.
+        lazy var children: [(key: String?, node: Node)] = {
+            if let array = value as? [Any] { return array.map { (nil, Node($0)) } }
+            if let dict = value as? [String: Any] { return dict.keys.sorted().map { ($0, Node(dict[$0]!)) } }
+            return []
+        }()
+        var bytes: Data? {
+            if let string = value as? String { return Data(string.utf8) }
+            return value as? Data
+        }
     }
     static func node(_ value: Any) -> plist_t { Unmanaged.passRetained(Node(value)).toOpaque() }
     static func value(_ node: plist_t?) -> Any? {
@@ -463,3 +474,63 @@ nonisolated enum IMDFake {
     if let p { Unmanaged<IMDFake.Node>.fromOpaque(p).release() }
 }
 @_cdecl("plist_mem_free") nonisolated func fakePlistMemFree(_ p: UnsafeMutableRawPointer?) { free(p) }
+
+// Walking a tree (IMobileDevice.withinLimits): node types, array items, dictionary entries, string and data lengths.
+private nonisolated func fakeNode(_ p: plist_t?) -> IMDFake.Node? {
+    p.map { Unmanaged<IMDFake.Node>.fromOpaque($0).takeUnretainedValue() }
+}
+private nonisolated func opaque(_ node: IMDFake.Node) -> plist_t { Unmanaged.passUnretained(node).toOpaque() }
+@_cdecl("plist_get_node_type") nonisolated func fakePlistNodeType(_ p: plist_t?) -> plist_type {
+    switch fakeNode(p)?.value {
+    case is [Any]: PLIST_ARRAY
+    case is [String: Any]: PLIST_DICT
+    case is String: PLIST_STRING
+    case is Data: PLIST_DATA
+    case is Date: PLIST_DATE
+    case .some: PLIST_INT
+    case nil: PLIST_NONE
+    }
+}
+@_cdecl("plist_array_get_size") nonisolated func fakePlistArraySize(_ p: plist_t?) -> UInt32 {
+    UInt32(fakeNode(p)?.children.count ?? 0)
+}
+@_cdecl("plist_array_get_item") nonisolated func fakePlistArrayItem(_ p: plist_t?, _ n: UInt32) -> plist_t? {
+    fakeNode(p).map { opaque($0.children[Int(n)].node) }
+}
+@_cdecl("plist_dict_new_iter") nonisolated func fakePlistDictNewIter(
+    _ p: plist_t?,
+    _ i: UnsafeMutablePointer<plist_dict_iter?>?
+) {
+    let index = malloc(MemoryLayout<Int>.size)!
+    index.storeBytes(of: 0, as: Int.self)
+    i?.pointee = index
+}
+@_cdecl("plist_dict_next_item") nonisolated func fakePlistDictNextItem(
+    _ p: plist_t?,
+    _ i: plist_dict_iter?,
+    _ k: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    _ v: UnsafeMutablePointer<plist_t?>?
+) {
+    k?.pointee = nil
+    v?.pointee = nil
+    guard let node = fakeNode(p), let i else { return }
+    let index = i.load(as: Int.self)
+    guard index < node.children.count else { return }
+    i.storeBytes(of: index + 1, as: Int.self)
+    k?.pointee = node.children[index].key.map { strdup($0) }
+    v?.pointee = opaque(node.children[index].node)
+}
+@_cdecl("plist_get_string_ptr") nonisolated func fakePlistStringPtr(
+    _ p: plist_t?,
+    _ n: UnsafeMutablePointer<UInt64>?
+) -> UnsafePointer<CChar>? {
+    n?.pointee = UInt64(fakeNode(p)?.bytes?.count ?? 0)
+    return nil
+}
+@_cdecl("plist_get_data_ptr") nonisolated func fakePlistDataPtr(
+    _ p: plist_t?,
+    _ n: UnsafeMutablePointer<UInt64>?
+) -> UnsafePointer<CChar>? {
+    n?.pointee = UInt64(fakeNode(p)?.bytes?.count ?? 0)
+    return nil
+}
