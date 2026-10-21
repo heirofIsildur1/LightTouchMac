@@ -224,6 +224,48 @@ extension SharedState {
             #expect(item.image !== lockImage && item.label == "Start" && item.toolTip == "Start (⌘L)")
         }
 
+        /// The zoom item in the toolbar keeps its control while the customization palette shows a zoom item of its own:
+        /// each item gets its own segmented control (issue 107).
+        @Test func zoomItemKeepsItsControl() {
+            final class Target: NSObject, NSToolbarDelegate {
+                @objc func zoom(_ sender: Any?) {}
+                func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+                    [NSToolbarItem.zoomIdentifier]
+                }
+                func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+                    toolbarDefaultItemIdentifiers(toolbar)
+                }
+                func toolbar(
+                    _ toolbar: NSToolbar,
+                    itemForItemIdentifier id: NSToolbarItem.Identifier,
+                    willBeInsertedIntoToolbar flag: Bool
+                ) -> NSToolbarItem? { .zoom(target: self, action: #selector(zoom(_:))) }
+            }
+            let target = Target()
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
+                styleMask: [.titled, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            let toolbar = NSToolbar(identifier: "zoom-check")
+            toolbar.delegate = target
+            window.toolbar = toolbar
+            let control = toolbar.items.first?.view as? NSSegmentedControl
+            #expect(control?.window === window && control?.segmentCount == 3)
+            // What the palette does with the item it asks for.
+            let palette = target.toolbar(
+                toolbar,
+                itemForItemIdentifier: NSToolbarItem.zoomIdentifier,
+                willBeInsertedIntoToolbar: false
+            )
+            let paletteView = NSView()
+            if let view = palette?.view { paletteView.addSubview(view) }
+            #expect(palette?.view !== control && palette?.view is NSSegmentedControl)
+            #expect(control?.window === window, "the palette's item took the toolbar's control")
+            withExtendedLifetime(window) {}
+        }
+
         /// The Apps inspector's Store and transfer rows at 240-500 pt: icons and labels align, the title stays one line,
         /// the action keeps its width whatever its text, a transfer shows (in)determinate progress beside Cancel. What each
         /// row says is LightTouchCoreTests' AppsInspectorRowsTests.

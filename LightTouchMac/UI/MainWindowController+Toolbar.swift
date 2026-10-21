@@ -251,7 +251,7 @@ extension NSToolbarItem.Identifier {
     fileprivate static let home = NSToolbarItem.Identifier("home")
     static let lock = NSToolbarItem.Identifier("lock")
     static let rotate = NSToolbarItem.Identifier("rotate")
-    static let zoom = NSToolbarItem.Identifier("zoom")
+    static let zoom = NSToolbarItem.zoomIdentifier
     static let installApp = NSToolbarItem.Identifier("installApp")
     static let searchCatalog = NSToolbarItem.Identifier("searchCatalog")
     static let addDevice = NSToolbarItem.Identifier("addDevice")
