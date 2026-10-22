@@ -122,6 +122,15 @@ struct Tools {
     static func build(work: URL) -> URL {
         let symroot = repository.appendingPathComponent(".build/sessions-xcode")
         let log = work.appendingPathComponent("xcodebuild.log")
+        // One xcodebuild at a time into this checkout's build folder: two runs started together (matrix lanes, an
+        // agent's second check) wait for each other rather than fail on its lock. The kernel drops it at exit.
+        try? FileManager.default.createDirectory(at: symroot, withIntermediateDirectories: true)
+        let lock = open(symroot.path + ".lock", O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
+        if lock >= 0, flock(lock, LOCK_EX | LOCK_NB) != 0 {
+            print("waiting for another run's build of the tools in \(symroot.path)")
+            flock(lock, LOCK_EX)
+        }
+        defer { if lock >= 0 { close(lock) } }
         print("building the helper, services worker and firmwarekit (log \(log.path))")
         let status = run(
             "/usr/bin/xcodebuild",
