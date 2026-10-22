@@ -4,7 +4,7 @@
 #
 #     scripts/format <path>...    these files, in place
 #     scripts/format --all        every tracked file, in place (the one-time whole-repository reformat)
-#     scripts/format --check      prints each tracked file that isn't formatted; exit 1 if any
+#     scripts/format --check      prints each tracked file that isn't formatted and each lint finding; exit 1 if any
 #     scripts/format --staged     the pre-commit hook (scripts/hooks/pre-commit): formats each staged file in place
 #                                 and stages it again; refuses a partly staged file whose staged text isn't formatted
 #
@@ -66,10 +66,15 @@ case "${1:-}" in
             mkdir -p "$copy/$(dirname "$f")" && cp "$f" "$copy/$f" && files+=("$f")
         done < <(tracked)
         (cd "$copy" && ROOT="$copy" format_files "${files[@]}") || exit 1
-        unformatted=0
+        unformatted=0 swift=()
         for f in "${files[@]}"; do
             cmp -s "$f" "$copy/$f" || { echo "$f"; unformatted=1; }
+            [[ $f == *.swift ]] && swift+=("$f")
         done
+        # Then the lint rules the formatter can't apply (ReplaceForEachWithForLoop, OnlyOneTrailingClosureArgument…).
+        if ((${#swift[@]})); then
+            "$swift_format" lint --strict --parallel --configuration .swift-format -- "${swift[@]}" || unformatted=1
+        fi
         exit $unformatted
         ;;
     --staged)

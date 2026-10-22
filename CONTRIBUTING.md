@@ -185,7 +185,7 @@ directory and fails a run that touched the real `app.log`.
 
 | Directory | What is there |
 |---|---|
-| `Packages/*/Tests`, `Unit.xctestplan` | Swift Testing: LightTouchCoreTests (the app's logic), HostRuntimeTests, FirmwareKitTests, HostServiceWireTests, ReleaseChecksTests' fixtures, BuildToolsTests (the native merge, the dependency sources). LightTouchCore's tests run one at a time in a private home (Tests/TestIsolation) |
+| `Packages/*/Tests`, `Unit.xctestplan` | Swift Testing: LightTouchCoreTests (the app's logic), HostRuntimeTests, FirmwareKitTests, HostServiceWireTests, ReleaseChecksTests' fixtures, BuildToolsTests (the native merge, the dependency sources, the repository's format and lint). LightTouchCore's tests run one at a time in a private home (Tests/TestIsolation) |
 | `tests/offline/` | A Swift package (OfflineTests, in the Unit plan) for what needs the app target's own files: AppKit views rendered offscreen, the display's input and layout, the helper's C API version and LCD color, the services engine against a fake libimobiledevice. The production files are compiled whole through symlinks beside small stand-ins; no window is ordered in |
 | `tests/sessions/` | A Swift package: `sessions` (the checks and their verdicts), the drivers that stand in for the app (`session-driver`: the app's session code; `helper-driver`: DeviceLink straight to the helper), and SessionKit (frame references, the Home verdict, the Setup walks), whose tests are in the Unit plan |
 | `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `format-hook.sh`: the pre-commit formatter in a scratch repository; `host-ready.sh`; `ship.sh`: scripts/ship's and scripts/release's tags, notes, notary config, IPSW fill, pruning, argument checks and release-helper.swift), run by hand |
@@ -207,10 +207,12 @@ and C++ (`.clang-format`: LLVM with those widths and case labels indented). Alwa
 clang-format`, never Homebrew's. The pre-commit hook (`scripts/hooks/pre-commit`) runs `scripts/format --staged`: it
 formats each staged file and stages it again, and refuses a partly staged file whose staged text isn't formatted,
 printing the command to run. `scripts/format <paths>` formats files by hand, `scripts/format --check` lists every
-tracked file that isn't formatted, and `scripts/format --all` reformats the repository (that commit goes in
-`.git-blame-ignore-revs`). Code from upstream projects (`build-support/patches`, the GPL fixture in
-`tests/offline/fixtures`) is left alone; a generator writes what the formatter would (`scripts/machine-options`).
-`xcrun swift-format lint -r <paths>` should stay quiet.
+tracked file that isn't formatted and every `swift-format lint --strict` finding (the rules the formatter can't
+apply, such as a for-in loop for `forEach`), and `scripts/format --all` reformats the repository (that commit goes in
+`.git-blame-ignore-revs`). BuildToolsTests runs `--check` in the Unit plan, so both stay at zero: a finding is fixed in
+the code (or in its generator), not by turning the rule off. Code from upstream projects (`build-support/patches`, the
+GPL fixture in `tests/offline/fixtures`) is left alone; a generator writes what the formatter would
+(`scripts/machine-options`).
 
 **Warnings.** None. Fix the cause: a `@Sendable` closure or a lock-guarded `@unchecked Sendable` box for state shared
 across threads, `MainActor.assumeIsolated` in an AppKit completion that runs on the main thread, `nonisolated` on test

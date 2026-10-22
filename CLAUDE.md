@@ -37,7 +37,8 @@ what to do and not do on a shared Mac.
   emulator slots taken, or disk); `sessions` holds a slot for its run and waits for one when none is free.
 - A new test must fail with the fix reverted; say so in the commit.
 - The pre-commit hook formats staged Swift and C (`scripts/format --staged`; `scripts/bootstrap` turns it on). When
-  it refuses a partly staged file, run the command it prints. `xcrun swift-format lint -r <changed paths>` stays quiet.
+  it refuses a partly staged file, run the command it prints. `scripts/format --check` (run by the Unit plan) fails on
+  an unformatted file or any swift-format lint finding: change the code, don't disable the rule.
 
 ## Commits
 
