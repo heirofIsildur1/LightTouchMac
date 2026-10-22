@@ -1,4 +1,5 @@
 import BuildSupport
+import CryptoKit
 import FirmwareSchema
 import Foundation
 import SessionKit
@@ -138,17 +139,28 @@ struct Tools {
         return symroot.appendingPathComponent("Debug")
     }
 
-    /// `--app`, else this tree's Debug build in an app's layout (work/tools/Tools.app: the helper, services worker and
-    /// firmwarekit beside APFS clones of scripts/vendor's MacOS, Frameworks and Resources), which `--app` also takes:
-    /// a run started with it (sessions matrix's) builds nothing.
+    /// `--app`, else this tree's Debug build in an app's layout (Tools.app: the helper, services worker and firmwarekit
+    /// beside APFS clones of scripts/vendor's MacOS, Frameworks and Resources): a sandboxed helper loads the emulator
+    /// from its own bundle, as firmwarekit's machines listing and one-shot boots need. Built once per source tree and
+    /// shared by every checkout (sharedTools, keyed by sourceKey); a tree whose tool sources have uncommitted changes
+    /// builds its own, in the run's directory.
     static func bundle(_ args: Inputs, work: URL) -> URL {
         if let app = args.app { return app }
         let fm = FileManager.default
         guard let vendor = vendorDirectory() else {
             die("no vendor directory for the current pins: run scripts/vendor (about 15 minutes), or pass --app")
         }
+        let key = sourceKey(vendor: vendor)
+        let shared = key.map { sharedTools.appendingPathComponent($0) }
+        if let shared, fm.isExecutableFile(atPath: shared.path + "/Tools.app/Contents/MacOS/firmwarekit") {
+            try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: shared.path)  // scripts/clean's age
+            print("tools: this source tree's, built before (\(shared.path))")
+            return shared.appendingPathComponent("Tools.app")
+        }
         let built = build(work: work)
-        let staging = work.appendingPathComponent("tools")
+        let staging =
+            shared.map { URL(fileURLWithPath: $0.path + ".partial-\(UUID().uuidString.prefix(8))") }
+            ?? work.appendingPathComponent("tools")
         let contents = staging.appendingPathComponent("Tools.app/Contents")
         try? fm.removeItem(at: staging)
         try? fm.createDirectory(at: contents, withIntermediateDirectories: true)
@@ -160,7 +172,52 @@ struct Tools {
         for (from, to) in copies where run("/bin/cp", ["-cR", from, to.path]) != 0 {
             die("could not copy \(from) into \(to.path)", code: 3)
         }
-        return staging.appendingPathComponent("Tools.app")
+        guard let shared else {
+            print("tools: built for this run (uncommitted changes to what they're built from)")
+            return staging.appendingPathComponent("Tools.app")
+        }
+        // Another checkout may have published the same tree's tools meanwhile: either copy is the same build.
+        if rename(staging.path, shared.path) != 0 { try? fm.removeItem(at: staging) }
+        print("tools: built and shared as \(shared.path)")
+        // Each reuse touches its key's folder: one nobody has used for a week goes (scripts/clean skips dot folders).
+        let weekAgo = Date().addingTimeInterval(-7 * 86400)
+        for name in (try? fm.contentsOfDirectory(atPath: sharedTools.path)) ?? [] {
+            let old = sharedTools.appendingPathComponent(name)
+            let used = (try? fm.attributesOfItem(atPath: old.path)[.modificationDate] as? Date) ?? Date()
+            if used < weekAgo { try? fm.removeItem(at: old) }
+        }
+        return shared.appendingPathComponent("Tools.app")
+    }
+
+    /// Where every checkout's Debug tools are kept by source tree (sourceKey).
+    static var sharedTools: URL {
+        URL(
+            fileURLWithPath: ProcessInfo.processInfo.environment["LTM_SESSIONS_TOOLS"]
+                ?? home.appendingPathComponent("Developer/ltm-scratch.noindex/.sessions-tools").path
+        )
+    }
+
+    /// What the helper, services worker and firmwarekit are built from, as one hash: the committed trees of their
+    /// sources, project and pins, the vendor directory, the sandbox setting, Local.xcconfig and the Xcode; nil when
+    /// any of those sources has an uncommitted change (the build can't be named by its commit).
+    static func sourceKey(vendor: URL) -> String? {
+        let paths = [
+            "LightTouchDevice", "LightTouchServices", "Packages", "Configuration", "LightTouchMac.xcodeproj",
+            "build-support"
+        ]
+        let git = ["-C", repository.path]
+        guard output("/usr/bin/git", git + ["status", "--porcelain", "--"] + paths).isEmpty else { return nil }
+        let trees = output("/usr/bin/git", git + ["rev-parse"] + paths.map { "HEAD:\($0)" })
+        guard trees.split(separator: "\n").count == paths.count else { return nil }
+        let local =
+            (try? String(contentsOf: repository.appendingPathComponent("Configuration/Local.xcconfig"), encoding: .utf8))
+            ?? ""
+        let inputs = [
+            trees, vendor.path, ProcessInfo.processInfo.environment["LTM_HELPER_SANDBOX"] ?? "YES", local,
+            output("/usr/bin/xcodebuild", ["-version"])
+        ]
+        return SHA256.hash(data: Data(inputs.joined(separator: "\n").utf8)).prefix(10)
+            .map { String(format: "%02x", $0) }.joined()
     }
 
     /// Resources/Guest/guest.aar unpacked into the run's directory.

@@ -198,8 +198,10 @@ TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -skipMacro
     -scheme LightTouchMac -testPlan Release
 ```
 
-`sessions` builds the Debug helper, services worker and firmwarekit (cached in `.build/sessions-xcode`) and boots with
-scripts/vendor's dylib, usbmuxd, SecureROMs and guest package, or with a built app's (`--app`); `--dylib` takes a
+`sessions` builds the Debug helper, services worker and firmwarekit and boots them in an app's layout beside
+scripts/vendor's dylib, usbmuxd, SecureROMs and guest package, or a built app's (`--app`). A build is shared by every
+checkout through `~/Developer/ltm-scratch.noindex/.sessions-tools/<key>`, the key the committed trees it is built from
+(a checkout with uncommitted changes there builds its own, in the run's directory); `--dylib` takes a
 development build for the Debug helper (it is refused with `--app`, whose helper loads the app's own dylib). It prints one ok/FAIL line per check and exits 1 on any FAIL; logs, screenshots and the driver's
 events stay in `--work`. It judges the Home screen by the guest agent's frontmost app and screen where the base has an
 agent, and by a frame reference in `tests/sessions/matrix-refs` where there is one. No test run writes the real app
