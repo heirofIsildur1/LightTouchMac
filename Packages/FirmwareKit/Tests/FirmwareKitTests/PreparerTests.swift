@@ -201,20 +201,33 @@ import Testing
         var staging: URL
     }
 
+    /// The emulator's machines as LightTouchDevice lists them.
+    static let machines = URL(fileURLWithPath: #filePath)
+        .appendingPathComponent("../../../../../tests/fixtures/machines.json").standardized
+
     /// Runs `firmwarekit create` on `ipsw` with the 7B500 entry; `whileRunning` gets the process after the first stdout bytes.
+    /// The helper is a stand-in that only lists the machines (machines.json): the K48 board's check asks the helper for
+    /// the iPad's machine before the plan begins, and nothing here gets as far as booting it.
     static func create(_ dir: URL, ipsw: URL, extra: [String] = [], whileRunning: ((Process) -> Void)? = nil) throws
         -> Run
     {
         let entry = dir.appendingPathComponent("entry.json")
         let staging = dir.appendingPathComponent("staging")
+        let helper = dir.appendingPathComponent("LightTouchDevice")
         try JSONEncoder().encode(try Oracle.entry("k48ap-7B500")).write(to: entry)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        try "#!/bin/sh\nprintf '{\"machines\":'\ncat '\(machines.path)'\nprintf '}'\n".write(
+            to: helper,
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: helper.path)
         let p = Process()
         let out = Pipe()
         p.executableURL = cli
         p.arguments =
             [
-                "create", "--entry", entry.path, "--ipsw", ipsw.path, "--out", staging.path, "--helper", "/bin/sh",
+                "create", "--entry", entry.path, "--ipsw", ipsw.path, "--out", staging.path, "--helper", helper.path,
                 "--guest-tools", dir.path
             ] + extra
         p.standardOutput = out
@@ -249,15 +262,13 @@ import Testing
             #expect(r.status == 1)
             #expect(r.lines.map { $0["event"] as? String }.filter { $0 != "progress" } == ["begin", "step", "error"])
             #expect(r.lines.first?["steps"] as? Int == 7)
-            #expect(r.lines[1]["index"] as? Int == 1 && r.lines.first?["seconds"] is [Double])
+            #expect(r.lines.dropFirst().first?["index"] as? Int == 1 && r.lines.first?["seconds"] is [Double])
             #expect(r.lines.last?["code"] as? String == "sha_mismatch")
 
-            // activation is built in: the old hook flag is an unknown argument
+            // activation is built in: the old hook flag is a command line it doesn't take (64, nothing on stdout)
             try FileManager.default.removeItem(at: r.staging)
             let h = try Self.create(dir, ipsw: ipsw, extra: ["--activation-hook", "/bin/true"])
-            #expect(h.status == 1)
-            #expect(h.lines.map { $0["event"] as? String } == ["error"])
-            #expect(h.lines.last?["code"] as? String == "internal")
+            #expect(h.status == 64 && h.lines.isEmpty)
         }
     }
 
