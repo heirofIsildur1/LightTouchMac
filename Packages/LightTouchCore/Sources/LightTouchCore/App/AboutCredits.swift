@@ -59,10 +59,16 @@ public enum AboutCredits {
         Project("Swift Crypto", "https://github.com/apple/swift-crypto", "Apache-2.0", "swift/swift-crypto"),
         Project("SwiftASN1", "https://github.com/apple/swift-asn1", "Apache-2.0", "swift/swift-asn1"),
         Project(
-            "Swift Certificates",
-            "https://github.com/apple/swift-certificates",
+            "Swift Argument Parser",
+            "https://github.com/apple/swift-argument-parser",
             "Apache-2.0",
-            "swift/swift-certificates"
+            "swift/swift-argument-parser"
+        ),
+        Project(
+            "Swift Binary Parsing",
+            "https://github.com/apple/swift-binary-parsing",
+            "Apache-2.0",
+            "swift/swift-binary-parsing"
         ),
         Project("Swift System", "https://github.com/apple/swift-system", "Apache-2.0", "swift/swift-system"),
         Project("Subprocess", "https://github.com/swiftlang/swift-subprocess", "Apache-2.0", "swift/swift-subprocess"),

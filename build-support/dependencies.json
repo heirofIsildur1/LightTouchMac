@@ -239,7 +239,7 @@
       "url": "https://github.com/weichsel/ZIPFoundation/archive/refs/tags/0.9.20.tar.gz",
       "sha256": "3ddad93f81480d141f15d9b8bdc276a21c5242446c179672c2e787799a423b5e",
       "license": "MIT",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-09-28. Pinned exact in Packages/FirmwareKit/Package.swift (SwiftPM fetches it; this record is the license and provenance ledger). FirmwareKit's IPSWArchive reads IPSW members through it."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-09-28. Pinned exact in Packages/FirmwareKit/Package.swift and Packages/LightTouchCore/Package.swift, and by the app through Xcode (SwiftPM fetches it; this record is the license and provenance ledger). FirmwareKit's IPSWArchive reads IPSW members through it, and LightTouchCore an IPA's and writes a diagnostics archive."
     },
     {
       "name": "swift-subprocess",
@@ -252,7 +252,7 @@
       "url": "https://github.com/swiftlang/swift-subprocess/archive/refs/tags/1.0.2.tar.gz",
       "sha256": "72a948b2a43cada28c34bd03bdf1b989f1a516f225d571bfe27909c7a3ef0323",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit/Package.swift (the app pins the same version through Xcode). FirmwareKit's DiskImage runs diskutil/hdiutil through it."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit/Package.swift, Packages/LightTouchCore/Package.swift and Packages/DeviceServices/Package.swift, and by the app through Xcode. FirmwareKit's DiskImage runs diskutil/hdiutil through it, LightTouchCore and HostServiceClient the helper tools they start."
     },
     {
       "name": "Sparkle",
@@ -291,7 +291,7 @@
       "url": "https://github.com/apple/swift-argument-parser/archive/refs/tags/1.8.2.tar.gz",
       "sha256": "62bb12fb84d07d7f9ebbbbae205d32f941bcfecdcebdd09889f6e7f7f96f04ac",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-07. Pinned exact in Packages/FirmwareKit/Package.swift (FirmwareSchema's FirmwareCommand: the firmwarekit command lines the app builds and the CLI parses), Packages/BuildTools, tests/sessions and tools/device-access. Never in LightTouchDevice, which loads the GPL-2.0-only emulator: it takes its launch as one HostRuntime HelperLaunch value."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-07. Pinned exact in Packages/FirmwareKit/Package.swift (FirmwareSchema's FirmwareCommand: the firmwarekit command lines the app builds and the CLI parses), Packages/BuildTools/Package.swift, tests/sessions/Package.swift and tools/device-access/Package.swift. Never in LightTouchDevice, which loads the GPL-2.0-only emulator: it takes its launch as one HostRuntime HelperLaunch value."
     },
     {
       "name": "swift-binary-parsing",
@@ -304,7 +304,7 @@
       "url": "https://github.com/apple/swift-binary-parsing/archive/refs/tags/0.0.4.tar.gz",
       "sha256": "ca15f673bc8d258d785fd1d45f0011a6e1cceb7ff31c8781ad7fb0eec55d6907",
       "license": "Apache-2.0 WITH Swift-exception",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-21. Pinned exact in Packages/FirmwareKit/Package.swift. FirmwareKit's readers of firmware files (HFSPlus, BTreeFile, UDIFReader, TarArchive) parse through its ParserSpan, whose reads check their bounds and throw. Its macro target builds swift-syntax (the next record: build time only), so xcodebuild runs with -skipMacroValidation; its RawSpan needs the toolchain's libswiftCompatibilitySpan.dylib below macOS 26, which the app embeds in Frameworks."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-21. Pinned exact in Packages/FirmwareKit/Package.swift and Packages/LightTouchCore/Package.swift. FirmwareKit's readers of firmware files (HFSPlus, BTreeFile, UDIFReader, TarArchive) and LightTouchCore's reads of guest and media bytes (MediaIdentity, MediaSong, StatusBarOverride) parse through its ParserSpan, whose reads check their bounds and throw. Its macro target builds swift-syntax (the next record: build time only), so xcodebuild runs with -skipMacroValidation; its RawSpan needs the toolchain's libswiftCompatibilitySpan.dylib below macOS 26, which the app embeds in Frameworks."
     },
     {
       "name": "swift-syntax",
@@ -330,7 +330,7 @@
       "url": "https://github.com/apple/swift-crypto/archive/refs/tags/5.0.3.tar.gz",
       "sha256": "ab84654f5e7746b67bcaa44562ff442882e31bab573f0a1fed4c69bc54849443",
       "license": "Apache-2.0",
-      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit and LightTouchCore. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras (BoringSSL) for FirmwareKit's AES-CBC only off Apple platforms, where there is no CommonCrypto: BoringSSL's error macros put each C source's absolute build path into the binary, which the release check refuses. Never in LightTouchDevice, which loads the GPL-2.0-only emulator: DeviceRuntime and HostRuntime keep Security and CryptoKit."
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Pinned exact in Packages/FirmwareKit/Package.swift and Packages/LightTouchCore/Package.swift. Crypto (CryptoKit itself on Apple platforms) for digests and HMAC; CryptoExtras (BoringSSL) for FirmwareKit's AES-CBC only off Apple platforms, where there is no CommonCrypto: BoringSSL's error macros put each C source's absolute build path into the binary, which the release check refuses. Never in LightTouchDevice, which loads the GPL-2.0-only emulator: DeviceRuntime and HostRuntime keep Security and CryptoKit."
     },
     {
       "name": "swift-asn1",
@@ -344,6 +344,19 @@
       "sha256": "77add3684fd75a586529893288af51ed092c565ec0c154d2b4eedb3a6bdc294c",
       "license": "Apache-2.0",
       "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-20. Not pinned by any manifest: swift-crypto's CryptoExtras depends on it, so it is linked wherever CryptoExtras is (FirmwareKit off Apple platforms); resolved, and its license carried, on a Mac too."
+    },
+    {
+      "name": "swift-system",
+      "version": "1.8.1",
+      "groups": [
+        "swiftpm"
+      ],
+      "archive": "swift-system-1.8.1.tar.gz",
+      "directory": "swift-system-1.8.1",
+      "url": "https://github.com/apple/swift-system/archive/refs/tags/1.8.1.tar.gz",
+      "sha256": "5610bea8f1f390895137247e7e6aa6bf89a6cd108d75d3368aba5da3f06f0d7a",
+      "license": "Apache-2.0 WITH Swift-exception",
+      "checksum_source": "SHA-256 calculated from this GitHub archive on 2026-10-21. Not pinned by any manifest: swift-subprocess depends on it (Package.resolved pins the version), so it is linked wherever Subprocess is and scripts/vendor ships its license."
     }
   ]
 }

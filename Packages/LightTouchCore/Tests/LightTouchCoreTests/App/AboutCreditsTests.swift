@@ -30,6 +30,20 @@ struct AboutCreditsTests {
         #expect(runs.last == .init(text: "\nShow Licenses", link: AboutCredits.licensesLink))
     }
 
+    /// The credits name each Swift package the ledger (build-support/dependencies.json's "swiftpm" records) says ships,
+    /// and no other.
+    @Test func everyShippedSwiftPackageIsCredited() throws {
+        let ledger = URL(fileURLWithPath: #filePath).appendingPathComponent(
+            "../../../../../../build-support/dependencies.json"
+        ).standardized
+        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: ledger)) as? [String: Any]
+        let shipped = (object?["packages"] as? [[String: Any]] ?? []).filter {
+            ($0["groups"] as? [String])?.contains("swiftpm") == true
+        }.compactMap { $0["name"] as? String }
+        let credited = AboutCredits.projects.map(\.directory).filter { $0.hasPrefix("swift/") }.map { $0.dropFirst(6) }
+        #expect(Set(credited.map(String.init)) == Set(shipped))
+    }
+
     /// A development build has no build record or license files: the projects, without Show Licenses.
     @Test func developmentBuildListsTheProjectsWithoutShowLicenses() {
         let runs = AboutCredits.runs(buildInputs: nil, licenses: false)

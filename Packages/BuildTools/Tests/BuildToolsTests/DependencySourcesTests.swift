@@ -156,4 +156,40 @@ struct DependencySourcesTests {
             #expect(note.hasSuffix("Patches: a.patch (in this directory), applied with patch -p1"))
         }
     }
+
+    /// dependencies.json is the Swift packages' license and provenance ledger: every package the app resolves has a
+    /// record at the resolved version, and each manifest that pins one exact is named in its record, at that version.
+    @Test func theLedgerRecordsEverySwiftPackageAndWhereItIsPinned() throws {
+        let repository = URL(fileURLWithPath: #filePath).appendingPathComponent("../../../../..").standardized
+        let records = Dictionary(
+            (try readJSON(repository.appendingPathComponent("build-support/dependencies.json"))["packages"]
+                as? [[String: Any]] ?? []).map { (($0["name"] as? String ?? "").lowercased(), $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        let resolved = try readJSON(
+            repository.appendingPathComponent("LightTouchMac.xcworkspace/xcshareddata/swiftpm/Package.resolved")
+        )
+        for pin in resolved["pins"] as? [[String: Any]] ?? [] {
+            let identity = pin["identity"] as? String ?? ""
+            let version = (pin["state"] as? [String: Any])?["version"] as? String
+            #expect(records[identity]?["version"] as? String == version, "\(identity) \(version ?? "")")
+        }
+        let manifests = [
+            "Packages/BuildTools", "Packages/DeviceRuntime", "Packages/DeviceServices", "Packages/FirmwareKit",
+            "Packages/HostRuntime", "Packages/LightTouchCore", "Packages/ReleaseChecks", "tests/offline",
+            "tests/sessions", "tools/device-access"
+        ].map { "\($0)/Package.swift" }
+        let pinned = /\.package\(url: "[^"]*\/([^\/"]+?)(?:\.git)?", exact: "([^"]+)"\)/
+        for manifest in manifests {
+            let text = try String(contentsOf: repository.appendingPathComponent(manifest), encoding: .utf8)
+            for match in text.matches(of: pinned) {
+                let record = records[String(match.1).lowercased()]
+                #expect(record?["version"] as? String == String(match.2), "\(manifest): \(match.1) \(match.2)")
+                #expect(
+                    (record?["checksum_source"] as? String)?.contains(manifest) == true,
+                    "\(match.1)'s record doesn't name \(manifest)"
+                )
+            }
+        }
+    }
 }
