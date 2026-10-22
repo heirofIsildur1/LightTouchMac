@@ -27,4 +27,10 @@ elif ((version < 27)); then
         "developer.apple.com/download/all, then sudo xcode-select -s that Xcode"
     exit 1
 fi
-exec "$ROOT/scripts/ltm-build" vendor "$@"
+"$ROOT/scripts/ltm-build" vendor "$@" || exit
+# Point build/vendor at this checkout's vendor directory now, not only in Xcode's first build phase: SwiftPM resolves
+# tests/offline (its headers come from build/vendor/include) before that phase runs, so on a fresh checkout or after
+# a pin bump the Unit plan failed to find libimobiledevice's headers.
+case " $* " in *" --check "* | *" --print "* | *" --help "* | *" -h "*) exit 0 ;; esac
+dir="$("$ROOT/scripts/vendor-check" --print)" || exit
+mkdir -p "$ROOT/build" && ln -sfn "$dir" "$ROOT/build/vendor"
