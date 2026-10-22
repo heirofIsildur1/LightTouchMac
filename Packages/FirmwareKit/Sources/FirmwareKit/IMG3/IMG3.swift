@@ -10,6 +10,7 @@
 // Which tail convention a firmware uses is decided once, on the kernelcache (the one component with a
 // checksum): see FirmwareDecryptor.
 
+import BinaryParsing
 import Crypto
 import Foundation
 
@@ -21,45 +22,70 @@ import Foundation
 
 public enum IMG3 {
     public struct Tag: Equatable, Sendable {
+        /// Magic as read ("DATA", "KBAG"; stored reversed).
+        public var magic: String = ""
+        /// The tag header's offset in the file.
         public var offset: Int
+        /// The tag's whole length (header, data and padding) and its data's.
+        public var total: Int = 0
         public var dataLength: Int
+        /// The data's offsets in the file.
+        public var data: Range<Int> { offset + 12..<offset + 12 + dataLength }
     }
 
-    /// Tag magic (as read, e.g. "DATA", "KBAG") -> its header offset and data length.
+    static let headerSize = 0x14
+
+    /// The tags in file order. The header ("Img3" stored reversed, then fullSize, sizeNoPack, sigCheckArea, ident) is
+    /// followed by tags up to fullSize, each a magic, its total length, its data length and the data: a tag must hold
+    /// its header and data and end within fullSize, and fullSize within the file. A zero total ends the tags.
+    public static func tagList(_ data: some ParserSpanProvider) throws -> [Tag] {
+        try parsing(data, "img3") { s in
+            guard try UInt32(parsingLittleEndian: &s) == 0x496D_6733 else {
+                throw FirmwareError(.unsupported, "not an img3")
+            }
+            let full = try Int(parsing: &s, storedAsLittleEndian: UInt32.self)
+            var body = try s.seeking(toAbsoluteOffset: headerSize)
+            guard full >= headerSize else {
+                throw FirmwareError(.unsupported, "img3 fullSize \(full) is below its header")
+            }
+            body = try body.sliceSpan(byteCount: full - headerSize)
+            var tags: [Tag] = []
+            while body.count >= 12 {
+                let offset = body.startPosition
+                var head = try body.seeking(toRelativeOffset: 0)
+                let magic = String(decoding: try [UInt8](parsing: &head, byteCount: 4).reversed(), as: UTF8.self)
+                let total = try Int(parsing: &head, storedAsLittleEndian: UInt32.self)
+                let dataLength = try Int(parsing: &head, storedAsLittleEndian: UInt32.self)
+                if total == 0 { break }
+                guard total >= 12, dataLength <= total - 12, total <= body.count else {
+                    throw FirmwareError(
+                        .unsupported,
+                        "img3 tag \(magic) at \(offset): \(total) bytes with \(dataLength) of data in the \(body.count) left"
+                    )
+                }
+                _ = try body.sliceSpan(byteCount: total)
+                tags.append(Tag(magic: magic, offset: offset, total: total, dataLength: dataLength))
+            }
+            return tags
+        }
+    }
+
+    /// Tag magic (as read, e.g. "DATA", "KBAG") -> its header offset and data length; a later tag of a magic wins.
     public static func tags(_ data: Data) throws -> [String: Tag] {
-        let d = [UInt8](data)
-        guard d.count >= 0x14, d[0..<4] == [0x33, 0x67, 0x6D, 0x49] else {
-            throw FirmwareError(.unsupported, "not an img3")
-        }
-        let full = Int(d.u32(4))
-        var off = 0x14
-        var tags: [String: Tag] = [:]
-        while off + 12 <= full, off + 12 <= d.count {
-            let magic = String(decoding: d[off..<off + 4].reversed(), as: UTF8.self)
-            let total = Int(d.u32(off + 4))
-            let dlen = Int(d.u32(off + 8))
-            if total < 12 { break }
-            tags[magic] = Tag(offset: off, dataLength: dlen)
-            off += total
-        }
-        return tags
+        Dictionary(try tagList(data).map { ($0.magic, $0) }, uniquingKeysWith: { $1 })
     }
 
     /// The DATA payload as stored (an unencrypted img3's plaintext, else the ciphertext).
     public static func payload(_ data: Data) throws -> Data {
         guard let tag = try tags(data)["DATA"] else { throw FirmwareError(.unsupported, "img3 has no DATA tag") }
         let start = data.startIndex + tag.offset + 12
-        guard start + tag.dataLength <= data.endIndex else {
-            throw FirmwareError(.unsupported, "img3 DATA runs past the file")
-        }
-        return data[start..<start + tag.dataLength]
+        return data[start..<start + tag.dataLength]  // within the tag, which tagList holds within the file
     }
 
     public static func decrypt(_ data: Data, iv: Data, key: Data, plainTail: Bool = false) throws -> Data {
         guard let tag = try tags(data)["DATA"] else { throw FirmwareError(.unsupported, "img3 has no DATA tag") }
         let start = data.startIndex + tag.offset + 12
         let dlen = tag.dataLength
-        guard start + dlen <= data.endIndex else { throw FirmwareError(.unsupported, "img3 DATA runs past the file") }
         if plainTail {
             let n = dlen & ~15
             return try AESCBC.crypt(data[start..<start + n], iv: iv, key: key) + data[start + n..<start + dlen]
@@ -130,11 +156,5 @@ extension Data {
     init(hexLiteral hex: StaticString) {
         guard let data = Data(hex: "\(hex)") else { preconditionFailure("not a hex literal: \(hex)") }
         self = data
-    }
-}
-
-extension [UInt8] {
-    func u32(_ at: Int) -> UInt32 {
-        UInt32(self[at]) | UInt32(self[at + 1]) << 8 | UInt32(self[at + 2]) << 16 | UInt32(self[at + 3]) << 24
     }
 }

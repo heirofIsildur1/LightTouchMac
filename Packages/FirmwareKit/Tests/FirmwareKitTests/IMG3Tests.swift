@@ -21,7 +21,7 @@ struct IMG3Tests {
         // 2.x: whole blocks encrypted, the last 5 bytes left in plaintext.
         let whole = try AESCBC.crypt(plain.prefix(32), iv: iv, key: key, decrypt: false) + plain.suffix(5)
         #expect(try IMG3.decrypt(img3(whole), iv: iv, key: key, plainTail: true) == plain)
-        #expect(try IMG3.tags(img3(padded))["DATA"] == IMG3.Tag(offset: 0x14, dataLength: 37))
+        #expect(try IMG3.tags(img3(padded))["DATA"] == IMG3.Tag(magic: "DATA", offset: 0x14, total: 60, dataLength: 37))
         #expect(throws: FirmwareError.self) { try IMG3.tags(Data("nope".utf8)) }
     }
 

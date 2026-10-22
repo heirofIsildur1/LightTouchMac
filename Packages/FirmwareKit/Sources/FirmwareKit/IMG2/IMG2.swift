@@ -6,6 +6,7 @@
 //
 // 2.0 moved to IMG3, so FirmwareDecryptor tells the two apart by the first four bytes.
 
+import BinaryParsing
 import Foundation
 
 public enum Apple8900 {
@@ -17,20 +18,24 @@ public enum Apple8900 {
 
     /// The payload, decrypted when the container says so. A final partial block is stored in the clear.
     public static func body(_ d: Data) throws -> Data {
-        let b = [UInt8](d.prefix(headerSize))
-        guard b.count == headerSize, isContainer(d), b[4..<7].elementsEqual("1.0".utf8) else {
-            throw FirmwareError(.unsupported, "not an 8900 v1.0 container")
+        // "8900", "1.0", the format byte, 4 bytes, the payload's size (little-endian); the payload at 0x800
+        let (format, body) = try parsing(d, "8900 container") { s -> (UInt8, ParserRange) in
+            guard try [UInt8](parsing: &s, byteCount: 7).elementsEqual("89001.0".utf8) else {
+                throw FirmwareError(.unsupported, "not an 8900 v1.0 container")
+            }
+            let format = try UInt8(parsing: &s)
+            try s.seek(toRelativeOffset: 4)
+            let size = try UInt32(parsingLittleEndian: &s)
+            try s.seek(toAbsoluteOffset: headerSize)
+            return (format, try s.sliceRange(byteCount: size))
         }
-        let size = Int(b.u32(0xC))
-        let start = d.startIndex + headerSize
-        guard start + size <= d.endIndex else { throw FirmwareError(.unsupported, "8900 payload runs past the file") }
-        let body = d[start..<start + size]
-        switch b[7] {
-        case 4: return Data(body)
+        let payload = d[d.startIndex + body.lowerBound..<d.startIndex + body.upperBound]
+        switch format {
+        case 4: return Data(payload)
         case 3:
-            let n = size & ~15
-            return try AESCBC.crypt(body.prefix(n), iv: Data(count: 16), key: key837) + body.dropFirst(n)
-        default: throw FirmwareError(.unsupported, "8900 format \(b[7]) (only 3, encrypted, and 4, plain, are known)")
+            let n = payload.count & ~15
+            return try AESCBC.crypt(payload.prefix(n), iv: Data(count: 16), key: key837) + payload.dropFirst(n)
+        default: throw FirmwareError(.unsupported, "8900 format \(format) (only 3, encrypted, and 4, plain, are known)")
         }
     }
 }
@@ -43,17 +48,23 @@ public enum IMG2 {
         public var type: String
         public var loadAddress: UInt32
         public var paddedLength: Int, dataLength: Int
+        /// "2gmI", the type, 4 bytes, the load address, the padded and data lengths (little-endian) in a 0x400-byte
+        /// header; the padded data after it must be in the image.
         public init(_ body: Data) throws {
-            let b = [UInt8](body.prefix(headerSize))
-            guard b.count == headerSize, b[0..<4].elementsEqual("2gmI".utf8) else {
-                throw FirmwareError(.unsupported, "not an IMG2 image")
-            }
-            type = String(decoding: b[4..<8].reversed(), as: UTF8.self)
-            loadAddress = b.u32(0xC)
-            paddedLength = Int(b.u32(0x10))
-            dataLength = Int(b.u32(0x14))
-            guard dataLength <= paddedLength, headerSize + paddedLength <= body.count else {
-                throw FirmwareError(.unsupported, "IMG2 \(type) data runs past the image")
+            (type, loadAddress, paddedLength, dataLength) = try parsing(body, "IMG2 image") { s in
+                guard try [UInt8](parsing: &s, byteCount: 4).elementsEqual("2gmI".utf8) else {
+                    throw FirmwareError(.unsupported, "not an IMG2 image")
+                }
+                let type = String(decoding: try [UInt8](parsing: &s, byteCount: 4).reversed(), as: UTF8.self)
+                try s.seek(toRelativeOffset: 4)
+                let load = try UInt32(parsingLittleEndian: &s)
+                let padded = try Int(parsing: &s, storedAsLittleEndian: UInt32.self)
+                let length = try Int(parsing: &s, storedAsLittleEndian: UInt32.self)
+                try s.seek(toAbsoluteOffset: headerSize)
+                guard length <= padded, padded <= s.count else {
+                    throw FirmwareError(.unsupported, "IMG2 \(type) data runs past the image")
+                }
+                return (type, load, padded, length)
             }
         }
     }

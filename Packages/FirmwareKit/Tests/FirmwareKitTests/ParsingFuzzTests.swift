@@ -284,6 +284,25 @@ import Testing
         }
     }
 
+    /// A plain 8900 container around an IMG2 of 50 bytes padded to 64, its headers flipped and the whole cut, through
+    /// Apple8900.body and IMG2's header and payload.
+    @Test func img2ContainersThrowOnCorruption() throws {
+        func word(_ v: Int) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
+        var img2 = Array("2gmIobi".utf8) + [0x62] + word(0) + word(0x1800_0000) + word(64) + word(50)
+        img2 += [UInt8](repeating: 0, count: IMG2.headerSize - img2.count) + [UInt8](repeating: 0x5A, count: 64)
+        var container = Array("89001.0".utf8) + [4] + word(0) + word(img2.count)
+        container += [UInt8](repeating: 0, count: Apple8900.headerSize - container.count)
+        let clean = container + img2
+        #expect(try IMG2.payload(Apple8900.body(Data(clean))) == Data(repeating: 0x5A, count: 50))
+        let headers =
+            Self.flipped(clean, in: 0..<16, count: 600, seed: 12)
+            + Self.flipped(clean, in: 0x800..<0x818, count: 600, seed: 13)
+        for b in headers + Self.cut(clean, 64) {
+            guard let body = try? Apple8900.body(Data(b)) else { continue }
+            _ = try? IMG2.payload(body)
+        }
+    }
+
     /// An img3 of a 4-byte TYPE tag and `last` (magic as stored, data), its header's sizeNoPack covering both.
     static func img3(_ last: (String, [UInt8])) -> [UInt8] {
         func word(_ v: Int) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
@@ -302,6 +321,10 @@ import Testing
         #expect(try N72NOR.wrapSHSH(&signed, key: key))
         let clean = Self.img3(("HSHS", [UInt8](repeating: 7, count: 128)))
         for var b in Self.flipped(clean, in: 0..<clean.count, count: 2000, seed: 9) + Self.cut(clean, clean.count) {
+            _ = try? IMG3.payload(Data(b))
+            _ = try? IMG3.decrypt(Data(b), iv: key, key: key)
+            _ = try? SandboxPatch.rebuildIMG3(Data(b), data: [1, 2, 3])
+            _ = try? N72NOR.type(of: Data(b))
             _ = try? N72NOR.wrapSHSH(&b, key: key)
         }
         let kbag = Self.img3(("GABK", [1, 0, 0, 0, 128, 0, 0, 0] + [UInt8](repeating: 9, count: 32)))

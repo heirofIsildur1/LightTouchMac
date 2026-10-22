@@ -28,11 +28,13 @@ public enum N72NOR {
 
     /// An img3's type tag ("illb", ...), as the header stores it reversed at 0x10.
     public static func type(of img3: Data) throws -> String {
-        let d = [UInt8](img3.prefix(img3Header))
-        guard d.count == img3Header, d[0..<4] == [0x33, 0x67, 0x6D, 0x49] else {
-            throw FirmwareError(.unsupported, "not an img3")
+        try parsing(img3, "img3 header") { s in
+            guard try UInt32(parsingLittleEndian: &s) == 0x496D_6733 else {
+                throw FirmwareError(.unsupported, "not an img3")
+            }
+            try s.seek(toRelativeOffset: 12)
+            return String(decoding: try [UInt8](parsing: &s, byteCount: 4).reversed(), as: UTF8.self)
         }
-        return String(decoding: d[16..<20].reversed(), as: UTF8.self)
     }
 
     /// build_nor.build over synth_base(identity): the whole NOR. `images` are the all_flash img3s by type;
@@ -88,24 +90,8 @@ public enum N72NOR {
 
     /// Encrypts the SHSH tag (past sigCheckArea, so no digest covers it) under the UID-derived key.
     static func wrapSHSH(_ b: inout [UInt8], key: Data) throws -> Bool {
-        // the tags past the header, within its sizeNoPack: magic, total length, data length, data
-        let shsh = try parsing(b, "NOR image") { s -> Range<Int>? in
-            let nopack = Int(try s.le32(at: 8))
-            var off = img3Header
-            while off + 12 <= img3Header + nopack {
-                var tag = try s.seeking(toAbsoluteOffset: off)
-                let magic = try [UInt8](parsing: &tag, byteCount: 4)
-                let total = Int(try UInt32(parsingLittleEndian: &tag))
-                let dlen = Int(try UInt32(parsingLittleEndian: &tag))
-                if total == 0 { break }
-                if magic.elementsEqual("HSHS".utf8), dlen % 16 == 0 {
-                    return try tag.sliceRange(byteCount: dlen).lowerBound..<off + 12 + dlen
-                }
-                off += total
-            }
-            return nil
-        }
-        guard let shsh else { return false }
+        guard let shsh = try IMG3.tagList(b).first(where: { $0.magic == "SHSH" && $0.dataLength % 16 == 0 })?.data
+        else { return false }
         let enc = try AESCBC.crypt(Data(b[shsh]), iv: Data(count: 16), key: key, decrypt: false)
         b.replaceSubrange(shsh, with: enc)
         return true

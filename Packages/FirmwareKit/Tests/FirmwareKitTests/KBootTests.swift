@@ -548,3 +548,10 @@ struct KBootTests {
 }
 
 private func * (a: [UInt8], n: Int) -> [UInt8] { (0..<n).flatMap { _ in a } }
+
+extension [UInt8] {
+    /// The little-endian word at `at` of an image a test built or a corpus file it checked.
+    func u32(_ at: Int) -> UInt32 {
+        UInt32(self[at]) | UInt32(self[at + 1]) << 8 | UInt32(self[at + 2]) << 16 | UInt32(self[at + 3]) << 24
+    }
+}

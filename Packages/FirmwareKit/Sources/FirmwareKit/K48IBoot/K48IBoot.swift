@@ -10,6 +10,7 @@
 //   let nor = try K48IBoot.buildNOR(identity: id, allFlash: imgs, order: order, bootArgs: args)
 //   let iboot = try K48IBoot.patchIBoot(decrypted, patcher: url, bootArgs: args, log: log)
 
+import BinaryParsing
 import Foundation
 import zlib
 
@@ -36,30 +37,20 @@ public enum K48IBoot {
             let plain = [UInt8](iv + key)
             let data = try ipsw.read(member)
             guard data.count >= img3Header, data.prefix(4).elementsEqual([0x33, 0x67, 0x6D, 0x49]) else { continue }
-            let d = [UInt8](data)
-            let full = Int(le32(d, 4))
-            guard full >= img3Header, full <= d.count else {
-                throw FirmwareError(.unsupported, "\(name): truncated IMG3")
-            }
-            var off = img3Header
             var bags: [[UInt8]] = []
-            while off + 12 <= full {
-                let total = Int(le32(d, off + 4))
-                let size = Int(le32(d, off + 8))
-                guard total >= 12, off + total <= full, size <= total - 12 else {
-                    throw FirmwareError(.unsupported, "\(name): malformed IMG3 tag")
-                }
-                if d[off..<off + 4].elementsEqual([0x47, 0x41, 0x42, 0x4B]), size >= 8 {  // "GABK"
-                    let state = le32(d, off + 12)
-                    let bits = le32(d, off + 16)
-                    if state == 1 || state == 2 {
-                        guard bits == 256, size == 56, plain.count == 48 else {
-                            throw FirmwareError(.unsupported, "\(name): invalid AES-256 KBAG/key")
-                        }
-                        bags.append(Array(d[off + 20..<off + 68]))
+            // a KBAG's data: its state (1 production, 2 development), the key size in bits, the IV and key
+            for t in try IMG3.tagList(data) where t.magic == "KBAG" && t.dataLength >= 8 {
+                let bag = try parsing(data, "\(name): KBAG") { s -> [UInt8]? in
+                    var k = try s.seeking(toAbsoluteOffset: t.offset + 12)
+                    let state = try UInt32(parsingLittleEndian: &k)
+                    let bits = try UInt32(parsingLittleEndian: &k)
+                    guard state == 1 || state == 2 else { return nil }
+                    guard bits == 256, t.dataLength == 56, plain.count == 48 else {
+                        throw FirmwareError(.unsupported, "\(name): invalid AES-256 KBAG/key")
                     }
+                    return try [UInt8](parsing: &k, byteCount: 48)
                 }
-                off += total
+                if let bag { bags.append(bag) }
             }
             for kbag in bags where !seen.contains(kbag) {
                 seen.insert(kbag)
@@ -93,18 +84,19 @@ public enum K48IBoot {
         for i in stride(from: 0, to: recs.count, by: 96) where i + 96 <= recs.count {
             pairs[Array(recs[i..<i + 48])] = Array(recs[i + 48..<i + 96])
         }
-        let img = [UInt8](image)
-        var off = img3Header
+        let tags = try IMG3.tagList(image)
         var key: [UInt8]?
-        while off + 12 <= img.count {
-            let size = Int(le32(img, off + 4))
-            let dlen = Int(le32(img, off + 8))
-            if size < 12 { break }
-            if img[off..<off + 4].elementsEqual([0x47, 0x41, 0x42, 0x4B]), dlen == 56, le32(img, off + 12) == 1 {
-                key = pairs[Array(img[off + 20..<off + 68])]
+        for t in tags where t.magic == "KBAG" && t.dataLength == 56 {
+            let (state, bag) = try parsing(image, "DeviceTree KBAG") { s in
+                var k = try s.seeking(toAbsoluteOffset: t.offset + 12)
+                let state = try UInt32(parsingLittleEndian: &k)
+                try k.seek(toRelativeOffset: 4)
+                return (state, try [UInt8](parsing: &k, byteCount: 48))
+            }
+            if state == 1 {
+                key = pairs[bag]
                 break
             }
-            off += size
         }
         guard let key, key.count == 48 else {
             throw FirmwareError(.keyMissing, "DeviceTree production KBAG has no catalog key")
@@ -112,11 +104,11 @@ public enum K48IBoot {
         // Encrypt the modified plaintext (AES-256, IV = key[:16], key = key[16:]); rewrite the DATA tag.
         let padded = plain + Data(count: (16 - plain.count % 16) % 16)
         let enc = try AESCBC.crypt(padded, iv: Data(key[0..<16]), key: Data(key[16..<48]), decrypt: false)
-        guard let dataTag = try IMG3.tags(image)["DATA"] else {
+        guard let dataTag = tags.last(where: { $0.magic == "DATA" }) else {
             throw FirmwareError(.unsupported, "DeviceTree img3 has no DATA tag")
         }
         var out = [UInt8](image)
-        let oldSize = Int(le32(out, dataTag.offset + 4))
+        let oldSize = dataTag.total
         let tag = Array("ATAD".utf8) + le32Bytes(UInt32(12 + enc.count)) + le32Bytes(UInt32(plain.count)) + [UInt8](enc)
         out.replaceSubrange(dataTag.offset..<dataTag.offset + oldSize, with: tag)
         let delta = tag.count - oldSize

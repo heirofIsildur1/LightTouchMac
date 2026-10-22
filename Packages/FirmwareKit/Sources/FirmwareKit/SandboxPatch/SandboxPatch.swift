@@ -158,28 +158,19 @@ public enum SandboxPatch {
     /// Rebuild an IMG3 with a new DATA payload, every other tag kept, the header sizes recomputed.
     static func rebuildIMG3(_ raw: Data, data newData: [UInt8]) throws -> Data {
         let d = [UInt8](raw)
-        guard d.count >= 0x14, d[0..<4] == [0x33, 0x67, 0x6D, 0x49] else {
-            throw FirmwareError(.unsupported, "not an img3")
-        }
-        let full = Int(le32(d, 4))
         var body: [UInt8] = []
         var signedEnd = 0  // tags before SHSH are the signed area
-        var off = 0x14
-        while off + 12 <= full, off + 12 <= d.count {
-            let magic = String(decoding: d[off..<off + 4].reversed(), as: UTF8.self)
-            let total = Int(le32(d, off + 4))
-            guard total >= 12 else { break }
-            if magic == "DATA" {
-                var tag = Array(d[off..<off + 4])  // file magic bytes, as stored
+        for t in try IMG3.tagList(d) {
+            if t.magic == "DATA" {
+                var tag = Array(d[t.offset..<t.offset + 4])  // file magic bytes, as stored
                 tag += le(UInt32(12 + newData.count)) + le(UInt32(newData.count)) + newData
                 body += tag
             } else {
-                body += Array(d[off..<off + total])
+                body += Array(d[t.offset..<t.offset + t.total])
             }
-            if magic != "SHSH" && magic != "CERT" { signedEnd = body.count }
-            off += total
+            if t.magic != "SHSH" && t.magic != "CERT" { signedEnd = body.count }
         }
-        var out = Array(d[0..<0x14])
+        var out = Array(d[0..<IMG3.headerSize])
         putLE(&out, 4, UInt32(0x14 + body.count))  // fullSize
         putLE(&out, 8, UInt32(body.count))  // size without the header
         putLE(&out, 12, UInt32(signedEnd))  // signed area (tags up to SHSH)
