@@ -11,6 +11,7 @@
 // the 4.x/5.x absolute literal-pool form and the 6.x/7.x PC-relative ldr/add form), and the function it sits in is
 // taken as the Thumb push{..,lr} prologue nearest before it. The prologue's four bytes become `movs r0, #0; bx lr`.
 
+import BinaryParsing
 import Foundation
 
 public enum SandboxPatch {
@@ -49,7 +50,7 @@ public enum SandboxPatch {
         guard let klo = img.sandboxKextLoadAddr() else { throw Error.noSandboxKext }
         guard let (taddr, tsize) = img.kextText(klo) else { throw Error.noKextText }
         guard let so = img.findCString("bad opcode"), let saddr = img.offToAddr(so) else { throw Error.noString }
-        guard let toff = img.addrToOff(taddr) else { throw Error.noKextText }
+        guard let toff = img.addrToOff(taddr), toff + Int(tsize) <= kernel.count else { throw Error.noKextText }
 
         // Resilient Thumb walk of the kext text: collect push{..,lr} prologues and references to saddr.
         var prologues: [UInt32] = []
@@ -93,7 +94,7 @@ public enum SandboxPatch {
         }
         guard let x = refs.min() else { throw Error.noReference }
         guard let entry = prologues.filter({ $0 <= x }).max() else { throw Error.noPrologue }
-        guard let eo = img.addrToOff(entry) else { throw Error.noPrologue }
+        guard let eo = img.addrToOff(entry), eo + patch.count <= kernel.count else { throw Error.noPrologue }
         let orig = Array(kernel[eo..<eo + 4])
         // A real prologue: push {..,lr} (0xB5xx) or push.w {..,lr} (0xE92D, lr bit set).
         let hw = UInt16(orig[0]) | UInt16(orig[1]) << 8
@@ -107,7 +108,9 @@ public enum SandboxPatch {
     public static func apply(_ kernel: [UInt8]) throws -> (kernel: [UInt8], found: Found) {
         let found = try locate(kernel)
         var out = kernel
-        guard let o = try Image(kernel).addrToOff(found.address) else { throw Error.badPatchSite }
+        guard let o = try Image(kernel).addrToOff(found.address), o + patch.count <= out.count else {
+            throw Error.badPatchSite
+        }
         out.replaceSubrange(o..<o + patch.count, with: patch)
         return (out, found)
     }
@@ -195,64 +198,33 @@ public enum SandboxPatch {
     }
 }
 
-/// A read view over the kernelcache Mach-O: outer segments for address<->offset, the prelink info, and the kext
-/// Mach-O's own __text. Kept small and local to the patch; FitCheck's MachO32 reads commands, not segment maps.
+/// A read view over the kernelcache Mach-O (MachO.load): outer segments for address<->offset, the prelink info, and
+/// the kext Mach-O's own __text.
 struct Image {
     let bytes: [UInt8]
-    // (vmaddr, vmsize, fileoff, filesize) per outer LC_SEGMENT.
-    let segs: [(UInt32, UInt32, UInt32, UInt32)]
-    // (sectname, segname, addr, size, off) per outer section.
-    let sects: [(String, String, UInt32, UInt32, UInt32)]
+    let segs: [MachO.Segment]
 
     init(_ b: [UInt8]) throws {
-        guard b.count >= 28, le32(b, 0) == 0xFEED_FACE, le32(b, 4) == 12 else { throw SandboxPatch.Error.notMachO }
-        bytes = b
-        var sg: [(UInt32, UInt32, UInt32, UInt32)] = []
-        var sc: [(String, String, UInt32, UInt32, UInt32)] = []
-        var off = 28
-        for _ in 0..<le32(b, 16) {
-            guard off + 8 <= b.count else { break }
-            let cmd = le32(b, off)
-            let size = Int(le32(b, off + 4))
-            guard size >= 8, off + size <= b.count else { break }
-            if cmd == 1 {  // LC_SEGMENT
-                sg.append((le32(b, off + 24), le32(b, off + 28), le32(b, off + 32), le32(b, off + 36)))
-                let nsects = Int(le32(b, off + 48))
-                var so = off + 56
-                for _ in 0..<nsects where so + 68 <= off + size {
-                    sc.append(
-                        (
-                            Image.cstr(b, so, 16), Image.cstr(b, so + 16, 16), le32(b, so + 32), le32(b, so + 36),
-                            le32(b, so + 40)
-                        ))
-                    so += 68
-                }
-            }
-            off += size
+        guard let load = try? parsing(b, "kernelcache", { s in try MachO.load(&s) }), load.cputype == 12 else {
+            throw SandboxPatch.Error.notMachO
         }
-        segs = sg
-        sects = sc
+        bytes = b
+        segs = load.segments
     }
 
-    static func cstr(_ b: [UInt8], _ o: Int, _ n: Int) -> String {
-        let end = (o..<o + n).first { b[$0] == 0 } ?? o + n
-        return String(decoding: b[o..<end], as: UTF8.self)
-    }
-
+    /// The Thumb halfword at `o`, which the caller has kept within the kext text it checked against the file.
     func u16(_ o: Int) -> UInt16 { UInt16(bytes[o]) | UInt16(bytes[o + 1]) << 8 }
-    func u32(_ o: Int) -> UInt32 { le32(bytes, o) }
+    func u32(_ o: Int) -> UInt32 { UInt32(u16(o)) | UInt32(u16(o + 2)) << 16 }
 
     func addrToOff(_ a: UInt32) -> Int? {
-        for (vmaddr, vmsize, fileoff, filesize) in segs
-        where a >= vmaddr && a < vmaddr &+ vmsize && (a &- vmaddr) < filesize {
-            return Int(fileoff &+ (a &- vmaddr))
+        for s in segs where a >= s.vmaddr && a < s.vmaddr &+ s.vmsize && (a &- s.vmaddr) < s.filesize {
+            return Int(s.fileoff &+ (a &- s.vmaddr))
         }
         return nil
     }
     func offToAddr(_ o: Int) -> UInt32? {
-        for (vmaddr, _, fileoff, filesize) in segs
-        where o >= Int(fileoff) && o < Int(fileoff &+ filesize) {
-            return vmaddr &+ UInt32(o - Int(fileoff))
+        for s in segs where o >= Int(s.fileoff) && o < Int(s.fileoff) + Int(s.filesize) {
+            return s.vmaddr &+ UInt32(o - Int(s.fileoff))
         }
         return nil
     }
@@ -267,9 +239,13 @@ struct Image {
     /// as the bundle id in __PRELINK_INFO. The key sits ahead of the id on 5.x-7.x but after it on 4.x, so take the
     /// occurrence nearest the id (its own dict's) rather than the last one before it (which on 4.x is the prior kext's).
     func sandboxKextLoadAddr() -> UInt32? {
-        guard let (_, _, _, size, off) = sects.first(where: { $0.0 == "__info" && $0.1 == "__PRELINK_INFO" })
+        guard
+            let section = segs.lazy.flatMap(\.sections).first(where: {
+                $0.name == "__info" && $0.segment == "__PRELINK_INFO"
+            })
         else { return nil }
-        let info = String(decoding: bytes[Int(off)..<min(bytes.count, Int(off) + Int(size))], as: UTF8.self)
+        let lo = min(Int(section.offset), bytes.count)
+        let info = String(decoding: bytes[lo..<min(bytes.count, lo + Int(section.size))], as: UTF8.self)
         guard let idRange = info.range(of: "com.apple.security.sandbox") else { return nil }
         let anchor = idRange.lowerBound
         let key = "_PrelinkExecutableLoadAddr</key><integer"
@@ -296,25 +272,15 @@ struct Image {
 
     /// The kext Mach-O's own __text (addr, size) given its load address.
     func kextText(_ kaddr: UInt32) -> (UInt32, UInt32)? {
-        guard let koff = addrToOff(kaddr), koff + 28 <= bytes.count, le32(bytes, koff) == 0xFEED_FACE else {
-            return nil
-        }
-        var off = koff + 28
-        for _ in 0..<le32(bytes, koff + 16) {
-            guard off + 8 <= bytes.count else { break }
-            let cmd = le32(bytes, off)
-            let size = Int(le32(bytes, off + 4))
-            guard size >= 8 else { break }
-            if cmd == 1 {
-                let nsects = Int(le32(bytes, off + 48))
-                var so = off + 56
-                for _ in 0..<nsects where so + 68 <= off + size {
-                    if Image.cstr(bytes, so, 16) == "__text" { return (le32(bytes, so + 32), le32(bytes, so + 36)) }
-                    so += 68
-                }
-            }
-            off += size
-        }
-        return nil
+        guard let koff = addrToOff(kaddr),
+            let kext = try? parsing(
+                bytes, "sandbox kext",
+                { s in
+                    try s.seek(toAbsoluteOffset: koff)
+                    return try MachO.load(&s)
+                }),
+            let text = kext.segments.lazy.flatMap(\.sections).first(where: { $0.name == "__text" })
+        else { return nil }
+        return (text.addr, text.size)
     }
 }

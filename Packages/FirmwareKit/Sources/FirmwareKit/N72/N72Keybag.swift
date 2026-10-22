@@ -11,6 +11,7 @@
 // replaces nor.bin. The boot uses the recipe's aes-uid, as the device's own boots do (the keybag's keys are
 // UID-derived, and iBoot unwraps the NOR's SHSH with a UID-derived key).
 
+import BinaryParsing
 import Foundation
 import HostRuntime
 
@@ -110,26 +111,11 @@ enum N72Keybag {
 
     /// (entry pc, link base): LC_UNIXTHREAD's pc and __TEXT's vmaddr top nibble.
     static func kernelEntry(_ d: Data) throws -> (pc: UInt32, base: UInt32) {
-        let b = [UInt8](d)
-        func u32(_ o: Int) -> UInt32 {
-            UInt32(b[o]) | UInt32(b[o + 1]) << 8 | UInt32(b[o + 2]) << 16 | UInt32(b[o + 3]) << 24
-        }
-        var off = 28
-        var pc: UInt32?
-        var base: UInt32?
-        for _ in 0..<Int(u32(16)) {
-            let cmd = u32(off)
-            let size = Int(u32(off + 4))
-            if cmd == 5 { pc = u32(off + 16 + 15 * 4) }
-            if cmd == 1, String(decoding: b[off + 8..<off + 24].prefix { $0 != 0 }, as: UTF8.self) == "__TEXT" {
-                base = u32(off + 24) & 0xF000_0000
-            }
-            off += size
-        }
-        guard let pc, let base else {
+        let kernel = try MachO(d)
+        guard let pc = kernel.load.entry, let text = kernel.segments.last(where: { $0.name == "__TEXT" }) else {
             throw FirmwareError(.unsupported, "no LC_UNIXTHREAD / __TEXT in the kernelcache")
         }
-        return (pc, base)
+        return (pc, text.vmaddr & 0xF000_0000)
     }
 
     /// ipod2g_keybag.add_ramdisk: a RAMDisk memory-map entry in the first spare reserved slot, no root-matching.
@@ -146,6 +132,38 @@ enum N72Keybag {
         try dt.set("chosen", "root-matching", .bytes(Data()))
         guard dt.data.count == blob.count else { throw FirmwareError(.internal, "DeviceTree changed size") }
         return dt.data
+    }
+
+    /// Where the ramdisk goes from the boot_args iBoot left in guest memory (revision, version, then virtBase,
+    /// physBase, memSize, topOfKernelData, …, deviceTreeP at 0x30 and its length): the page after topOfKernelData,
+    /// the new top past it, and the device tree's physical address. The guest's words are checked: a ramdisk that
+    /// would run past memory, or a device tree below the kernel's base, is refused rather than wrapped.
+    static func ramdiskPlace(bootArgs args: Data, at ba: UInt32, base: UInt32, ramdisk: Int) throws
+        -> (rdPA: UInt32, newTop: UInt32, top: UInt32, dtPA: UInt32, dtLength: UInt32)
+    {
+        let (rev, virt, phys, mem, top, dtp, dtlen) = try parsing(args, "boot_args at 0x\(String(ba, radix: 16))") {
+            s in
+            let rev = try UInt16(parsingLittleEndian: &s)
+            try s.seek(toAbsoluteOffset: 4)
+            let words = try [UInt32](parsing: &s, count: 4) { try UInt32(parsingLittleEndian: &$0) }
+            try s.seek(toAbsoluteOffset: 0x30)
+            return (
+                rev, words[0], words[1], words[2], words[3], try UInt32(parsingLittleEndian: &s),
+                try UInt32(parsingLittleEndian: &s)
+            )
+        }
+        guard rev == 1, phys == physBase, virt == base else {
+            throw FirmwareError(.oneshotFailed, "unexpected boot_args at 0x\(String(ba, radix: 16))")
+        }
+        let rdPA = (UInt64(top) + 0xFFF) & ~0xFFF
+        let newTop = (rdPA + UInt64(ramdisk) + 0x3FFF) & ~0x3FFF
+        guard newTop < UInt64(phys) + UInt64(mem), let rd = UInt32(exactly: rdPA), let new = UInt32(exactly: newTop)
+        else { throw FirmwareError(.oneshotFailed, "the ramdisk does not fit below memSize") }
+        guard dtp >= virt, let dtPA = UInt32(exactly: UInt64(dtp - virt) + UInt64(phys)) else {
+            throw FirmwareError(
+                .oneshotFailed, "boot_args' device tree at 0x\(String(dtp, radix: 16)) is below the kernel")
+        }
+        return (rd, new, top, dtPA, dtlen)
     }
 
     /// Stop at the kernel's entry and give it the ramdisk the way iBoot's restore path does.
@@ -166,21 +184,8 @@ enum N72Keybag {
         _ = try gdb.command(String(format: "z0,%x,4", entry))
         let ba = regs[0]
         var args = try gdb.read(ba, 0x138)
-        func u32(_ o: Int) throws -> UInt32 { try args.u32le(o) }
-        let rev = UInt16(args[0]) | UInt16(args[1]) << 8
-        let virt = try u32(4)
-        let phys = try u32(8)
-        let mem = try u32(12)
-        let top = try u32(16)
-        let dtp = try u32(0x30)
-        let dtlen = try u32(0x34)
-        guard rev == 1, phys == physBase, virt == base else {
-            throw FirmwareError(.oneshotFailed, "unexpected boot_args at 0x\(String(ba, radix: 16))")
-        }
-        let rdPA = (top + 0xFFF) & ~0xFFF
-        let newTop = (rdPA + UInt32(ramdisk.count) + 0x3FFF) & ~0x3FFF
-        guard newTop < phys + mem else { throw FirmwareError(.oneshotFailed, "the ramdisk does not fit below memSize") }
-        let dtPA = dtp - virt + phys
+        let (rdPA, newTop, top, dtPA, dtlen) = try Self.ramdiskPlace(
+            bootArgs: args, at: ba, base: base, ramdisk: ramdisk.count)
         try gdb.write(dtPA, try addRamdisk(try gdb.read(dtPA, Int(dtlen)), pa: rdPA, length: UInt32(ramdisk.count)))
         try gdb.write(rdPA, ramdisk)
         var command = Data(bootArgs.utf8)

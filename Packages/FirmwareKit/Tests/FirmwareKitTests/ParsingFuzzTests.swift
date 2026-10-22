@@ -273,6 +273,21 @@ import Testing
         }
     }
 
+    /// KBootTests' kernelcache, its header and load commands flipped and the whole cut, through MachO (segments,
+    /// entry, the boot_args version scan), the keybag one-shot's entry and the sandbox patch's locate.
+    @Test func kernelcachesThrowOnCorruption() {
+        let clean = [UInt8](KBootTests.kernel(at: 0x8000_0000))
+        let commands = 0..<28 + 56 * 2 + 80
+        for b in Self.flipped(clean, in: commands, count: 3000, seed: 14) + Self.cut(clean, 128) {
+            if let m = try? MachO(Data(b)) {
+                _ = try? m.entry()
+                _ = m.bootArgsVersion()
+            }
+            _ = try? N72Keybag.kernelEntry(Data(b))
+            _ = try? SandboxPatch.locate(b)
+        }
+    }
+
     /// KBootTests' device tree, flipped and cut, through DeviceTree's parse and its edits (each reparses).
     @Test func deviceTreesThrowOnCorruption() {
         let clean = [UInt8](KBootTests.dtBlob)

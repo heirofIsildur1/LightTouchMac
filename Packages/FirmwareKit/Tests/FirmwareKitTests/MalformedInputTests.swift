@@ -40,6 +40,67 @@ struct MalformedInputTests {
         }
     }
 
+    // MARK: Mach-O (kernelcaches)
+
+    static let le = DeviceTree.Value.le
+
+    /// A 32-bit ARM Mach-O header for `cmds`, the commands' bytes after it, then `tail`.
+    static func machO(ncmds: UInt32, _ cmds: Data, tail: Data = Data()) -> Data {
+        le([0xFEED_FACE, 12, 9, 2, ncmds, UInt32(cmds.count), 0]) + cmds + tail
+    }
+
+    /// The keybag one-shot's read of the kernelcache's entry, the sandbox patch's and kboot's, over a kernel whose
+    /// one command is missing and one whose LC_SEGMENT is only its 8-byte cmd/cmdsize: the first two read the
+    /// segment's fields past the end of the file.
+    @Test func aKernelcacheCutShortIsRefused() {
+        for kernel in [Self.machO(ncmds: 1, Data()), Self.machO(ncmds: 1, Self.le([1, 8]))] {
+            #expect(throws: FirmwareError.self) { try N72Keybag.kernelEntry(kernel) }
+            #expect(throws: SandboxPatch.Error.self) { try SandboxPatch.locate([UInt8](kernel)) }
+            #expect(throws: FirmwareError.self) { try MachO(kernel) }
+        }
+    }
+
+    /// A segment whose fileoff and filesize add up past 4 GiB: the boot_args version check added them as UInt32s.
+    @Test func aSegmentPast4GiBIsNotAnOverflow() throws {
+        let seg =
+            Self.le([1, 56]) + DeviceTree.name32("__TEXT").prefix(16)
+            + Self.le([0x8000_0000, 0x1000, 0x10, 0xFFFF_FFF8, 7, 7, 0, 0])
+        let kernel = Self.machO(ncmds: 1, seg, tail: Data("pe_identify_machine: Epoch Mismatch\0".utf8))
+        #expect(try MachO(kernel).bootArgsVersion() == 2)
+    }
+
+    /// A kernelcache whose segment claims 3.75 GiB: kboot laid out (and zero-filled) an image that size.
+    @Test func aKernelcacheLargerThanMemoryIsRefused() {
+        var kernel = KBootTests.kernel(at: 0x8000_0000)
+        kernel.replaceSubrange(28 + 56 + 28..<28 + 56 + 32, with: Self.le([0xF000_0000]))  // __DATA's vmsize
+        #expect(throws: FirmwareError.self) {
+            try KBoot.build(kernel: kernel, deviceTree: KBootTests.dtBlob, identity: KBootTests.placeholder)
+        }
+    }
+
+    /// boot_args read out of guest memory by the keybag one-shot: a topOfKernelData at the top of the address space
+    /// and a device tree pointer below the kernel's base are refused, not wrapped.
+    @Test func bootArgsThatWouldWrapAreRefused() throws {
+        func args(top: UInt32, dtp: UInt32) -> Data {
+            var a = Data(count: 0x138)
+            a.replaceSubrange(0..<2, with: [1, 0])
+            a.replaceSubrange(4..<20, with: Self.le([0x8000_0000, N72Keybag.physBase, 0x0800_0000, top]))
+            a.replaceSubrange(0x30..<0x38, with: Self.le([dtp, 0x1000]))
+            return a
+        }
+        let ok = try N72Keybag.ramdiskPlace(
+            bootArgs: args(top: 0x0900_0000, dtp: 0x8100_0000), at: 0, base: 0x8000_0000, ramdisk: 0x1000)
+        #expect(ok.rdPA == 0x0900_0000 && ok.newTop == 0x0900_4000 && ok.dtPA == 0x0900_0000)
+        for bad in [args(top: 0xFFFF_F800, dtp: 0x8100_0000), args(top: 0x0900_0000, dtp: 0x10)] {
+            #expect(throws: FirmwareError.self) {
+                try N72Keybag.ramdiskPlace(bootArgs: bad, at: 0, base: 0x8000_0000, ramdisk: 0x1000)
+            }
+        }
+        #expect(throws: FirmwareError.self) {
+            try N72Keybag.ramdiskPlace(bootArgs: Data(count: 0x20), at: 0, base: 0x8000_0000, ramdisk: 0x1000)
+        }
+    }
+
     // MARK: IMG3
 
     static func word(_ v: Int) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }

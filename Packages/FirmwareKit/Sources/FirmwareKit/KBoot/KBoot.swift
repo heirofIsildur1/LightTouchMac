@@ -20,6 +20,7 @@
 // with its own platform-name/chip-id, a 320x480 panel and the iPad's clock table cut to its DT's 32 slots; N18 gets
 // the NOR graft, N88 keeps its own NOR and has its baseband node's identity filled with test values.
 
+import BinaryParsing
 import Foundation
 import HostRuntime
 
@@ -550,6 +551,13 @@ public enum KBoot {
         let argsVA = top + page(dtLen)
         let endVA = argsVA + 0x1000
         let topOfKernel = pa((endVA + 0x3FFF) & ~0x3FFF)
+        // The segments' sizes are the kernelcache's word: what they lay out must fit the memory it boots in.
+        guard endVA - vbase <= Int(board.memSize) else {
+            throw FirmwareError(
+                .unsupported,
+                "the kernelcache's segments, RAM disk and device tree take \(endVA - vbase) bytes, past the board's \(board.memSize)"
+            )
+        }
 
         var image = Data(count: endVA - vbase)
         var memoryMap: [(String, UInt32, UInt32)] = []
@@ -640,45 +648,89 @@ public enum KBoot {
     }
 }
 
-/// A 32-bit Mach-O's segments and entry point (imgtools/macho.py, as much as kboot needs).
+/// A 32-bit little-endian Mach-O's segments, their sections and its entry point (imgtools/macho.py, as much as kboot,
+/// the keybag one-shot and the sandbox patch need).
 public struct MachO: Sendable {
     public struct Segment: Equatable, Sendable {
         public var name: String
         public var vmaddr: UInt32, vmsize: UInt32, fileoff: UInt32, filesize: UInt32
+        var sections: [Section] = []
+    }
+    struct Section: Equatable, Sendable {
+        var name: String, segment: String
+        var addr: UInt32, size: UInt32, offset: UInt32
+    }
+    /// What a Mach-O's header and load commands say.
+    struct Load: Sendable {
+        var cputype: UInt32
+        var segments: [Segment]
+        /// LC_UNIXTHREAD's ARM_THREAD_STATE pc (r15), from the first one.
+        var entry: UInt32?
     }
 
     public let segments: [Segment]
     let data: Data
+    let load: Load
 
     public init(_ data: Data) throws {
         self.data = data
-        guard data.count >= 28, try Self.u32(data, 0) == 0xFEED_FACE else {
+        load = try parsing(data, "Mach-O") { s in try Self.load(&s) }
+        segments = load.segments
+    }
+
+    static let lcSegment: UInt32 = 1, lcUnixThread: UInt32 = 5
+
+    /// The header at `s` (mach_header: magic, cputype, cpusubtype, filetype, ncmds, sizeofcmds, flags) and its load
+    /// commands, each a cmd, a cmdsize of at least 8 and its body, all in the data: an LC_SEGMENT's 16-byte name,
+    /// vmaddr, vmsize, fileoff, filesize, protections, nsects and flags, then its 68-byte sections (sectname, segname,
+    /// addr, size, offset, …), within the command; LC_UNIXTHREAD's flavor, count and r0-r15. Offsets are the span's.
+    static func load(_ s: inout ParserSpan) throws -> Load {
+        guard try UInt32(parsingLittleEndian: &s) == 0xFEED_FACE else {
             throw FirmwareError(.unsupported, "not a 32-bit Mach-O")
         }
-        var segs: [Segment] = []
-        var off = 28
-        for _ in 0..<(try Self.u32(data, 16)) {
-            guard off + 8 <= data.count else {
-                throw FirmwareError(.unsupported, "Mach-O load commands run past the file")
-            }
-            let cmd = try Self.u32(data, off)
-            let size = Int(try Self.u32(data, off + 4))
-            if cmd == 1 {  // LC_SEGMENT
-                let nameBytes = try data.withUnsafeBytes { [UInt8](try $0.bytes(off + 8, 16)) }.prefix { $0 != 0 }
-                segs.append(
-                    Segment(
-                        name: String(decoding: nameBytes, as: UTF8.self),
-                        vmaddr: try Self.u32(data, off + 24),
-                        vmsize: try Self.u32(data, off + 28),
-                        fileoff: try Self.u32(data, off + 32),
-                        filesize: try Self.u32(data, off + 36)
-                    )
-                )
-            }
-            guard size > 0 else { break }
-            off += size
+        let cputype = try UInt32(parsingLittleEndian: &s)
+        try s.seek(toRelativeOffset: 8)
+        let ncmds = try UInt32(parsingLittleEndian: &s)
+        try s.seek(toRelativeOffset: 8)
+        func name(_ c: inout ParserSpan) throws -> String {
+            String(decoding: try [UInt8](parsing: &c, byteCount: 16).prefix { $0 != 0 }, as: UTF8.self)
         }
-        segments = segs
+        var load = Load(cputype: cputype, segments: [])
+        for _ in 0..<ncmds {
+            let cmd = try UInt32(parsingLittleEndian: &s)
+            let size = try UInt32(parsingLittleEndian: &s)
+            guard size >= 8 else { throw FirmwareError(.unsupported, "Mach-O load command \(cmd) of \(size) bytes") }
+            var c = try s.sliceSpan(byteCount: size - 8)
+            if cmd == lcSegment {
+                var seg = Segment(
+                    name: try name(&c),
+                    vmaddr: try UInt32(parsingLittleEndian: &c),
+                    vmsize: try UInt32(parsingLittleEndian: &c),
+                    fileoff: try UInt32(parsingLittleEndian: &c),
+                    filesize: try UInt32(parsingLittleEndian: &c)
+                )
+                try c.seek(toRelativeOffset: 8)
+                let nsects = try UInt32(parsingLittleEndian: &c)
+                try c.seek(toRelativeOffset: 4)
+                for _ in 0..<nsects {
+                    var sect = try c.sliceSpan(byteCount: 68)
+                    seg.sections.append(
+                        Section(
+                            name: try name(&sect),
+                            segment: try name(&sect),
+                            addr: try UInt32(parsingLittleEndian: &sect),
+                            size: try UInt32(parsingLittleEndian: &sect),
+                            offset: try UInt32(parsingLittleEndian: &sect)
+                        )
+                    )
+                }
+                load.segments.append(seg)
+            } else if cmd == lcUnixThread, load.entry == nil {
+                try c.seek(toRelativeOffset: 8 + 15 * 4)
+                load.entry = try UInt32(parsingLittleEndian: &c)
+            }
+        }
+        return load
     }
 
     /// The boot_args.Version pe_identify_machine demands, read off the kernel's own check (imgtools/ipad1_kboot.py
@@ -688,10 +740,10 @@ public struct MachO: Sendable {
     public func bootArgsVersion() -> UInt8 {
         guard let so = data.range(of: Data("pe_identify_machine: Epoch Mismatch".utf8))?.lowerBound,
             let seg = segments.first(where: {
-                Int($0.fileoff) <= so - data.startIndex && so - data.startIndex < Int($0.fileoff + $0.filesize)
+                Int($0.fileoff) <= so - data.startIndex && so - data.startIndex < Int($0.fileoff) + Int($0.filesize)
             })
         else { return 2 }
-        let sva = seg.vmaddr + UInt32(so - data.startIndex) - seg.fileoff
+        let sva = seg.vmaddr &+ UInt32(so - data.startIndex - Int(seg.fileoff))
         if let lit = data.range(of: Data(DeviceTree.Value.le([sva])))?.lowerBound {
             let window = [UInt8](data[max(data.startIndex, lit - 0x400)..<lit])
             for n in 0..<8 {
@@ -728,7 +780,7 @@ public struct MachO: Sendable {
         }
         for seg in segments where seg.filesize > 0 {
             let lo = Int(seg.fileoff)
-            let hi = min(Int(seg.fileoff + seg.filesize), bytes.count - 4)
+            let hi = min(Int(seg.fileoff) + Int(seg.filesize), bytes.count - 4)
             guard lo < hi else { continue }
             for i in stride(from: lo, to: hi, by: 2) where bytes[i + 1] == 0x88 && bytes[i] & 0xF8 == 0x40 {
                 let n = bytes[i] & 7
@@ -740,16 +792,9 @@ public struct MachO: Sendable {
 
     /// LC_UNIXTHREAD's ARM_THREAD_STATE pc (r15).
     public func entry() throws -> UInt32 {
-        var off = 28
-        for _ in 0..<(try Self.u32(data, 16)) {
-            let cmd = try Self.u32(data, off)
-            let size = Int(try Self.u32(data, off + 4))
-            if cmd == 5 { return try Self.u32(data, off + 16 + 15 * 4) }
-            guard size > 0 else { break }
-            off += size
-        }
-        throw FirmwareError(.unsupported, "no LC_UNIXTHREAD")
+        guard let pc = load.entry else { throw FirmwareError(.unsupported, "no LC_UNIXTHREAD") }
+        return pc
     }
 
-    static func u32(_ d: Data, _ at: Int) throws -> UInt32 { try d.u32le(at) }
+    static func u32(_ d: Data, _ at: Int) throws -> UInt32 { try parsing(d, "Mach-O") { s in try s.le32(at: at) } }
 }
