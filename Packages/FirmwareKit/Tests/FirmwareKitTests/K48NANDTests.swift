@@ -1,3 +1,4 @@
+import Crypto
 import Foundation
 import Testing
 
@@ -125,6 +126,45 @@ struct K48NANDTests {
         )!
         #expect(Data(head[0x1be..<0x1ee]) == unit && head[510] == 0x55 && head[511] == 0xAA)
         #expect((head[..<0x1be] + head[0x1ee..<510] + head[512...]).allSatisfy { $0 == 0 })
+    }
+
+    /// A small store's bytes, whitened and plain, are the ones recorded before Store.write inverted its records a word
+    /// at a time instead of a byte at a time.
+    @Test(arguments: [
+        (true, "219fe8ceb8e5a1dc"), (false, "6bf30b844fe046c4")
+    ]) func storeBytesAreUnchanged(whitening: Bool, recorded: String) async throws {
+        let dir = try Fixtures.tempDir("nand-bytes")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let ps = 4096
+        var mbr = [UInt8](repeating: 0, count: ps * 63)
+        mbr[510] = 0x55
+        mbr[511] = 0xAA
+        for (i, (typ, lba, cnt)) in [(0xAF, 63, 300), (0xAE, 400, 100), (0xAF, 363, 8)].enumerated() {
+            let o = 0x1be + 16 * i
+            mbr[o + 4] = UInt8(typ)
+            put32(&mbr, o + 8, UInt32(lba))
+            put32(&mbr, o + 12, UInt32(cnt))
+        }
+        let mbrURL = dir.appendingPathComponent("mbr")
+        let system = dir.appendingPathComponent("system.img")
+        try Data(mbr).write(to: mbrURL)
+        try Data((0..<ps * 300).map { UInt8(truncatingIfNeeded: $0 &* 2_654_435_761 >> 13) }).write(to: system)
+        let out = dir.appendingPathComponent("store")
+        try await K48NAND.build(
+            geometry: .selfcheck,
+            mbr: mbrURL,
+            kernelVersion: Array("Darwin Kernel Version selfcheck".utf8),
+            system: system,
+            data: .none,
+            out: out,
+            whitening: whitening
+        )
+        var hash = SHA256()
+        for name in try FileManager.default.contentsOfDirectory(atPath: out.path).sorted() {
+            hash.update(data: try Data(contentsOf: out.appendingPathComponent(name)))
+        }
+        let got = String(hash.finalize().map { String(format: "%02x", $0) }.joined().prefix(16))
+        #expect(got == recorded, "the store's SHA-256 begins \(got)")
     }
 
     /// Small synthetic store (the selfcheck geometry), including a sparse data image and an fstab line: the checker

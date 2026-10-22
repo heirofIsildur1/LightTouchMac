@@ -225,7 +225,16 @@ public enum K48NAND {
             rec.withUnsafeMutableBytes { r in
                 r.copyMemory(from: data)
                 for i in 0..<geo.spareBytes { r[geo.pageSize + i] = i < 12 ? m[i] : 0 }
-                if format == .image { for i in 0..<stride { r[i] ^= 0xFF } }
+                // Inverted a word at a time: a byte loop over each record was nine tenths of a Debug build's
+                // "Writing the NAND" (100-200 s for an A4 store).
+                if format == .image {
+                    let words = stride / 8
+                    for i in 0..<words {
+                        let word = r.loadUnaligned(fromByteOffset: i * 8, as: UInt64.self)
+                        r.storeBytes(of: ~word, toByteOffset: i * 8, as: UInt64.self)
+                    }
+                    for i in words * 8..<stride { r[i] ^= 0xFF }
+                }
             }
             let (b, c) = geo.busCE(cs)
             let n = rec.withUnsafeBytes {
