@@ -91,35 +91,18 @@ struct Tools {
     static func resolve(_ args: Inputs, work: URL) -> Tools {
         takeEmulatorSlot()
         let fm = FileManager.default
-        let tools: Tools
-        if let app = args.app {
-            let contents = app.appendingPathComponent("Contents")
-            tools = Tools(
-                helper: contents.appendingPathComponent("MacOS/LightTouchDevice"),
-                services: contents.appendingPathComponent("MacOS/LightTouchServices"),
-                firmwarekit: contents.appendingPathComponent("MacOS/firmwarekit"),
-                dylib: contents.appendingPathComponent("Frameworks/libqemu-arm.dylib"),
-                usbmuxd: contents.appendingPathComponent("MacOS/usbmuxd"),
-                files: contents.appendingPathComponent("Resources/Device"),
-                guest: unpack(contents.appendingPathComponent("Resources/Guest/guest.aar"), into: work),
-                requirement: args.requirement
-            )
-        } else {
-            guard let vendor = vendorDirectory() else {
-                die("no vendor directory for the current pins: run scripts/vendor (about 15 minutes), or pass --app")
-            }
-            let built = build(work: work)
-            tools = Tools(
-                helper: built.appendingPathComponent("LightTouchDevice"),
-                services: built.appendingPathComponent("LightTouchServices"),
-                firmwarekit: built.appendingPathComponent("firmwarekit"),
-                dylib: vendor.appendingPathComponent("Frameworks/libqemu-arm.dylib"),
-                usbmuxd: vendor.appendingPathComponent("MacOS/usbmuxd"),
-                files: vendor.appendingPathComponent("Resources/Device"),
-                guest: unpack(vendor.appendingPathComponent("Resources/Guest/guest.aar"), into: work),
-                requirement: args.requirement ?? teamRequirement
-            )
-        }
+        let contents = bundle(args, work: work).appendingPathComponent("Contents")
+        // A built app's helper is pinned to its own designated requirement; this tree's Debug build to the team's.
+        let tools = Tools(
+            helper: contents.appendingPathComponent("MacOS/LightTouchDevice"),
+            services: contents.appendingPathComponent("MacOS/LightTouchServices"),
+            firmwarekit: contents.appendingPathComponent("MacOS/firmwarekit"),
+            dylib: contents.appendingPathComponent("Frameworks/libqemu-arm.dylib"),
+            usbmuxd: contents.appendingPathComponent("MacOS/usbmuxd"),
+            files: contents.appendingPathComponent("Resources/Device"),
+            guest: unpack(contents.appendingPathComponent("Resources/Guest/guest.aar"), into: work),
+            requirement: args.requirement ?? (args.app == nil ? teamRequirement : nil)
+        )
         var t = tools
         if let dylib = args.dylib { t.dylib = dylib }
         if let usbmuxd = args.usbmuxd { t.usbmuxd = usbmuxd }
@@ -153,6 +136,31 @@ struct Tools {
         )
         if status != 0 { die("xcodebuild failed; see \(log.path)", code: 3) }
         return symroot.appendingPathComponent("Debug")
+    }
+
+    /// `--app`, else this tree's Debug build in an app's layout (work/tools/Tools.app: the helper, services worker and
+    /// firmwarekit beside APFS clones of scripts/vendor's MacOS, Frameworks and Resources), which `--app` also takes:
+    /// a run started with it (sessions matrix's) builds nothing.
+    static func bundle(_ args: Inputs, work: URL) -> URL {
+        if let app = args.app { return app }
+        let fm = FileManager.default
+        guard let vendor = vendorDirectory() else {
+            die("no vendor directory for the current pins: run scripts/vendor (about 15 minutes), or pass --app")
+        }
+        let built = build(work: work)
+        let staging = work.appendingPathComponent("tools")
+        let contents = staging.appendingPathComponent("Tools.app/Contents")
+        try? fm.removeItem(at: staging)
+        try? fm.createDirectory(at: contents, withIntermediateDirectories: true)
+        let copies: [(String, URL)] =
+            ["MacOS", "Frameworks", "Resources"].map { (vendor.appendingPathComponent($0).path, contents) }
+            + ["LightTouchDevice", "LightTouchServices", "firmwarekit"].map {
+                (built.appendingPathComponent($0).path, contents.appendingPathComponent("MacOS"))
+            }
+        for (from, to) in copies where run("/bin/cp", ["-cR", from, to.path]) != 0 {
+            die("could not copy \(from) into \(to.path)", code: 3)
+        }
+        return staging.appendingPathComponent("Tools.app")
     }
 
     /// Resources/Guest/guest.aar unpacked into the run's directory.

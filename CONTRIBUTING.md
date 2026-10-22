@@ -181,6 +181,9 @@ swift run --package-path tests/sessions sessions single BASE [--launch] [--reboo
 # a jailbroken base: Cydia refreshes and installs from local repositories the web proxy serves (no internet);
 # --network uses the real ones and installs bc (the nightly and pre-release matrix)
 swift run --package-path tests/sessions sessions single JAILBROKEN_BASE --jailbreak [--network]
+# many rows at once: each job a base, or create's flags to prepare one, and a check (default single as prepared);
+# up to --lanes jobs share the Mac's emulator slots, so one row prepares while others boot (`sessions matrix --help`)
+swift run --package-path tests/sessions sessions matrix JOBS [--lanes 3]
 # as a device the user already has, through the app's boot admission; an old device must take its admission steps
 # (the old devices in ~/Developer/qemu-ios-files/old-devices: tests/sessions/Sources/sessions/Managed.swift)
 swift run --package-path tests/sessions sessions single BASE --managed
