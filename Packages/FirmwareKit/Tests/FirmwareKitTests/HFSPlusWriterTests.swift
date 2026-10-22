@@ -100,7 +100,7 @@ import Testing
                 #expect(fsck.ok, "batch \(batch): \(fsck.output.suffix(800))")
                 try Self.check(img, model)
                 let v = try HFSPlusVolume(img)
-                depths.append(Int(be16(try v.read(v.catalogFork, fileID: 4, offset: 0, count: 512), 14)))
+                depths.append(Int(try be16(try v.read(v.catalogFork, fileID: 4, offset: 0, count: 512), 14)))
             }
             // the catalog grew index levels and lost some again
             #expect(depths.max() ?? 0 >= 3 && depths.last ?? 0 < depths.max() ?? 0, "catalog depths \(depths)")
@@ -192,7 +192,7 @@ import Testing
             try w.remove("big")
             try w.close()
             let header = try HFSPlusVolume(img).read(v.extentsFork, fileID: 3, offset: 0, count: 512)
-            #expect(be32(header, 14 + 6) == 0)  // no overflow records left
+            #expect(try be32(header, 14 + 6) == 0)  // no overflow records left
             fsck = try await Self.fsck(img)
             #expect(fsck.ok, "\(fsck.output)")
         }
@@ -303,10 +303,10 @@ import Testing
                 let rec = try v.read(
                     v.catalogFork,
                     fileID: 4,
-                    offset: r.node * Int(be16(t, 32)) + r.bodyOffset,
+                    offset: r.node * Int(try be16(t, 32)) + r.bodyOffset,
                     count: 4
                 )
-                return (be16(rec, 2), r.ownerFlags, r.cnid)
+                return (try be16(rec, 2), r.ownerFlags, r.cnid)
             }
             let before = try flags()
             try #require(before.owner & 0x20 != 0 && before.record & 0x04 != 0, "ditto did not compress the file")
@@ -444,14 +444,15 @@ import Testing
         let total = try t.nodesNeeded(totalNodes: 5000)
         #expect(total > (512 - 256) * 8)  // more nodes than the header's map covers
         let file = try t.layout(totalNodes: 5000)
-        #expect(be32(file, 0) == 1 && file[512 + 8] == 2)  // the header links to map node 1
+        #expect(try be32(file, 0) == 1 && file[512 + 8] == 2)  // the header links to map node 1
         let back = try BTreeFile(file, compare: BTreeFile.extentsOrder)
         #expect(back.records == t.records)
         // every node in use is marked, and no other
         let map = Array(file[248..<512 - 8]) + Array(file[512 + 14..<1024 - 6])
         let marked = (0..<5000).filter { map[$0 / 8] & (0x80 >> UInt8($0 % 8)) != 0 }
         #expect(marked == Array(0..<total))
-        #expect(Int(be32(file, 14 + 22)) == 5000 && Int(be32(file, 14 + 26)) == 5000 - total)
+        #expect(try be32(file, 14 + 22) == 5000)
+        #expect(Int(try be32(file, 14 + 26)) == 5000 - total)
     }
 
     /// Growing keeps every file and leaves a volume fsck passes, its alternate header at the new end.

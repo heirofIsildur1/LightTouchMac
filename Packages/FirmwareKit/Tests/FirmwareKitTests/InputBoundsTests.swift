@@ -52,13 +52,13 @@ struct InputBoundsTests {
 
     @Test func rawReadersThrowPastTheirInput() throws {
         let bytes = Data([1, 2, 3, 4, 5, 6])
-        try bytes.withUnsafeBytes { (b: UnsafeRawBufferPointer) throws in
-            #expect(try b.u32le(2) == 0x0605_0403)
-            #expect(throws: FirmwareError.self) { try b.u32le(3) }
-            #expect(throws: FirmwareError.self) { try b.u16le(-1) }
-            #expect(throws: FirmwareError.self) { try b.u64le(0) }
-            #expect(throws: FirmwareError.self) { try b.bytes(4, Int.max) }
-        }
+        let b = [UInt8](bytes)
+        #expect(try le32(b, 2) == 0x0605_0403)
+        #expect(try be16(b, 4) == 0x0506)
+        #expect(throws: FirmwareError.self) { try le32(b, 3) }
+        #expect(throws: FirmwareError.self) { try le16(b, -1) }
+        #expect(throws: FirmwareError.self) { try be64(b, 0) }
+        #expect(throws: FirmwareError.self) { try parsing(bytes, "t") { s in try s.bytes(at: 4, Int.max) } }
         #expect(try parsing(bytes, "t") { s in try s.cBytes(at: 4) } == [5, 6])
         #expect(throws: FirmwareError.self) { try parsing(bytes, "t") { s in try s.cBytes(at: 7) } }
     }

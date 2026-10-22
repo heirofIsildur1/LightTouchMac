@@ -288,7 +288,7 @@ public enum VolumeExport {
         guard vh.count == 8, vh[0] == 0x48 else {
             throw FirmwareError(.unsupported, "\(image.lastPathComponent): no HFS+ volume header")
         }
-        let attrs = be32(vh, 4)
+        let attrs = try be32(vh, 4)
         return attrs & (1 << 8) != 0 && attrs & (1 << 11) == 0
     }
 }

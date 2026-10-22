@@ -63,19 +63,19 @@ public enum N45NOR {
     static func sign(_ b: [UInt8]) throws -> [UInt8] {
         var b = b
         guard b.count >= IMG2.headerSize else { throw FirmwareError(.unsupported, "IMG2 shorter than its header") }
-        let padded = Int(le32(b, 0x10))
+        let padded = Int(try le32(b, 0x10))
         guard IMG2.headerSize + padded <= b.count else {
             throw FirmwareError(.unsupported, "IMG2 data runs past the image")
         }
         put32(&b, 0x18, UInt32(b.count / block + 5))
-        let flags = le32(b, 0x1C) | 1 << 24 | 1 << 1
+        let flags = try le32(b, 0x1C) | 1 << 24 | 1 << 1
         put32(&b, 0x1C, flags)
         let dataHash =
             Array(Insecure.SHA1.hash(data: b[IMG2.headerSize..<IMG2.headerSize + padded])) + hashPadding.prefix(44)
         b.replaceSubrange(0x20..<0x60, with: S5L8900UID.img2VerifyEncrypt(dataHash))
         put32(&b, 0x64, crc(b[0..<0x64]))
         if flags & 1 << 30 != 0 {
-            let next = Int(le32(b, 0x60))
+            let next = Int(try le32(b, 0x60))
             guard 0x6C + next <= IMG2.headerSize else {
                 throw FirmwareError(.unsupported, "IMG2 extension runs past the header")
             }

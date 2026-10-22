@@ -8,6 +8,7 @@
 // Streams in fixed-size chunks; the input is read once, front to back, so it can come straight off
 // `unzip -p` without a temporary copy of the encrypted image.
 
+import BinaryParsing
 import Crypto
 import Foundation
 
@@ -30,10 +31,16 @@ public enum VFDecrypt {
         guard readFully(fd, &header, 0, 0x100) == 0x100, header[0..<8].elementsEqual("encrcdsa".utf8) else {
             throw FirmwareError(.unsupported, "not encrcdsa")
         }
-        let be = { (o: Int, n: Int) in header[o..<o + n].reduce(UInt64(0)) { $0 << 8 | UInt64($1) } }
-        let bs = Int(be(52, 4))
-        let dataOffset = Int(be(64, 8))
-        var left = be(56, 8)
+        // the block size (u32 at 52), the data's size and offset (u64s at 56 and 64), big-endian; an offset past
+        // what an Int holds is refused
+        let (bs, size, dataOffset) = try parsing(header, "encrcdsa header") { s in
+            try s.seek(toAbsoluteOffset: 52)
+            return (
+                Int(try UInt32(parsingBigEndian: &s)), try UInt64(parsingBigEndian: &s),
+                try Int(parsing: &s, storedAsBigEndian: UInt64.self)
+            )
+        }
+        var left = size
         guard bs > 0, bs % 16 == 0, bs <= 1 << 24 else {
             throw FirmwareError(.unsupported, "encrcdsa block size \(bs)")
         }

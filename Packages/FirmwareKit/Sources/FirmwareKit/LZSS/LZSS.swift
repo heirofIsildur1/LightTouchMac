@@ -6,6 +6,7 @@
 //   Adler32.checksum(data)
 //   try BootLogo.segments(iBootIm: blob, framebufferPA: KBoot.vramPA)   // [KBoot.Segment], centered on black
 
+import BinaryParsing
 import Foundation
 
 public enum LZSS {
@@ -50,14 +51,16 @@ public enum LZSS {
 
     /// A complzss payload (decrypted kernelcache): header "complzss", adler32, ulen, clen (big-endian); data at 0x180.
     public static func complzss(_ payload: Data) throws -> Data {
-        let p = [UInt8](payload.prefix(0x180))
-        guard p.count >= 20, p[0..<8].elementsEqual("complzss".utf8) else {
-            throw FirmwareError(.unsupported, "not complzss")
+        let (adler, ulen, clen) = try parsing(payload.prefix(0x180), "complzss header") { s in
+            guard try s.bytes(at: 0, 8).elementsEqual("complzss".utf8) else {
+                throw FirmwareError(.unsupported, "not complzss")
+            }
+            try s.seek(toRelativeOffset: 8)
+            return (
+                try UInt32(parsingBigEndian: &s), Int(try UInt32(parsingBigEndian: &s)),
+                Int(try UInt32(parsingBigEndian: &s))
+            )
         }
-        let be = { (o: Int) in UInt32(p[o]) << 24 | UInt32(p[o + 1]) << 16 | UInt32(p[o + 2]) << 8 | UInt32(p[o + 3]) }
-        let adler = be(8)
-        let ulen = Int(be(12))
-        let clen = Int(be(16))
         let body = payload.dropFirst(0x180).prefix(clen)
         let out = decompress(body)
         guard out.count == ulen, Adler32.checksum(out) == adler else {
@@ -103,14 +106,18 @@ public enum BootLogo {
         turn: Bool = true
     ) throws -> [KBoot.Segment] {
         let b = [UInt8](blob)
-        guard b.count >= 0x40, b[0..<8].elementsEqual("iBootIm\0".utf8), b[12..<16].elementsEqual("sszl".utf8) else {
-            throw FirmwareError(.unsupported, "not an LZSS iBootIm")
+        // "iBootIm\0", the Adler-32, the compression and format tags (stored reversed), width and height
+        // (little-endian u16s); the LZSS data at 0x40
+        let (w, h) = try parsing(b, "iBootIm") { s -> (Int, Int) in
+            guard s.count >= 0x40, try s.bytes(at: 0, 8).elementsEqual("iBootIm\0".utf8),
+                try s.bytes(at: 12, 4).elementsEqual("sszl".utf8)
+            else { throw FirmwareError(.unsupported, "not an LZSS iBootIm") }
+            guard try s.bytes(at: 16, 4).elementsEqual("yerg".utf8) else {
+                throw FirmwareError(.unsupported, "only the grey iBootIm format is handled")
+            }
+            try s.seek(toRelativeOffset: 20)
+            return (Int(try UInt16(parsingLittleEndian: &s)), Int(try UInt16(parsingLittleEndian: &s)))
         }
-        guard b[16..<20].elementsEqual("yerg".utf8) else {
-            throw FirmwareError(.unsupported, "only the grey iBootIm format is handled")
-        }
-        let w = Int(b[20]) | Int(b[21]) << 8
-        let h = Int(b[22]) | Int(b[23]) << 8
         let px = [UInt8](LZSS.decompress(b[0x40...], windowFill: 0))
         guard px.count >= w * h * 2 else { throw FirmwareError(.unsupported, "short iBootIm") }
         let (lw, lh) = turn ? (h, w) : (w, h)  // the logo as it lands on the panel

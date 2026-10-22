@@ -93,8 +93,8 @@ final class K48Board: Board {
                 throw FirmwareError(.unsupported, "kboot.bin: no K48KBOOT trailer")
             }
             // boot_args: revision, version, 13 words, then the 256-byte command line (KBoot.build)
-            let at = Int(le32(b, t + 16)) - Int(le32(b, t + 8)) + 56
-            guard at > 0, at + 256 <= Int(le32(b, t + 20)) else {
+            let at = Int(try le32(b, t + 16)) - Int(try le32(b, t + 8)) + 56
+            guard at > 0, at + 256 <= Int(try le32(b, t + 20)), at + 256 <= t else {
                 throw FirmwareError(.unsupported, "kboot.bin: boot_args outside the image")
             }
             let line = String(decoding: b[at..<at + 256].prefix { $0 != 0 }, as: UTF8.self)

@@ -112,7 +112,7 @@ public enum K48IBoot {
         let tag = Array("ATAD".utf8) + le32Bytes(UInt32(12 + enc.count)) + le32Bytes(UInt32(plain.count)) + [UInt8](enc)
         out.replaceSubrange(dataTag.offset..<dataTag.offset + oldSize, with: tag)
         let delta = tag.count - oldSize
-        for field in [4, 8, 12] { put32(&out, field, le32(out, field) &+ UInt32(bitPattern: Int32(delta))) }
+        for field in [4, 8, 12] { put32(&out, field, try le32(out, field) &+ UInt32(bitPattern: Int32(delta))) }
         return Data(out)
     }
 

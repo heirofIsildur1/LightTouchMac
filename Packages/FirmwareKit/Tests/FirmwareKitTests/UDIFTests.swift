@@ -54,15 +54,16 @@ import Testing
     static func digest(_ raw: URL, _ dmg: URL) throws -> String {
         let d = try Data(contentsOf: dmg)
         let koly = [UInt8](d.suffix(512))
-        let xml = d[Int(be64(koly, 0xD8))..<Int(be64(koly, 0xD8) + be64(koly, 0xE0))]
+        let xmlAt = Int(try be64(koly, 0xD8))
+        let xml = d[xmlAt..<xmlAt + Int(try be64(koly, 0xE0))]
         let plist = try PropertyListSerialization.propertyList(from: xml, format: nil) as? [String: Any]
         let blkx = (plist?["resource-fork"] as? [String: Any])?["blkx"] as? [[String: Any]] ?? []
         let r = try Data(contentsOf: raw)
         var h = SHA256()
         for b in blkx where !((b["Name"] as? String) ?? "").contains("Apple_Free") {
             let m = [UInt8](b["Data"] as? Data ?? Data())
-            let first = Int(be64(m, 8)) * 512
-            h.update(data: r[first..<first + Int(be64(m, 16)) * 512])
+            let first = Int(try be64(m, 8)) * 512
+            h.update(data: r[first..<first + Int(try be64(m, 16)) * 512])
         }
         #expect(blkx.count > 1)
         return h.finalize().map { String(format: "%02x", $0) }.joined()

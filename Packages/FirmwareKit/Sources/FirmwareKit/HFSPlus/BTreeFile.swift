@@ -57,16 +57,16 @@ struct BTreeFile {
     ) throws {
         guard file.count >= 512, file[8] == 1 else { throw FirmwareError(.unsupported, "no B-tree header node") }
         let h = 14
-        nodeSize = Int(be16(file, h + 18))
-        maxKeyLength = Int(be16(file, h + 20))
-        clumpSize = be32(file, h + 32)
+        nodeSize = Int(try be16(file, h + 18))
+        maxKeyLength = Int(try be16(file, h + 20))
+        clumpSize = try be32(file, h + 32)
         btreeType = file[h + 36]
         keyCompareType = file[h + 37]
-        attributes = be32(file, h + 38)
+        attributes = try be32(file, h + 38)
         guard nodeSize >= 512, file.count >= nodeSize else { throw FirmwareError(.unsupported, "bad B-tree node size") }
         userData = Array(file[120..<248])
         self.compare = compare
-        var n = Int(be32(file, h + 10))
+        var n = Int(try be32(file, h + 10))
         var seen = Set<Int>()
         while n != 0 {
             guard seen.insert(n).inserted, (n + 1) * nodeSize <= file.count else {
@@ -300,38 +300,48 @@ struct BTreeFile {
 
     // MARK: - Key orders
 
+    // Keys reach the orders well-formed (wellFormed on load, the writer's own keys); a field one doesn't hold reads
+    // as 0 and a name as the units it holds, so an order never reads past its key.
+
     /// HFSX catalog keys (keyLength, parentID, name length, UTF-16BE name): by parent, then name as binary UTF-16
     /// (kHFSBinaryCompare).
     static func catalogOrder(_ a: [UInt8], _ b: [UInt8]) -> Int {
-        let pa = be32(a, 2)
-        let pb = be32(b, 2)
+        let pa = word(a, 2)
+        let pb = word(b, 2)
         if pa != pb { return pa < pb ? -1 : 1 }
-        return compareNames(a, 8, Int(be16(a, 6)), b, 8, Int(be16(b, 6)))
+        return compareNames(name(a, at: 6), name(b, at: 6))
     }
 
     /// Extents overflow keys (keyLength, forkType, pad, fileID, startBlock): by file, fork, start.
     static func extentsOrder(_ a: [UInt8], _ b: [UInt8]) -> Int {
-        let ka = (be32(a, 4), a[2], be32(a, 8))
-        let kb = (be32(b, 4), b[2], be32(b, 8))
+        let ka = (word(a, 4), a.count > 2 ? a[2] : 0, word(a, 8))
+        let kb = (word(b, 4), b.count > 2 ? b[2] : 0, word(b, 8))
         return ka == kb ? 0 : ka < kb ? -1 : 1
     }
 
     /// Attributes keys (keyLength, pad, fileID, startBlock, name length, UTF-16BE name): by file, name, start.
     static func attributesOrder(_ a: [UInt8], _ b: [UInt8]) -> Int {
-        let fa = be32(a, 4)
-        let fb = be32(b, 4)
+        let fa = word(a, 4)
+        let fb = word(b, 4)
         if fa != fb { return fa < fb ? -1 : 1 }
-        let c = compareNames(a, 14, Int(be16(a, 12)), b, 14, Int(be16(b, 12)))
+        let c = compareNames(name(a, at: 12), name(b, at: 12))
         if c != 0 { return c }
-        let sa = be32(a, 8)
-        let sb = be32(b, 8)
+        let sa = word(a, 8)
+        let sb = word(b, 8)
         return sa == sb ? 0 : sa < sb ? -1 : 1
     }
 
+    private static func word(_ k: [UInt8], _ o: Int) -> UInt32 { (try? be32(k, o)) ?? 0 }
+
+    /// The UTF-16BE name whose unit count (big-endian) is at `o`, the units after it, within the key.
+    private static func name(_ k: [UInt8], at o: Int) -> ArraySlice<UInt8> {
+        let units = Int((try? be16(k, o)) ?? 0)
+        return k[min(o + 2, k.count)..<min(o + 2 + 2 * units, k.count)]
+    }
+
     /// Two UTF-16BE names compared as binary code units, a prefix first: big-endian units order as their bytes.
-    static func compareNames(_ a: [UInt8], _ ao: Int, _ an: Int, _ b: [UInt8], _ bo: Int, _ bn: Int) -> Int {
-        let n = 2 * min(an, bn)
-        if let (x, y) = zip(a[ao..<ao + n], b[bo..<bo + n]).first(where: { $0 != $1 }) { return x < y ? -1 : 1 }
-        return an == bn ? 0 : an < bn ? -1 : 1
+    static func compareNames(_ a: ArraySlice<UInt8>, _ b: ArraySlice<UInt8>) -> Int {
+        if let (x, y) = zip(a, b).first(where: { $0 != $1 }) { return x < y ? -1 : 1 }
+        return a.count == b.count ? 0 : a.count < b.count ? -1 : 1
     }
 }

@@ -91,12 +91,12 @@ public final class HFSPlusVolume {
             throw FirmwareError(.unsupported, "\(url.lastPathComponent): no HFS+ volume header")
         }
         signature = vh[1] == 0x58 ? "HX" : "H+"
-        fileCount = Int(be32(vh, 32))
-        folderCount = Int(be32(vh, 36))
-        blockSize = Int(be32(vh, 40))
-        totalBlocks = Int(be32(vh, 44))
-        freeBlocks = Int(be32(vh, 48))
-        nextCatalogID = Int(be32(vh, 64))
+        fileCount = Int(try be32(vh, 32))
+        folderCount = Int(try be32(vh, 36))
+        blockSize = Int(try be32(vh, 40))
+        totalBlocks = Int(try be32(vh, 44))
+        freeBlocks = Int(try be32(vh, 48))
+        nextCatalogID = Int(try be32(vh, 64))
         guard (512...(1 << 24)).contains(blockSize), blockSize & (blockSize - 1) == 0 else {
             close(fd)
             throw FirmwareError(.unsupported, "\(url.lastPathComponent): block size \(blockSize)")
@@ -201,13 +201,13 @@ public final class HFSPlusVolume {
     /// The content size: the data fork's, or a compressed file's decmpfs uncompressed size.
     public func size(_ r: CatalogRecord) throws -> UInt64 {
         let r = try r.isHardLink ? inode(r) : r
-        if r.ownerFlags & Self.compressed != 0, let x = try decmpfsHeader(r.cnid) { return le64(x, 8) }
+        if r.ownerFlags & Self.compressed != 0, let x = try decmpfsHeader(r.cnid) { return try le64(x, 8) }
         return r.data?.logicalSize ?? 0
     }
 
     func decmpfsHeader(_ cnid: UInt32) throws -> [UInt8]? {
         if decmpfs == nil { decmpfs = try readDecmpfs() }
-        return decmpfs?[cnid].flatMap { $0.count >= 16 && le32($0, 0) == 0x636D_7066 ? $0 : nil }
+        return decmpfs?[cnid].flatMap { x in x.count >= 16 && (try? le32(x, 0)) == 0x636D_7066 ? x : nil }
     }
 
     /// The catalog IDs that own any extended attribute (the attributes B-tree's keys).
@@ -643,7 +643,7 @@ public final class HFSPlusVolume {
             guard pread(fd, &vh, 512, off_t(at)) == 512 else {
                 throw FirmwareError(.internal, "read volume header at \(at) of \(url.lastPathComponent)")
             }
-            for o in stride(from: 16, through: 28, by: 4) where be32(vh, o) > after { putBE32(&vh, o, to) }
+            for o in stride(from: 16, through: 28, by: 4) where try be32(vh, o) > after { putBE32(&vh, o, to) }
             if let uuid, uuid.count == 8 { vh.replaceSubrange(104..<112, with: uuid) }
             guard pwrite(fd, vh, 512, off_t(at)) == 512 else {
                 throw FirmwareError(.internal, "write volume header at \(at) of \(url.lastPathComponent)")
@@ -663,10 +663,10 @@ public final class HFSPlusVolume {
             let t = try btree(fork, fileID: id)
             for node in 0..<(Int(fork.logicalSize) / t.nodeSize) {
                 let buf = try read(fork, fileID: id, offset: node * t.nodeSize, count: t.nodeSize)
-                let records = Int(be16(buf, 10))
+                let records = Int(try be16(buf, 10))
                 let table = t.nodeSize - 2 * (records + 1)
                 guard records > 0, table > 14 else { continue }
-                let free = Int(be16(buf, table))
+                let free = Int(try be16(buf, table))
                 guard free >= 14, free < table, buf[free..<table].contains(where: { $0 != 0 }) else { continue }
                 try write(
                     fork,
@@ -695,13 +695,17 @@ public final class HFSPlusVolume {
     public func journal() throws -> (offset: Int, size: Int, needsInit: Bool)? {
         var vh = [UInt8](repeating: 0, count: 512)
         // kHFSVolumeJournaledBit, journalInfoBlock
-        guard pread(fd, &vh, 512, 1024) == 512, be32(vh, 4) & (1 << 13) != 0, be32(vh, 12) != 0 else { return nil }
+        guard pread(fd, &vh, 512, 1024) == 512, try be32(vh, 4) & (1 << 13) != 0, try be32(vh, 12) != 0 else {
+            return nil
+        }
         var jib = [UInt8](repeating: 0, count: 52)  // flags, device_signature[8], offset, size
         // in the volume
-        guard pread(fd, &jib, 52, off_t(Int(be32(vh, 12)) * blockSize)) == 52, be32(jib, 0) & 3 == 1 else { return nil }
-        let offset = Int(be64(jib, 36))
-        let size = Int(be64(jib, 44))
-        return size > 0 ? (offset, size, be32(jib, 0) & 4 != 0) : nil
+        guard pread(fd, &jib, 52, off_t(Int(try be32(vh, 12)) * blockSize)) == 52, try be32(jib, 0) & 3 == 1 else {
+            return nil
+        }
+        let offset = Int(try be64(jib, 36))
+        let size = Int(try be64(jib, 44))
+        return size > 0 ? (offset, size, try be32(jib, 0) & 4 != 0) : nil
     }
 
     /// The journal info block and the journal (offset, bytes) while the journal is still to be initialized or is
@@ -715,7 +719,7 @@ public final class HFSPlusVolume {
             var hdr = [UInt8](repeating: 0, count: 32)  // magic, endian, start, end, ...
             guard pread(fd, &hdr, 32, off_t(j.offset)) == 32, hdr[8..<16] == hdr[16..<24] else { return nil }
         }
-        return try [(Int(be32(vh, 12)) * blockSize, blockSize), (j.offset, j.size)].map { at, n in
+        return try [(Int(try be32(vh, 12)) * blockSize, blockSize), (j.offset, j.size)].map { at, n in
             var bytes = Data(count: n)
             guard bytes.withUnsafeMutableBytes({ pread(fd, $0.baseAddress, n, off_t(at)) }) == n else {
                 throw FirmwareError(.internal, "read the journal of \(url.lastPathComponent)")
@@ -734,12 +738,12 @@ public final class HFSPlusVolume {
         guard let j = try journal(), pread(fd, &vh, 512, 1024) == 512 else {
             throw FirmwareError(.internal, "\(url.lastPathComponent) has no journal in the volume")
         }
-        let at = Int(be32(vh, 12)) * blockSize
+        let at = Int(try be32(vh, 12)) * blockSize
         var jib = [UInt8](repeating: 0, count: 4)
         guard pread(fd, &jib, 4, off_t(at)) == 4 else {
             throw FirmwareError(.internal, "read the journal info block of \(url.lastPathComponent)")
         }
-        putBE32(&jib, 0, be32(jib, 0) | 4)
+        putBE32(&jib, 0, try be32(jib, 0) | 4)
         try restore([(j.offset, Data(count: j.size)), (at, Data(jib))])
     }
 
@@ -752,7 +756,7 @@ public final class HFSPlusVolume {
             guard pread(fd, &a, 4, off_t(at + 4)) == 4 else {
                 throw FirmwareError(.internal, "read volume header at \(at) of \(url.lastPathComponent)")
             }
-            putBE32(&a, 0, be32(a, 0) | 0x4000_0000)
+            putBE32(&a, 0, try be32(a, 0) | 0x4000_0000)
             guard pwrite(fd, a, 4, off_t(at + 4)) == 4 else {
                 throw FirmwareError(.internal, "write volume header at \(at) of \(url.lastPathComponent)")
             }

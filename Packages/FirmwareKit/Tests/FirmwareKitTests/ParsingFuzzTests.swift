@@ -159,10 +159,10 @@ import Testing
             ])
             let clean = [UInt8](try Data(contentsOf: dmg))
             let koly = Array(clean.suffix(512))
-            let xmlAt = Int(be64(koly, 0xD8))
+            let xmlAt = Int(try be64(koly, 0xD8))
             let plist = try #require(
                 try PropertyListSerialization.propertyList(
-                    from: Data(clean[xmlAt..<xmlAt + Int(be64(koly, 0xE0))]),
+                    from: Data(clean[xmlAt..<xmlAt + Int(try be64(koly, 0xE0))]),
                     format: nil
                 ) as? [String: Any]
             )

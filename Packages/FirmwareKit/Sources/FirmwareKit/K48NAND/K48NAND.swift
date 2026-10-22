@@ -37,7 +37,7 @@ public enum K48NAND {
     static func whiten(_ m: [UInt8], _ ppage: Int) -> [UInt8] {
         var out = [UInt8](repeating: 0, count: 12)
         for i in 0..<3 {
-            let w = le32(m, 4 * i) ^ lcgTable[(i + ppage) % 256]
+            let w = ((try? le32(m, 4 * i)) ?? 0) ^ lcgTable[(i + ppage) % 256]
             for k in 0..<4 { out[4 * i + k] = UInt8(truncatingIfNeeded: w >> (8 * k)) }
         }
         out[10] = 0
@@ -305,12 +305,14 @@ public enum K48NAND {
         return vflChecksum(c)
     }
 
+    /// The VFL context `c0` (0x800 bytes: its writers' own, the check's page prefix) with its keyed word sum and xor at
+    /// 0x7F8.
     static func vflChecksum(_ c0: [UInt8]) -> [UInt8] {
         var c = c0
         var sum: UInt32 = 0
         var x: UInt32 = 0
         for i in 0..<(0x7f8 / 4) {
-            let w = le32(c, 4 * i)
+            let w = (try? le32(c, 4 * i)) ?? 0
             sum &+= w
             x ^= w
         }

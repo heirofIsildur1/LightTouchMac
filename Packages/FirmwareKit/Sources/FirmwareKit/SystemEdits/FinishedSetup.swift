@@ -7,6 +7,7 @@
 // write anyway (lockdown's zone and clock, it_prefs, caches) is left to them. The language and region are
 // seedLanguage's, which every prepared device gets.
 
+import BinaryParsing
 import Foundation
 
 extension SystemEdits {
@@ -105,20 +106,22 @@ extension SystemEdits {
                 .first(where: { $0.hasPrefix("icudt") && $0.hasSuffix("l.dat") }),
             let data = try? v.contents(at: "usr/share/icu/" + name)
         else { return nil }
-        return try? data.withUnsafeBytes { b throws -> Set<String>? in
-            // ICU's common data: a header (its size, magic DA 27, format "CmnD"), then the entry count and each
-            // entry's name and data offsets, both from the header's end.
-            guard b.count > 24, b[2] == 0xDA, b[3] == 0x27, Array(b[12..<16]) == Array("CmnD".utf8) else { return nil }
-            let toc = Int(try b.u16le(0))
-            guard toc + 4 <= b.count else { return nil }
-            let count = Int(try b.u32le(toc))
-            guard toc + 4 + count * 8 <= b.count else { return nil }
+        // ICU's common data: a header (its size, magic DA 27, format "CmnD"), then the entry count and each entry's
+        // name and data offsets, both from the header's end; a name is a NUL-terminated string.
+        return try? parsing(data, "ICU data") { s -> Set<String>? in
+            guard s.count > 24, try s.bytes(at: 2, 2) == [0xDA, 0x27], try s.bytes(at: 12, 4).elementsEqual("CmnD".utf8)
+            else { return nil }
+            let toc = try s.seeking(toAbsoluteOffset: Int(try UInt16(parsingLittleEndian: &s)))
+            var entries = try toc.seeking(toRelativeOffset: 0)
+            let count = try UInt32(parsingLittleEndian: &entries)
             var out = Set<String>()
-            for i in 0..<count {
-                let at = toc + Int(try b.u32le(toc + 4 + i * 8))
-                guard at < b.count, let end = b[at...].firstIndex(of: 0) else { return nil }
+            for _ in 0..<count {
+                var entry = try entries.sliceSpan(byteCount: 8)
+                var name = try toc.seeking(toRelativeOffset: try UInt32(parsingLittleEndian: &entry))
+                guard let end = name.withUnsafeBytes({ $0.firstIndex(of: 0) }) else { return nil }
                 // a locale is a top-level .res ("icudt42l/uk_UA.res"); coll/ and the like are not region formats
-                let path = String(decoding: b[at..<end], as: UTF8.self).split(separator: "/")
+                let path = String(decoding: try [UInt8](parsing: &name, byteCount: end), as: UTF8.self)
+                    .split(separator: "/")
                 if path.count == 2, path[1].hasSuffix(".res") { out.insert(String(path[1].dropLast(4))) }
             }
             return out

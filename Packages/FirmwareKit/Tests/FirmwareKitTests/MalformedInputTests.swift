@@ -41,6 +41,32 @@ struct MalformedInputTests {
         }
     }
 
+    // MARK: Disk images
+
+    /// An Apple partition map whose block size (16) is smaller than an entry's fields: the type was read 80 bytes
+    /// into an entry only checked for 16.
+    @Test func anApplePartitionMapWithTinyBlocksIsRefused() {
+        var map = [UInt8](repeating: 0, count: 40)
+        map.replaceSubrange(0..<4, with: [0x45, 0x52, 0, 16])
+        map.replaceSubrange(16..<24, with: [0x50, 0x4D, 0, 0, 0, 0, 0, 1])
+        #expect(throws: FirmwareError.self) { try APM.hfsSlice(Data(map)) }
+    }
+
+    /// An encrcdsa header whose data offset has its top bit set: converting it to an Int trapped.
+    @Test func anEncryptedImageOffsetPastAnIntIsRefused() throws {
+        let dir = try Fixtures.tempDir("malformed-encrcdsa")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var header = [UInt8](repeating: 0, count: 0x100)
+        header.replaceSubrange(0..<8, with: Array("encrcdsa".utf8))
+        header.replaceSubrange(52..<56, with: [0, 0, 0x10, 0])  // 4 KiB chunks
+        header.replaceSubrange(56..<72, with: [0, 0, 0, 0, 0, 0, 0x10, 0] + [0x80, 0, 0, 0, 0, 0, 0, 0])
+        let image = dir.appendingPathComponent("image")
+        try Data(header).write(to: image)
+        #expect(throws: FirmwareError.self) {
+            try VFDecrypt.decrypt(input: image, output: dir.appendingPathComponent("out"), key: Data(count: 36))
+        }
+    }
+
     // MARK: dyld shared cache
 
     /// A dyld_v1 cache of one image, /usr/lib/libtest.dylib, mapped at 0x30000000: its Mach-O at 0x100 holds

@@ -3,19 +3,41 @@ import BinaryParsing
 import Foundation
 import zlib
 
-func le16(_ b: [UInt8], _ o: Int) -> UInt16 { UInt16(b[o]) | UInt16(b[o + 1]) << 8 }
-
-func le32(_ b: [UInt8], _ o: Int) -> UInt32 {
-    UInt32(b[o]) | UInt32(b[o + 1]) << 8 | UInt32(b[o + 2]) << 16 | UInt32(b[o + 3]) << 24
+/// The integer at offset `o` of `b`, read through ParserSpan: one past the end throws (FirmwareError's
+/// unsupported) where a subscript would trap. What these read comes from firmware files and guest storage.
+func le16(_ b: [UInt8], _ o: Int) throws -> UInt16 {
+    try integer(b, o) { s throws(ParsingError) in try UInt16(parsingLittleEndian: &s) }
+}
+func le32(_ b: [UInt8], _ o: Int) throws -> UInt32 {
+    try integer(b, o) { s throws(ParsingError) in try UInt32(parsingLittleEndian: &s) }
+}
+func le64(_ b: [UInt8], _ o: Int) throws -> UInt64 {
+    try integer(b, o) { s throws(ParsingError) in try UInt64(parsingLittleEndian: &s) }
+}
+func be16(_ b: [UInt8], _ o: Int) throws -> UInt16 {
+    try integer(b, o) { s throws(ParsingError) in try UInt16(parsingBigEndian: &s) }
+}
+func be32(_ b: [UInt8], _ o: Int) throws -> UInt32 {
+    try integer(b, o) { s throws(ParsingError) in try UInt32(parsingBigEndian: &s) }
+}
+func be64(_ b: [UInt8], _ o: Int) throws -> UInt64 {
+    try integer(b, o) { s throws(ParsingError) in try UInt64(parsingBigEndian: &s) }
 }
 
-func be32(_ b: [UInt8], _ o: Int) -> UInt32 {
-    UInt32(b[o]) << 24 | UInt32(b[o + 1]) << 16 | UInt32(b[o + 2]) << 8 | UInt32(b[o + 3])
+private func integer<T: FixedWidthInteger>(
+    _ b: [UInt8],
+    _ o: Int,
+    _ read: (inout ParserSpan) throws(ParsingError) -> T
+) throws -> T {
+    do {
+        return try b.withParserSpan { s throws(ParsingError) in
+            try s.seek(toRelativeOffset: o)
+            return try read(&s)
+        }
+    } catch {
+        throw FirmwareError(.unsupported, "\(MemoryLayout<T>.size) bytes at \(o) run past the \(b.count) there are")
+    }
 }
-
-func be16(_ b: [UInt8], _ o: Int) -> UInt16 { UInt16(b[o]) << 8 | UInt16(b[o + 1]) }
-func le64(_ b: [UInt8], _ o: Int) -> UInt64 { UInt64(le32(b, o)) | UInt64(le32(b, o + 4)) << 32 }
-func be64(_ b: [UInt8], _ o: Int) -> UInt64 { UInt64(be32(b, o)) << 32 | UInt64(be32(b, o + 4)) }
 
 /// `v`, big-endian (HFS+), at `o`.
 func putBE16(_ b: inout [UInt8], _ o: Int, _ v: UInt16) {
@@ -53,30 +75,6 @@ func crc(_ b: ArraySlice<UInt8>) -> UInt32 {
 extension Sequence<UInt8> {
     /// Lowercase hex, two digits a byte.
     var hexString: String { map { String(format: "%02x", $0) }.joined() }
-}
-
-/// The readers over raw bytes check their bounds and throw: what they read comes from firmware files, and a raw
-/// load or subscript checks nothing in a Release build.
-extension UnsafeRawBufferPointer {
-    /// The `n` bytes at `o`.
-    func bytes(_ o: Int, _ n: Int) throws -> UnsafeRawBufferPointer {
-        guard o >= 0, n >= 0, o <= count, n <= count - o else {
-            throw FirmwareError(.unsupported, "\(n) bytes at \(o) run past the \(count) there are")
-        }
-        return UnsafeRawBufferPointer(rebasing: self[o..<o + n])
-    }
-    func field<T: FixedWidthInteger>(_ o: Int, as: T.Type = T.self) throws -> T {
-        try bytes(o, MemoryLayout<T>.size).loadUnaligned(as: T.self)
-    }
-    func byte(_ o: Int) throws -> UInt8 { try field(o) }
-    func u16le(_ o: Int) throws -> UInt16 { UInt16(littleEndian: try field(o)) }
-    func u32le(_ o: Int) throws -> UInt32 { UInt32(littleEndian: try field(o)) }
-    func u64le(_ o: Int) throws -> UInt64 { UInt64(littleEndian: try field(o)) }
-}
-
-extension Data {
-    /// The little-endian UInt32 at `o` (from the data's start), or the readers' error.
-    func u32le(_ o: Int) throws -> UInt32 { try withUnsafeBytes { try $0.u32le(o) } }
 }
 
 /// The parsers read firmware files through BinaryParsing's ParserSpan, whose reads check their bounds and throw.

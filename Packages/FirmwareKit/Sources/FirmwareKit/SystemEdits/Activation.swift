@@ -131,25 +131,25 @@ public enum Activation {
         func invalid() -> ActivationFailure { ActivationFailure("Unsupported code signature") }
         guard let cs = MachOSignature.codeSignature(in: data) else { throw invalid() }
         let (start, size) = cs
-        guard size >= 12, start <= b.count - size, be32(b, start) == 0xFADE_0CC0 else { throw invalid() }
-        let length = Int(be32(b, start + 4))
-        let count = Int(be32(b, start + 8))
+        guard size >= 12, start <= b.count - size, try be32(b, start) == 0xFADE_0CC0 else { throw invalid() }
+        let length = Int(try be32(b, start + 4))
+        let count = Int(try be32(b, start + 8))
         guard length >= 12, length <= size, count <= (length - 12) / 8 else { throw invalid() }
         var entries: [(UInt32, Int)] = []
         var directories = 0
         for i in 0..<count {
-            let type = be32(b, start + 12 + i * 8)
-            let offset = Int(be32(b, start + 16 + i * 8))
+            let type = try be32(b, start + 12 + i * 8)
+            let offset = Int(try be32(b, start + 16 + i * 8))
             guard offset >= 12 + count * 8, offset <= length - 8 else { throw invalid() }
             let blob = start + offset
-            let blobLength = Int(be32(b, blob + 4))
+            let blobLength = Int(try be32(b, blob + 4))
             guard blobLength >= 8, blobLength <= length - offset else { throw invalid() }
             if type == 0 || (0x1000...0x1005).contains(type) {
-                guard blobLength >= 44, be32(b, blob) == 0xFADE_0C02 else { throw invalid() }
-                let hashOffset = Int(be32(b, blob + 16))
-                let special = Int(be32(b, blob + 24))
-                let slots = Int(be32(b, blob + 28))
-                let limit = Int(be32(b, blob + 32))
+                guard blobLength >= 44, try be32(b, blob) == 0xFADE_0C02 else { throw invalid() }
+                let hashOffset = Int(try be32(b, blob + 16))
+                let special = Int(try be32(b, blob + 24))
+                let slots = Int(try be32(b, blob + 28))
+                let limit = Int(try be32(b, blob + 32))
                 let hashSize = Int(b[blob + 36])
                 let hashType = b[blob + 37]
                 let exponent = Int(b[blob + 39])
@@ -161,10 +161,10 @@ public enum Activation {
                 let page = 1 << exponent
                 guard slots == (limit + page - 1) / page else { throw invalid() }
                 // Scatter layouts require a different page mapping, so fail before touching disk.
-                if be32(b, blob + 8) >= 0x20100 {
-                    guard blobLength >= 48, be32(b, blob + 44) == 0 else { throw invalid() }
+                if try be32(b, blob + 8) >= 0x20100 {
+                    guard blobLength >= 48, try be32(b, blob + 44) == 0 else { throw invalid() }
                 }
-                putBE32(&b, blob + 12, be32(b, blob + 12) | 2)  // CS_ADHOC
+                putBE32(&b, blob + 12, try be32(b, blob + 12) | 2)  // CS_ADHOC
                 for slot in 0..<slots {
                     let bytes = Data(b[(slot * page)..<min(limit, (slot + 1) * page)])
                     let digest =

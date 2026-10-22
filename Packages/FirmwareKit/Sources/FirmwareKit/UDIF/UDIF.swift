@@ -6,6 +6,7 @@
 //   try await UDIF.extractRootfs(dmg: rootfsDMG, to: rawVolume)             // work files go next to `to`
 //   try APM.hfsSlice(headerBytes)                                     // (offset, length) in bytes
 
+import BinaryParsing
 import Foundation
 
 public enum UDIF {
@@ -55,22 +56,29 @@ public enum UDIF {
 public enum APM {
     /// (byte offset, byte length) of the Apple_HFS(X) partition in an Apple Partition Map.
     public static func hfsSlice(_ raw: Data) throws -> (offset: Int, length: Int) {
-        let r = [UInt8](raw)
-        let be16 = { (o: Int) in Int(r[o]) << 8 | Int(r[o + 1]) }
-        let be32 = { (o: Int) in Int(r[o]) << 24 | Int(r[o + 1]) << 16 | Int(r[o + 2]) << 8 | Int(r[o + 3]) }
-        guard r.count >= 4, r[0] == 0x45, r[1] == 0x52 else {
-            throw FirmwareError(.unsupported, "not an Apple partition map")
-        }
-        let bs = be16(2)
-        guard bs > 0, r.count >= bs + 8 else { throw FirmwareError(.unsupported, "truncated Apple partition map") }
-        let n = be32(bs + 4)
-        for i in 1...max(n, 1) where bs * (i + 1) <= r.count {
-            let e = bs * i
-            let type = r[e + 48..<e + 80].split(separator: 0, omittingEmptySubsequences: false).first ?? []
-            if type.elementsEqual("Apple_HFSX".utf8) || type.elementsEqual("Apple_HFS".utf8) {
-                return (be32(e + 8) * bs, be32(e + 12) * bs)
+        // the driver descriptor ("ER", the block size); from block 1 a map entry a block: "PM", a pad, the map's entry
+        // count, the partition's start block and block count, its name and type (32 bytes each, from 16)
+        try parsing(raw, "Apple partition map") { s in
+            guard s.count >= 4, try s.bytes(at: 0, 2) == [0x45, 0x52] else {
+                throw FirmwareError(.unsupported, "not an Apple partition map")
             }
+            try s.seek(toRelativeOffset: 2)
+            let bs = Int(try UInt16(parsingBigEndian: &s))
+            guard bs >= 80 else { throw FirmwareError(.unsupported, "Apple partition map block size \(bs)") }
+            var map = try s.seeking(toAbsoluteOffset: bs)
+            let n = Int(try map.be32(at: 4))
+            for _ in 1...max(n, 1) {
+                guard var entry = try? map.sliceSpan(byteCount: bs) else { break }
+                try entry.seek(toRelativeOffset: 8)
+                let start = Int(try UInt32(parsingBigEndian: &entry))
+                let count = Int(try UInt32(parsingBigEndian: &entry))
+                try entry.seek(toRelativeOffset: 32)
+                let type = try [UInt8](parsing: &entry, byteCount: 32).prefix { $0 != 0 }
+                if type.elementsEqual("Apple_HFSX".utf8) || type.elementsEqual("Apple_HFS".utf8) {
+                    return (start * bs, count * bs)
+                }
+            }
+            throw FirmwareError(.unsupported, "no Apple_HFS(X) partition")
         }
-        throw FirmwareError(.unsupported, "no Apple_HFS(X) partition")
     }
 }

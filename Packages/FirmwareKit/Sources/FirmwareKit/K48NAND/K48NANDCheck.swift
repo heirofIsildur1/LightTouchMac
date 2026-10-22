@@ -258,8 +258,8 @@ extension K48NAND {
             "NANDDRIVERSIGN at cs0 block \(hex(sigBlock ?? 0)) (BBT hdr+0x24)"
         )
         if let (d, _) = sig {
-            let ns = le32(d, 0x38)
-            let flags = le32(d, 0x3c)
+            let ns = try le32(d, 0x38)
+            let flags = try le32(d, 0x3c)
             st.plain = flags & 0x10000 == 0  // 0x5, or a recipe's nand_sig_flags (3.1.x: 4)
             ok(
                 ns >> 8 == nsigBase >> 8 && (0x31...0x39).contains(ns & 0xff)
@@ -285,18 +285,18 @@ extension K48NAND {
                 copies.allSatisfy { $0.map { $0.meta[8] == 0 && $0.meta[9] == tVFL } ?? false },
                 "cs\(cs) VFLCxt spare type 0x80"
             )
-            func u16(_ o: Int) -> Int { Int(ctx[o]) | Int(ctx[o + 1]) << 8 }
-            let ver = le32(ctx, 0x7f4)
-            let ftlType = le32(ctx, 8)
-            let usable = u16(0x696)
-            let pstart = u16(0x698)
-            let cb = [u16(0x69a), u16(0x69c), u16(0x69e)]
+            func u16(_ o: Int) throws -> Int { Int(try le16(ctx, o)) }
+            let ver = try le32(ctx, 0x7f4)
+            let ftlType = try le32(ctx, 8)
+            let usable = try u16(0x696)
+            let pstart = try u16(0x698)
+            let cb = [try u16(0x69a), try u16(0x69c), try u16(0x69e)]
             ok(
                 ver <= 2 && ftlType == 2 && usable == geo.usable && pstart == geo.usable && cb == geo.ctrlBlocks,
                 "cs\(cs) VFLCxt version \(ver) ftl_type \(ftlType) usable \(usable) ctrl \(cb)"
             )
             ok(
-                geo.remap.allSatisfy { pbn, r in u16(0x26 + 2 * (r.bank * geo.pool + r.slot)) == pbn },
+                try geo.remap.allSatisfy { pbn, r in try u16(0x26 + 2 * (r.bank * geo.pool + r.slot)) == pbn },
                 "cs\(cs) pool map remaps blocks \(geo.remap.keys.sorted())"
             )
         }
@@ -326,17 +326,17 @@ extension K48NAND {
             var lpns: [UInt32] = []
             for j in 0..<geo.ppsublk {
                 guard let (pd, pm) = st.readVPN(base + j), pm[9] & tClosed == 0 else { break }
-                let lpn = le32(pm, 0)
+                let lpn = try le32(pm, 0)
                 lpns.append(lpn)
                 if typ == tIndex {
-                    tocFromIndex[Int(lpn)] = (0..<geo.tocEntries).map { le32(pd, 4 * $0) }
+                    tocFromIndex[Int(lpn)] = try (0..<geo.tocEntries).map { try le32(pd, 4 * $0) }
                 } else {
                     tocFromUser[Int(lpn)] = base + j
                 }
             }
             if lpns.count == geo.dataPages {
                 let table = (0..<geo.toc).flatMap { st.readVPN(base + geo.dataPages + $0)?.data ?? [] }
-                let got = (0..<geo.dataPages).map { 4 * $0 + 4 <= table.count ? le32(table, 4 * $0) : 0 }
+                let got = try (0..<geo.dataPages).map { 4 * $0 + 4 <= table.count ? try le32(table, 4 * $0) : 0 }
                 if v % 25 == 0 || got != lpns {
                     ok(got == lpns, "vblock \(v) closed, BTOC matches \(lpns.count) page spares")
                 }

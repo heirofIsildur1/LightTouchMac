@@ -59,20 +59,10 @@ public enum N72NAND {
             w[1024] = 1
             w[1028] = 0x8000
         }
-        var p = u16s(w)
+        let p = u16s(w)
         // The VFL writer's checksum over the 0x7f8-byte context: word sum and word xor, each keyed with 0xaabbccdd
         // (4.x iBoot verifies it; 3.x's verifier is a stub).
-        var sum: UInt32 = 0
-        var xor: UInt32 = 0
-        for i in 0..<510 {
-            let v =
-                UInt32(p[4 * i]) | UInt32(p[4 * i + 1]) << 8 | UInt32(p[4 * i + 2]) << 16 | UInt32(p[4 * i + 3]) << 24
-            sum &+= v
-            xor ^= v
-        }
-        put(&p, 0x7F8, UInt64(sum &+ 0xAABB_CCDD), 4)
-        put(&p, 0x7FC, UInt64(xor ^ 0xAABB_CCDD), 4)
-        return p
+        return K48NAND.vflChecksum(p)
     }
 
     static func ftlContext() -> [UInt8] {

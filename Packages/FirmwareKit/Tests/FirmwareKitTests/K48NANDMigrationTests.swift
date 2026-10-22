@@ -345,8 +345,11 @@ struct K48NANDMigrationTests {
             st.close()
             #expect(try K48NAND.storeFormat(dir) == .image)
             let r = try K48NAND.StoreReader(dir, geo: geo)
-            #expect(r.read(0, 7, raw: true).map { $0.data.allSatisfy { $0 == 0 } && le32($0.meta, 0) == 1 } == true)
-            #expect(r.read(0, 8, raw: true).map { $0.data.allSatisfy { $0 == 0xFF } && le32($0.meta, 0) == 2 } == true)
+            #expect(
+                r.read(0, 7, raw: true).map { $0.data.allSatisfy { $0 == 0 } && (try? le32($0.meta, 0)) == 1 } == true)
+            #expect(
+                r.read(0, 8, raw: true).map { $0.data.allSatisfy { $0 == 0xFF } && (try? le32($0.meta, 0)) == 2 }
+                    == true)
             #expect(r.read(0, 9) == nil && r.read(1, 7) == nil)
             var g = try K48NAND.geometryObject(dir)
             g.removeValue(forKey: "layout")

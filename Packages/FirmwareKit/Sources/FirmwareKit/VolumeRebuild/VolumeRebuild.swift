@@ -82,10 +82,14 @@ public enum VolumeRebuild {
         // The volume's own size, not a legacy overlong GPT partition's: macOS looks for the
         // alternate volume header 1 KiB before the end of the device.
         var header = [UInt8](repeating: 0, count: page)
-        guard try read(0, into: &header), header[1024] == 0x48, header[1025] == 0x2B || header[1025] == 0x58 else {
+        guard try read(0, into: &header), let bytes = try HFSPlusVolume.headerBytes(header, at: 1024) else {
             throw FirmwareError(.unsupported, "\(base.path): no HFS+ volume header at block 0")
         }
-        let blocks = Int(be32(header, 1024 + 44)) * Int(be32(header, 1024 + 40)) / page
+        let blocks = bytes / page
+        // the guest's header says the size: its last block must be one the FTL lays out below the bad-block table
+        guard blocks == 0 || N72NAND.predict(blocks - 1).page < N72NAND.bbtPage else {
+            throw FirmwareError(.unsupported, "\(base.path): the volume header claims \(bytes) bytes, past the NAND")
+        }
 
         let out = dir.appendingPathComponent("system.img")
         let fd = try create(out, bytes: blocks * page)
@@ -197,9 +201,10 @@ public enum VolumeRebuild {
                 guard let m = st.meta(cs, pp) else { break }  // pages of a vblock are programmed in order
                 let typ = m[9]
                 guard typ & K48NAND.tUser != 0, typ & (K48NAND.tIndex | K48NAND.tClosed) == 0 else { continue }
-                let lpn = Int(le32(m, 0))
-                let usn = le32(m, 4)
-                guard lpn < geo.totalPages else { continue }
+                // the spare's lpn and usn, little-endian u32s
+                guard let lpn = (try? le32(m, 0)).map(Int.init), let usn = try? le32(m, 4), lpn < geo.totalPages else {
+                    continue
+                }
                 // equal USN: the later vpn (a later page of the same block) wins
                 if vpnOf[lpn] == 0 || usn > usnOf[lpn] || (usn == usnOf[lpn] && UInt32(vpn + 1) > vpnOf[lpn]) {
                     vpnOf[lpn] = UInt32(vpn + 1)

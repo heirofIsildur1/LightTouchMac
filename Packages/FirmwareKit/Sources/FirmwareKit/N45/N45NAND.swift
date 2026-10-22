@@ -103,16 +103,7 @@ public enum N45NAND {
         d[0x688 + (blocksPerBank - 1) / 64] &= ~UInt8(1 << (7 - ((blocksPerBank - 1) / 8) % 8))
         for i in 0..<4 { put(&d, 0x7A2 + 2 * i, UInt64(vflCxtBlock + i), 2) }  // awInfoBlk
         put(&d, 0x7AA, UInt64(maxReserved), 2)  // wBadMapTableScrubIdx
-        var sum: UInt32 = 0
-        var xor: UInt32 = 0
-        for o in stride(from: 0, to: 0x7F8, by: 4) {
-            let w = UInt32(d[o]) | UInt32(d[o + 1]) << 8 | UInt32(d[o + 2]) << 16 | UInt32(d[o + 3]) << 24
-            sum &+= w
-            xor ^= w
-        }
-        put(&d, 0x7F8, UInt64(sum &+ 0xAABB_CCDD), 4)
-        put(&d, 0x7FC, UInt64(xor ^ 0xAABB_CCDD), 4)
-        return d
+        return K48NAND.vflChecksum(d)  // the VFL writer's keyed word sum and xor at 0x7F8
     }
 
     /// VFLSpare as the VFL writes its context pages: dwCxtAge, dwReserved, status mark 0 (valid), type 0x80.
