@@ -181,6 +181,7 @@ struct Tools {
         for (from, to) in copies where run("/bin/cp", ["-cR", from, to.path]) != 0 {
             die("could not copy \(from) into \(to.path)", code: 3)
         }
+        signAsBuilt(contents)
         guard let shared else {
             print("tools: built for this run (uncommitted changes to what they're built from)")
             return staging.appendingPathComponent("Tools.app")
@@ -196,6 +197,31 @@ struct Tools {
             if used < weekAgo { try? fm.removeItem(at: old) }
         }
         return shared.appendingPathComponent("Tools.app")
+    }
+
+    /// The vendor directory's executables and libraries in `contents` signed as the build is (the services worker's
+    /// identity, hardened runtime kept), as Xcode's Code Sign On Copy signs them into the app. scripts/vendor signs them
+    /// ad hoc with the hardened runtime, and before macOS 26 library validation refuses an ad hoc library to a
+    /// hardened process of any other signature, ad hoc included ("different Team IDs"): usbmuxd and the services
+    /// worker couldn't load libimobiledevice on the macOS 15 Mac mini. A build signed ad hoc is left as it is.
+    static func signAsBuilt(_ contents: URL) {
+        // codesign -d writes what it found to standard error
+        let services = contents.appendingPathComponent("MacOS/LightTouchServices").path
+        let signed = (try? Shell.run(["/usr/bin/codesign", "-dvv", services]))?.error ?? ""
+        guard
+            let identity = signed.split(separator: "\n").first(where: { $0.hasPrefix("Authority=") })?
+                .dropFirst("Authority=".count)
+        else { return }
+        let fm = FileManager.default
+        let frameworks = contents.appendingPathComponent("Frameworks")
+        let paths =
+            ((try? fm.contentsOfDirectory(atPath: frameworks.path)) ?? []).filter { $0.hasSuffix(".dylib") }
+            .map { frameworks.appendingPathComponent($0).path }
+            + ["usbmuxd", "inetcat", "ipod-helper", "iBoot32Patcher"].map {
+                contents.appendingPathComponent("MacOS/" + $0).path
+            }.filter { fm.fileExists(atPath: $0) }
+        guard run("/usr/bin/codesign", ["-f", "-o", "runtime", "--timestamp=none", "-s", String(identity)] + paths) == 0
+        else { die("could not sign the vendor's files in \(contents.path) as \(identity)", code: 3) }
     }
 
     /// Where every checkout's Debug tools are kept by source tree (sourceKey).
@@ -223,7 +249,8 @@ struct Tools {
             ?? ""
         let inputs = [
             trees, vendor.path, ProcessInfo.processInfo.environment["LTM_HELPER_SANDBOX"] ?? "YES", local,
-            output("/usr/bin/xcodebuild", ["-version"])
+            output("/usr/bin/xcodebuild", ["-version"]),
+            "layout 2"  // how bundle lays the tools out and signs them: a change here must not reuse an older bundle
         ]
         return SHA256.hash(data: Data(inputs.joined(separator: "\n").utf8)).prefix(10)
             .map { String(format: "%02x", $0) }.joined()
