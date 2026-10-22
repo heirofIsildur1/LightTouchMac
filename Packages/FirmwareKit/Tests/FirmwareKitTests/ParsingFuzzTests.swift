@@ -273,6 +273,17 @@ import Testing
         }
     }
 
+    /// KBootTests' device tree, flipped and cut, through DeviceTree's parse and its edits (each reparses).
+    @Test func deviceTreesThrowOnCorruption() {
+        let clean = [UInt8](KBootTests.dtBlob)
+        for b in Self.flipped(clean, in: 0..<clean.count, count: 3000, seed: 11) + Self.cut(clean, 64) {
+            guard var dt = try? DeviceTree(Data(b)) else { continue }
+            _ = try? dt.set("chosen", "firmware-version", .string("iBoot-1"))
+            _ = try? dt.add("arm-io", "x")
+            _ = try? dt.addNode("arm-io", "y")
+        }
+    }
+
     /// An img3 of a 4-byte TYPE tag and `last` (magic as stored, data), its header's sizeNoPack covering both.
     static func img3(_ last: (String, [UInt8])) -> [UInt8] {
         func word(_ v: Int) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }

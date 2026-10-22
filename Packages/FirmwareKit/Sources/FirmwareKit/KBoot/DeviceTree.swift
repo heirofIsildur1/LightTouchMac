@@ -13,6 +13,7 @@
 // node with the same path shadows an earlier one, as in the Python. iBoot's DT reserves every slot it
 // fills, so set() never resizes: a value longer than its slot is an error.
 
+import BinaryParsing
 import Foundation
 
 public struct DeviceTree: Sendable {
@@ -105,39 +106,49 @@ public struct DeviceTree: Sendable {
 
     static func name32(_ s: String) -> Data { Data(Array(s.utf8).prefix(32)) + Data(count: max(0, 32 - s.utf8.count)) }
 
-    private func u32(_ at: Int) throws -> UInt32 { try data.u32le(at) }
+    private func u32(_ at: Int) throws -> UInt32 { try parsing(data, "DeviceTree") { s in try s.le32(at: at) } }
+
+    /// Deeper than any tree iBoot hands over (a handful of levels); a deeper one is refused, not recursed into.
+    static let maxDepth = 64
 
     private mutating func reparse() throws {
-        props = [:]
-        nodes = [:]
-        ends = [:]
-        let end = try node(at: 0, parent: nil)
-        guard end == data.count else {
-            throw FirmwareError(.unsupported, "DeviceTree: trailing bytes after the device tree")
+        var props: [String: [String: Slot]] = [:]
+        var nodes: [String: (start: Int, propsEnd: Int)] = [:]
+        var ends: [String: Int] = [:]
+        // A node: its property and child counts (little-endian u32s), each property (a NUL-padded 32-byte name, a
+        // u32 length whose top bit is a flag, the value padded to 4 bytes), then its children.
+        func node(_ s: inout ParserSpan, parent: String?, depth: Int) throws {
+            guard depth < Self.maxDepth else {
+                throw FirmwareError(.unsupported, "DeviceTree: nested deeper than \(Self.maxDepth) nodes")
+            }
+            let start = s.startPosition
+            let nprops = try UInt32(parsingLittleEndian: &s)
+            let nchildren = try UInt32(parsingLittleEndian: &s)
+            var mine: [String: Slot] = [:]
+            var name: [UInt8]?
+            for _ in 0..<nprops {
+                let offset = s.startPosition
+                let key = String(decoding: try [UInt8](parsing: &s, byteCount: 32).prefix { $0 != 0 }, as: UTF8.self)
+                let length = Int(try UInt32(parsingLittleEndian: &s) & 0x7FFF_FFFF)
+                let value = try [UInt8](parsing: &s, byteCount: length)
+                try s.seek(toRelativeOffset: (4 - length % 4) % 4)
+                mine[key] = Slot(offset: offset, length: length)
+                if key == "name" { name = value }
+            }
+            guard let name else { throw FirmwareError(.unsupported, "DeviceTree: node without a name") }
+            let text = String(decoding: name.prefix { $0 != 0 }, as: UTF8.self)
+            let path = parent.map { String("\($0)/\(text)".drop { $0 == "/" }) } ?? ""
+            props[path] = mine
+            nodes[path] = (start, s.startPosition)
+            for _ in 0..<nchildren { try node(&s, parent: path, depth: depth + 1) }
+            ends[path] = s.startPosition
         }
-    }
-
-    private mutating func node(at start: Int, parent: String?) throws -> Int {
-        guard start + 8 <= data.count else { throw FirmwareError(.unsupported, "DeviceTree: truncated") }
-        let nprops = Int(try u32(start))
-        let nchildren = Int(try u32(start + 4))
-        var off = start + 8
-        var mine: [String: Slot] = [:]
-        for _ in 0..<nprops {
-            guard off + 36 <= data.count else { throw FirmwareError(.unsupported, "DeviceTree: truncated") }
-            let name = String(decoding: data[off..<off + 32].prefix { $0 != 0 }, as: UTF8.self)
-            let len = Int(try u32(off + 32) & 0x7FFF_FFFF)
-            guard off + 36 + len <= data.count else { throw FirmwareError(.unsupported, "DeviceTree: truncated") }
-            mine[name] = Slot(offset: off, length: len)
-            off += 36 + ((len + 3) & ~3)
+        try parsing(data, "DeviceTree") { s in
+            try node(&s, parent: nil, depth: 0)
+            guard s.isEmpty else {
+                throw FirmwareError(.unsupported, "DeviceTree: trailing bytes after the device tree")
+            }
         }
-        guard let n = mine["name"] else { throw FirmwareError(.unsupported, "DeviceTree: node without a name") }
-        let name = String(decoding: data[n.offset + 36..<n.offset + 36 + n.length].prefix { $0 != 0 }, as: UTF8.self)
-        let path = parent.map { String("\($0)/\(name)".drop { $0 == "/" }) } ?? ""
-        props[path] = mine
-        nodes[path] = (start, off)
-        for _ in 0..<nchildren { off = try node(at: off, parent: path) }
-        ends[path] = off
-        return off
+        (self.props, self.nodes, self.ends) = (props, nodes, ends)
     }
 }
