@@ -299,6 +299,12 @@ final class WebProxy: @unchecked Sendable {
             guard let components = URLComponents(string: url), let host = components.host, components.url != nil else {
                 throw Reply(400, "Invalid URL")
             }
+            #if DEBUG
+                if let fixture = Self.fixture(config, url: components) {
+                    _ = guest.write(fixture)
+                    return
+                }
+            #endif
             if mode == .direct, WebProxyAdapters.retired(host: host) {
                 throw Reply(410, "This online service has been retired")
             }
@@ -388,6 +394,37 @@ final class WebProxy: @unchecked Sendable {
             return
         }
     }
+
+    #if DEBUG
+        /// Debug: with a directory beside CONFIG (web-proxy.conf.fixture: `sessions single --jailbreak`'s recorded
+        /// Cydia repositories) every request is answered from it, <host>/<path> (index.html for a directory; a
+        /// fixture segment named `_` stands for any one segment), or 404: nothing goes to the internet.
+        static func fixture(_ config: URL, url: URLComponents) -> Data? {
+            let root = config.path + ".fixture"
+            guard FileManager.default.fileExists(atPath: root), let host = url.host?.lowercased() else { return nil }
+            var segments =
+                [host]
+                + url.path.split(separator: "/", omittingEmptySubsequences: false).dropFirst()
+                .map(String.init)
+            if segments.last?.isEmpty ?? true { segments[segments.count - 1] = "index.html" }
+            guard !segments.contains(where: { $0 == ".." || $0 == "." }) else { return head(404, "Not Found", []) }
+            let candidates =
+                [segments]
+                + segments.indices.dropFirst().map { i in
+                    segments.enumerated().map { $0.offset == i ? "_" : $0.element }
+                }
+            for candidate in candidates {
+                guard let body = FileManager.default.contents(atPath: ([root] + candidate).joined(separator: "/"))
+                else { continue }
+                let type =
+                    ["html": "text/html", "css": "text/css", "js": "application/javascript"][
+                        (candidate.last! as NSString).pathExtension
+                    ] ?? "application/octet-stream"
+                return head(200, "OK", ["Content-Type: \(type)", "Content-Length: \(body.count)"]) + body
+            }
+            return head(404, "Not Found", ["Content-Length: 0"])
+        }
+    #endif
 
     /// Request line and headers, a byte at a time (nothing past the blank line is consumed: TLS may follow a CONNECT).
     private func readHead(_ guest: Guest) throws -> (String, String, [(String, String)]) {

@@ -85,6 +85,9 @@ struct SingleConfig: Decodable {
     /// The base was prepared with firmwarekit create --jailbreak: Files through afc2 lists "/", reads the build's
     /// SystemVersion.plist and round-trips a file in root's home (`afc2`).
     var jailbreak: Bool?
+    /// With `jailbreak`: Cydia's sources and front page from the internet, its install bc from Cydia/Telesphoreo;
+    /// without, from the local repositories the web proxy serves (CydiaFixture), installing its package.
+    var network: Bool?
     /// The app's armv6.itpack: ittrust for a guest whose package lacks it (WebProxySetup.bundledGuestTool, which
     /// the app runs on every board).
     var proxyItpack: String?
@@ -156,6 +159,12 @@ nonisolated enum WiFiProbe {
                     try WebProxyCA.prepare(config: WebProxyConfiguration.file(in: proxyDir)).certificate
                 ) as Data
         } catch { fail("web proxy: \(error)") }
+        if s.network != true {
+            do {
+                try CydiaFixture.write(
+                    to: URL(fileURLWithPath: WebProxyConfiguration.file(in: proxyDir).path + ".fixture"))
+            } catch { fail("Cydia fixture: \(error)") }
+        }
         let endpoint = WebProxyConfiguration.endpoint(directory: proxyDir)
         d.webProxy = endpoint
         d.netdevExtra = (d.netdevExtra ?? "") + WebProxyConfiguration.guestForward(socket: endpoint.socket)
@@ -1075,7 +1084,7 @@ nonisolated enum WiFiProbe {
         } catch {
             emit("afc2", ["device": d.name, "top": top, "error": "\(error)"])
         }
-        await cydia(d, proxyCA: proxyCA, itpack: s.proxyItpack)
+        await cydia(d, proxyCA: proxyCA, itpack: s.proxyItpack, network: s.network == true)
         await substrate(d)
     }
     if s.install != false {
@@ -1570,7 +1579,10 @@ nonisolated enum CydiaSources {
 /// Cydia is online: its front page comes through the proxy (the CLI reads the proxy's trace), it refreshes its sources
 /// (the lists in its cache), and on a phone it installs a small package from Cydia's own repository through its own
 /// pages, which then runs. Emits `cydia`.
-@MainActor func cydia(_ d: Device, proxyCA: Data? = nil, itpack: String? = nil) async {
+@MainActor func cydia(_ d: Device, proxyCA: Data? = nil, itpack: String? = nil, network: Bool = false) async {
+    // Online, bc from Cydia/Telesphoreo; else the fixture's package (CydiaFixture).
+    let package = network ? "bc" : CydiaFixture.package
+    let command = network ? ["/bin/sh", "-c", "echo 6*7 | /usr/bin/bc"] : CydiaFixture.command
     let id = "com.saurik.Cydia"
     var event: [String: Any] = ["device": d.name]
     do { event["onHome"] = try await d.services.homeScreenOrder().contains(id) } catch {
@@ -1637,11 +1649,12 @@ nonisolated enum CydiaSources {
             event["links"] = await run(["/bin/ls", "-l", "/etc/apt/sources.list.d", "/usr/libexec/cydia/cydo"])
             if let path = d.screenshot("cydia-refreshed") { event["shotRefreshed"] = path }
             event["sources"] = await run(["/bin/cat", cache + "/sources.list"])
-            // A package installed the way a user does it: Cydia's page for bc (no dependencies, Cydia/Telesphoreo),
-            // Install, Confirm (each button found by Vision on a screenshot), then bc runs. The phones' portrait
+            // A package installed the way a user does it: Cydia's page for it (no dependencies, Cydia/Telesphoreo),
+            // Install, Confirm (each button found by Vision on a screenshot), then it runs. The phones' portrait
             // Cydia only; the iPad's turns with SpringBoard.
             if d.profile != .k48 {
-                event["open"] = await run(["/usr/bin/uiopen", "cydia://package/bc"])
+                event["package"] = package
+                event["open"] = await run(["/usr/bin/uiopen", "cydia://package/\(package)"])
                 var taps: [String] = []
                 for (n, label) in ["Install", "Confirm"].enumerated() {
                     for _ in 0..<12 {
@@ -1666,11 +1679,26 @@ nonisolated enum CydiaSources {
                 var status = ""
                 for _ in 0..<36 where !status.hasPrefix("install ok installed") {
                     try? await Task.sleep(for: .seconds(5))
-                    status = await run(["/usr/bin/dpkg-query", "-W", "-f", "${Status}", "bc"])
+                    status = await run(["/usr/bin/dpkg-query", "-W", "-f", "${Status}", package])
                 }
-                event["bcStatus"] = status
+                event["packageStatus"] = status
+                // Cydia finishes after dpkg (its online progress page's "Return to Cydia", else the bar's Close, then
+                // a reload that writes its metadata); Home before that suspends it holding the metadata's lock, and
+                // iOS kills it (0xdead10cc).
+                for _ in 0..<24 {
+                    guard let shot = d.screenshot("cydia-return") else { break }
+                    let labels = CydiaSources.labels(shot)
+                    if let back = labels.first(where: { $0.text.hasPrefix("Return to") || $0.text == "Close" }) {
+                        await d.tap(back.x, back.y)
+                        taps.append(back.text)
+                        try? await Task.sleep(for: .seconds(10))
+                        break
+                    }
+                    try? await Task.sleep(for: .seconds(5))
+                }
+                event["taps"] = taps
                 if let path = d.screenshot("cydia-installed") { event["shotInstalled"] = path }
-                event["bc"] = (await run(["/bin/sh", "-c", "echo 6*7 | /usr/bin/bc"]))
+                event["ran"] = (await run(command))
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }

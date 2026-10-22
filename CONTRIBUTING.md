@@ -178,6 +178,9 @@ Three commands, no runner around them:
 xcodebuild test -skipMacroValidation -project LightTouchMac.xcodeproj -scheme LightTouchMac -testPlan Unit
 # emulator sessions on prepared bases (firmwarekit create output), one boot at a time; `sessions --help` for the rest
 swift run --package-path tests/sessions sessions single BASE [--launch] [--reboot]
+# a jailbroken base: Cydia refreshes and installs from local repositories the web proxy serves (no internet);
+# --network uses the real ones and installs bc (the nightly and pre-release matrix)
+swift run --package-path tests/sessions sessions single JAILBROKEN_BASE --jailbreak [--network]
 # as a device the user already has, through the app's boot admission; an old device must take its admission steps
 # (the old devices in ~/Developer/qemu-ios-files/old-devices: tests/sessions/Sources/sessions/Managed.swift)
 swift run --package-path tests/sessions sessions single BASE --managed

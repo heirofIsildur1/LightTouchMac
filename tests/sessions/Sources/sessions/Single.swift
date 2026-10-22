@@ -58,6 +58,7 @@ func single(_ args: SingleCheck) -> Never {
     if let managed { single["managed"] = managed.paths(state: work, logs: work).directory.path }
     if args.skipSetup { single["skipSetup"] = true }
     if args.jailbreak { single["jailbreak"] = true }
+    if args.network { single["network"] = true }
     if let panel = args.panel { single["panel"] = panel }
     if args.angle { single["angle"] = true }
     if args.killPersist { single["killPersist"] = true }
@@ -96,8 +97,8 @@ func single(_ args: SingleCheck) -> Never {
     {
         timeout += 150 * Double(text.split(separator: "\n").count) + 60
     }
-    // --jailbreak: Cydia online (its refresh and an install) and the proxy's trace, which the check reads.
-    if args.jailbreak { timeout += 600 }
+    // --jailbreak: Cydia's refresh and an install (online, far longer) and the proxy's trace, which the check reads.
+    if args.jailbreak { timeout += args.network ? 900 : 240 }
     config["timeout"] = timeout
 
     print("\(base.entryID): \(d) from \(base.url.path)")
@@ -358,10 +359,12 @@ func single(_ args: SingleCheck) -> Never {
             "\(d): Cydia refreshed its sources (\(lists.filter { $0.hasSuffix("_Packages") }.joined(separator: ", ")))"
         )
         if base.board != "k48ap" {
+            let package = cydia.string("package") ?? ""
             r.check(
-                (cydia.string("bcStatus") ?? "").hasPrefix("install ok installed") && cydia.string("bc") == "42",
-                "\(d): Cydia installs bc from Cydia/Telesphoreo (\((cydia["taps"] as? [String] ?? []).joined(separator: ", ")))"
-                    + " and it runs: 6*7 = \(cydia.string("bc") ?? "")"
+                (cydia.string("packageStatus") ?? "").hasPrefix("install ok installed") && cydia.string("ran") == "42",
+                "\(d): Cydia installs \(package) from Cydia/Telesphoreo"
+                    + (args.network ? "" : " (local)")
+                    + " (\((cydia["taps"] as? [String] ?? []).joined(separator: ", "))) and it runs: 6*7 = \(cydia.string("ran") ?? "")"
             )
         }
         if (3...6).contains(base.major) {  // Substrate where FirmwareKit's jailbreak installs it

@@ -122,11 +122,19 @@ struct SingleCheck: ParsableCommand {
     @Flag(
         help: """
             The base was prepared with --jailbreak: Files reads the whole file system through afc2, Cydia launches \
-            with the web proxy on (its front page through it, its sources refreshed, and on a phone bc installed \
-            through Cydia's pages), Substrate loads into SpringBoard (3.x to 6.x; idevicesyslog on PATH).
+            with the web proxy on (its front page through it, its sources refreshed, and on a phone a package \
+            installed through Cydia's pages), Substrate loads into SpringBoard (3.x to 6.x; idevicesyslog on PATH). \
+            Cydia's repositories are local ones the proxy serves (no internet) unless --network.
             """
     )
     var jailbreak = false
+    @Flag(
+        help: """
+            With --jailbreak: Cydia's sources and front page from the internet and bc installed from Cydia/Telesphoreo \
+            (the nightly and pre-release matrix), instead of the local repositories.
+            """
+    )
+    var network = false
     @Option(help: "Install a newer build of the same app over it; its data must stay.", transform: path)
     var upgradeIPA: URL?
     @Option(help: "With --reboot: boot 2 asks for TZ.") var secondZone: String?
