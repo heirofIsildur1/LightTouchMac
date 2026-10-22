@@ -103,6 +103,7 @@ check "ship refuses a partial key" 'LTM_NOTARY_KEY_ID=K refused "$SRC/scripts/sh
 check "ship refuses no key" 'refused "$SRC/scripts/ship" --notes "$T/notes.md" --dry-run'
 check "the deprecated release hands its archive and notes to ship" \
     '[[ "$("$SRC/scripts/release" "$T/X.xcarchive" --amore --notes "$T/todo.md" --publish 2>&1)" == *"running scripts/ship --archive $T/X.xcarchive --notes $T/todo.md"*"FAIL preflight: the notes at $T/todo.md still have template text"* ]]'
+check "the Amore upload asks for no JSON (amore refuses --skip-notarization with it)" '! grep -E "amore release .*--draft" -A1 "$SRC/scripts/ship" | grep -q -- "--format json"'
 check "the deprecated release still needs an archive" 'refused "$SRC/scripts/release" --amore'
 
 # the Amore release's id: the upload's answer first, else this app's cached details

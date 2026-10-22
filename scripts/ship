@@ -340,9 +340,12 @@ main() {
             || fail Amore "Gatekeeper rejects the DMG: $(cat "$WORK/dmg-spctl.log")"
 
         step "Amore upload (draft)"
+        # No --format json: amore 0.1 with it checks for a notarization profile before honoring --skip-notarization
+        # and refuses ("notarization_not_configured"), as the 10-22 release did.
         amore release "$dmg" --draft --skip-notarization --non-interactive --release-notes "$(cat "$NOTES")" \
-            --format json > "$WORK/amore.json" 2>&1 || { tail -20 "$WORK/amore.json"; fail Amore "amore release --draft"; }
-        # The id: from the upload's answer, else from the CLI's cache of the app's releases (which the list refreshes).
+            > "$WORK/amore.json" 2>&1 || { tail -20 "$WORK/amore.json"; fail Amore "amore release --draft"; }
+        # The id: from the upload's answer if it carries one, else from the CLI's cache of the app's releases (which
+        # the list refreshes).
         amore releases list --bundle-id "$bundle_id" > /dev/null 2>&1 || true
         while IFS= read -r f; do cached+=("$f"); done < <(ls -t "$HOME/Library/Caches/amore/fsCachedData/"* 2>/dev/null || true)
         read -r amore_id url < <("$ROOT/scripts/ltm-build" release amore-id "$build" "$bundle_id" "$WORK/amore.json" ${cached[@]+"${cached[@]}"}) \
