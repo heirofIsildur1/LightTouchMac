@@ -16,6 +16,10 @@
     "path": "~/Developer/usbmuxd-qemu/usbmuxd",
     "provides": "the usbmuxd the bundle ships: real ZLPs after max-packet-multiple writes, 50 ms polling once idle for 1 s, complete EP0 control transfers across NAK pauses, per-transfer log lines only at -v -v, and both listeners on owner-only Unix sockets"
   },
+  "xcode": {
+    "build": "27A266a",
+    "comment": "The Xcode releases are built with, by its build (xcodebuild -version): scripts/ship refuses any other. scripts/ship --pin-xcode records the selected Xcode's here. Development needs Xcode 27 or later."
+  },
   "iBoot32Patcher": {
     "pinned_in": "build-support/dependencies.json",
     "group": "tools"

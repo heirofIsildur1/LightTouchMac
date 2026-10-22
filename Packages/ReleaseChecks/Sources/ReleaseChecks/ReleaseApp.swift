@@ -7,7 +7,7 @@ public enum ReleaseApp {
 
     /// The Release plan sets LTM_RELEASE_REQUIRED=1: without an app its tests fail instead of standing aside.
     public static var required: Bool { environment["LTM_RELEASE_REQUIRED"] == "1" }
-    /// Skip the prepare matrix (LTM_RELEASE_SKIP_PREPARE=1): development dry runs only; scripts/release refuses it
+    /// Skip the prepare matrix (LTM_RELEASE_SKIP_PREPARE=1): development dry runs only; scripts/ship refuses it
     /// for a real release.
     public static var skipPrepare: Bool { environment["LTM_RELEASE_SKIP_PREPARE"] == "1" }
     /// The app is an export (notarized, stapled): Gatekeeper and the ticket are checked too (LTM_RELEASE_EXPORTED=1).

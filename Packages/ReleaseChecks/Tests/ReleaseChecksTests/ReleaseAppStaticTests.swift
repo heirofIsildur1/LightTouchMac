@@ -337,7 +337,7 @@ struct ReleaseAppStaticTests {
         }
     }
 
-    /// An export (scripts/release: exported for Developer ID, zipped and unzipped): stapled and accepted by Gatekeeper.
+    /// An export (scripts/ship: exported for Developer ID, zipped and unzipped): stapled and accepted by Gatekeeper.
     @Test(.enabled(if: ReleaseApp.exported, "not an export (LTM_RELEASE_EXPORTED=1)"))
     func anExportIsStapledAndPassesGatekeeper() throws {
         #expect(try run(["xcrun", "stapler", "validate", app.path]).succeeded, "no stapled notarization ticket")

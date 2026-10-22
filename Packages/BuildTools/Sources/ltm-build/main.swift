@@ -17,7 +17,7 @@ struct LTMBuild: ParsableCommand {
         commandName: "ltm-build",
         subcommands: [
             VendorCommand.self, MachineOptionsCommand.self, CheckMachO.self, MergeNativeCommand.self, Sources.self,
-            StaticRecord.self, NativeRecord.self, QemuCommand.self
+            StaticRecord.self, NativeRecord.self, Release.self, QemuCommand.self
         ]
     )
 }
@@ -185,6 +185,54 @@ struct NativeRecord: ParsableCommand {
             usbmuxd: usbmuxd,
             arch: arch
         )
+    }
+}
+
+struct Release: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "scripts/ship's JSON and appcast checks.",
+        subcommands: [Catalog.self, AmoreID.self, Appcast.self]
+    )
+
+    struct Catalog: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Per ID: \"<id> <sha1> <bytes> <url> <mirror url>...\" from the firmware catalog's source."
+        )
+        @Argument(transform: path) var catalog: URL
+        @Argument var ids: [String]
+
+        func run() throws {
+            for line in try ReleaseHelper.catalog(catalog, ids: ids) { print(line) }
+        }
+    }
+
+    struct AmoreID: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "amore-id",
+            abstract:
+                "The Amore release of BUILD: \"<id> <downloadURL>\" from the upload's answer, else the cached ones."
+        )
+        @Argument var build: Int
+        @Argument var bundleID: String
+        @Argument(transform: path) var files: [URL]
+
+        func run() throws { print(try ReleaseHelper.amoreID(build: build, bundleID: bundleID, files: files)) }
+    }
+
+    struct Appcast: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "The appcast's item for BUILD carries NOTES and an edSignature of DMG valid for KEY."
+        )
+        @Argument(transform: path) var appcast: URL
+        @Argument var build: String
+        @Argument var key: String
+        @Argument(transform: path) var dmg: URL
+        @Argument(transform: path) var notes: URL
+
+        func run() throws {
+            try ReleaseHelper.appcast(appcast, build: build, key: key, dmg: dmg, notes: notes)
+            print("appcast: build \(build) carries the notes and a valid edSignature")
+        }
     }
 }
 

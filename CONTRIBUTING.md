@@ -78,7 +78,7 @@ device), `FIRMWAREKIT_IBOOT_PATCHER`/`IBOOT32PATCHER` (another iBoot32Patcher; D
 
 ## Releases
 
-A release is an Xcode archive; nothing edits the bundle after Xcode.
+A release is an Xcode archive made by `scripts/ship`; nothing edits the bundle after Xcode.
 
 1. **`scripts/vendor`**, once per pin change (`build-support/sources.json`, `dependencies.json`, the patches or the
    recipes in `build-support/recipes`). It builds what Xcode can't, from the pins, into `~/Developer/ltm-vendor.noindex/<pin-hash>/`
@@ -98,53 +98,54 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    scripts/vendor" when there is none, rather than build with another pin's, or when the checkout's
    `MachineOptions.swift` isn't the one written there. `LTM_VENDOR_ROOT` counts for Debug builds
    only. A `VENDOR_DIR` in `Configuration/Local.xcconfig` is held to the current pins the same way.
-2. **Xcode ▸ Product ▸ Archive** (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID). The archive's
-   Copy Files phases bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity
-   and the hardened runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`: allow-jit, library validation on; a Debug build uses `LightTouchDevice-Debug.entitlements`, which also disables library validation for a development dylib).
-   Archiving takes only Xcode's own time.
-3. **Test the archive**: `TEST_RUNNER_LTM_RELEASE_ARCHIVE=path/to/X.xcarchive xcodebuild test -skipMacroValidation -workspace
-   LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Release` (`TEST_RUNNER_LTM_RELEASE_APP` takes an app
-   instead). `Packages/ReleaseChecks` checks the archived app: it is built from the current pins; every Mach-O
+2. **`scripts/ship --notes notes.md [--title T] [--commit REV] [--archive X.xcarchive] [--dry-run]`**, the only way to
+   make a release, from a clean checkout at origin/main (or REV). Preflight: Xcode is exactly the build
+   `build-support/sources.json` pins (`xcode.build`; `scripts/ship --pin-xcode` records the selected one, then commit
+   it), the tree is clean at the commit, the notes are there and hold no template text such as TODO, the notary key,
+   the Developer ID identity, `amore whoami`, `gh auth status`, disk, and `scripts/host-ready` (waited on). Then every
+   IPSW the vendor step and the Release plan need goes into the app's IPSW cache (a local copy with the catalog's
+   SHA-1 found under `LTM_IPSW_DIRS` or `LTM_BUILT_IN_IPSW`, else downloaded and checked), `scripts/vendor --release`,
+   and `xcodebuild archive` (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID, only the package versions
+   `Package.resolved` records; `--archive` restarts with an archive made before). The archive's Copy Files phases
+   bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity and the hardened
+   runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`: allow-jit,
+   library validation on; a Debug build uses `LightTouchDevice-Debug.entitlements`, which also disables library
+   validation for a development dylib). Nothing edits the bundle after Xcode.
+
+   It exports for Developer ID (`Configuration/ExportOptions.plist`), notarizes a zip of the app (`notarytool submit
+   --wait`; on Invalid it prints the log), staples and validates the ticket, and writes `LightTouchMac-universal.zip`
+   (`ditto -c -k --keepParent` of the stapled app) and `SHA256SUMS` beside the exported app. Then the Release plan
+   (`Packages/ReleaseChecks`) on the stapled app as an export: the app is built from the current pins; every Mach-O
    signed, hardened, universal, with the declared entitlements and an in-bundle load closure at the app's minimum
    macOS; the bundled helper, services worker and bridge run from the bundle and the helper loads the bundled
    emulator; bundle hygiene (licenses, sources, Help, no local paths, the built-in iPod's placeholder identity,
-   stripped, no duplicates, nothing loose under `Resources`, the guest archive included); the identity scan; and the
-   bundled `firmwarekit` unpacks the built-in iPod, which `sessions single` (tests/sessions) boots through
-   the bundled helper, dylib, services worker and usbmuxd; and the prepare matrix: the bundled `firmwarekit create`,
-   with its default helper and guest tools, prepares one firmware per preparation route (n45ap-4A102, n72ap-7E18,
-   k48ap-7B500, n90ap-8A293, n88ap-10B500; two at a time) and each is booted the same way. Their IPSWs come from the
-   app's IPSW cache (the catalog's sha1); a missing one fails the plan. `TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE=1`
-   skips the matrix, for development runs only.
-4. **Notarize and make the download**, either way; both write `LightTouchMac-universal.zip` (`ditto -c -k
-   --keepParent` of the stapled app) and `SHA256SUMS` naming it beside the exported app, since Xcode has no hook
-   after notarization:
-   - **`scripts/release path/to/X.xcarchive [--dry-run] [--amore --notes notes.md [--publish]]`**: exports for
-     Developer ID (`Configuration/ExportOptions.plist`), notarizes a zip of the app (`notarytool submit --wait`; on
-     Invalid it prints the log), staples and validates the ticket, writes the download, then runs the Release
-     plan's static checks on the stapled app as an export, its boots (the built-in iPod and the prepare matrix,
-     run once more if they fail; `LTM_RELEASE_SKIP_PREPARE=1` skips the matrix with `--dry-run` and is refused
-     without it) and `spctl -a -vv`. With `--amore` (the notes are required, and must not be empty or hold template
-     text such as TODO): Amore makes an unsigned DMG of the stapled app (`--skip-notarization`), which is signed with
-     the app's own Developer ID identity (or `LTM_SIGN_IDENTITY`), notarized, stapled, checked by Gatekeeper and
-     uploaded as a draft with the notes; the CDN's copy must have the DMG's SHA-256 and pass Gatekeeper.
-     `--publish` then publishes the draft and checks the appcast's item for the build: the notes as its
-     `<description>` and an `edSignature` of the CDN's DMG valid for the app's `SUPublicEDKey`
-     (`scripts/release-helper.swift`). The last line is `PASS release … <zip>` or `FAIL <step> <work>`.
-     `--dry-run` skips notarizing, stapling and everything Amore does.
-   - **`scripts/ship --notes notes.md [--title T] [--commit REV] [--dry-run]`**, the whole release from a clean
-     checkout at origin/main (or REV): preflight (clean tree at the commit, the notes, the notary key, the
-     Developer ID identity, `amore whoami`, `gh auth status`, disk, `scripts/host-ready`, waited on), every IPSW the
-     vendor step and the Release plan need into the app's IPSW cache (a local copy with the catalog's SHA-1 found
-     under `LTM_IPSW_DIRS` or `LTM_BUILT_IN_IPSW`, else downloaded and checked), `scripts/vendor`, `xcodebuild
-     archive`, `scripts/release --amore --publish`, `gh release create v<version>-<YYYY.MM.DD>[b|c|…]` with the
-     zip and SHA256SUMS, a line in `releases.log`, and only the newest two archives and exports kept. Its work
-     and log go in `~/Developer/ltm-int-rel` (`LTM_RELEASE_DIR`); it ends `PASS released build N (tag) <log>`.
-     `--dry-run` runs through the release's checks without notarizing or uploading and prints what Amore, GitHub
-     and the record would get. The header of `scripts/ship` lists its settings.
+   stripped, no duplicates, nothing loose under `Resources`, the guest archive included); the identity scan;
+   Gatekeeper and the ticket; and the boots, run once more if they fail: the bundled `firmwarekit` unpacks the
+   built-in iPod, which `sessions single` (tests/sessions) boots through the bundled helper, dylib, services worker
+   and usbmuxd, and the prepare matrix: the bundled `firmwarekit create`, with its default helper and guest tools,
+   prepares one firmware per preparation route (`Packages/ReleaseChecks/boots.json`: n45ap-4A102, n72ap-7E18,
+   k48ap-7B500, n90ap-8A293, n88ap-10B500; two at a time) and each is booted the same way.
 
-   Notarization (both scripts) uses an App Store Connect API key when one is configured, read from the environment
-   or, for any it leaves unset, from `~/.config/lighttouch/notary.env` (mode 600; `LTM_NOTARY_CONFIG` moves it),
-   which is never committed:
+   Then Amore makes an unsigned DMG of the stapled app (`--skip-notarization`), which is signed with the app's own
+   Developer ID identity (or `LTM_SIGN_IDENTITY`), notarized, stapled, checked by Gatekeeper and uploaded as a draft
+   with the notes; the CDN's copy must have the DMG's SHA-256 and pass Gatekeeper; the draft is published, and the
+   appcast's item for the build must carry the notes as its `<description>` and an `edSignature` of the CDN's DMG
+   valid for the app's `SUPublicEDKey` (`scripts/ltm-build release`). Last, `gh release create
+   v<version>-<YYYY.MM.DD>[b|c|…]` with the zip and SHA256SUMS, a line in `releases.log`, and only the newest two
+   archives and exports kept. Its work and log go in `~/Developer/ltm-int-rel` (`LTM_RELEASE_DIR`); it ends `PASS
+   released build N (tag) <log>`. `--dry-run` runs through the release's checks without notarizing, stapling or
+   uploading and prints what Amore, GitHub and the record would get; `LTM_RELEASE_SKIP_PREPARE=1` also skips the
+   prepare matrix, in a dry run only. The header of `scripts/ship` lists its settings. (`scripts/release ARCHIVE
+   --notes notes.md` still runs `scripts/ship --archive` for now; it is deprecated and goes after the next real
+   release.)
+
+   The Release plan alone, on a built app: `TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test
+   -skipMacroValidation -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Release`
+   (`TEST_RUNNER_LTM_RELEASE_ARCHIVE` takes an archive; `TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE=1` skips the matrix, for
+   development runs only; a missing IPSW fails the plan).
+
+   Notarization uses an App Store Connect API key, read from the environment or, for any it leaves unset, from
+   `~/.config/lighttouch/notary.env` (mode 600; `LTM_NOTARY_CONFIG` moves it), which is never committed:
 
    ```sh
    LTM_NOTARY_KEY=$HOME/.appstoreconnect/private_keys/AuthKey_<key id>.p8
@@ -154,10 +155,8 @@ A release is an Xcode archive; nothing edits the bundle after Xcode.
    LTM_SIGN_IDENTITY=Developer ID Application: <name> (<team>)
    ```
 
-   The key is an App Store Connect team key with the Developer role (Users and Access ▸ Integrations); the scripts
-   pass its path to `notarytool --key` and never print it. Without one, `scripts/release` falls back to the
-   `ltm-notary` keychain profile (`xcrun notarytool store-credentials ltm-notary`), which needs an unlocked login
-   keychain; `scripts/ship` requires the key.
+   The key is an App Store Connect team key with the Developer role (Users and Access ▸ Integrations); `scripts/ship`
+   passes its path to `notarytool --key` and never prints it.
 
 ## Gates
 
@@ -175,7 +174,7 @@ swift run --package-path tests/sessions sessions single BASE --managed
 swift run --package-path tests/sessions sessions single OLD_DEVICE --expect-admission STEP
 swift run --package-path tests/sessions sessions phone N90_BASE --only carrier --overlay PAST_SETUP_OVERLAY
 swift run --package-path tests/sessions sessions local-network N72_BASE
-# a built app (Releases, step 3)
+# a built app (Releases, step 2)
 TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -skipMacroValidation -workspace LightTouchMac.xcworkspace \
     -scheme LightTouchMac -testPlan Release
 ```
@@ -193,7 +192,7 @@ directory and fails a run that touched the real `app.log`.
 | `Packages/*/Tests`, `Unit.xctestplan` | Swift Testing: LightTouchCoreTests (the app's logic), HostRuntimeTests, FirmwareKitTests, HostServiceWireTests, ReleaseChecksTests' fixtures, BuildToolsTests (the native merge, the dependency sources, the repository's format and lint). LightTouchCore's tests run one at a time in a private home (Tests/TestIsolation) |
 | `tests/offline/` | A Swift package (OfflineTests, in the Unit plan) for what needs the app target's own files: AppKit views rendered offscreen, the display's input and layout, the helper's C API version and LCD color, the services engine against a fake libimobiledevice. The production files are compiled whole through symlinks beside small stand-ins; no window is ordered in |
 | `tests/sessions/` | A Swift package: `sessions` (the checks and their verdicts), the drivers that stand in for the app (`session-driver`: the app's session code; `helper-driver`: DeviceLink straight to the helper), and SessionKit (frame references, the Home verdict, the Setup walks), whose tests are in the Unit plan |
-| `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `format-hook.sh`: the pre-commit formatter in a scratch repository; `host-ready.sh`; `ship.sh`: scripts/ship's and scripts/release's tags, notes, notary config, IPSW fill, pruning, argument checks and release-helper.swift), run by hand |
+| `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `format-hook.sh`: the pre-commit formatter in a scratch repository; `host-ready.sh`; `ship.sh`: scripts/ship's tags, notes, Xcode pin, notary config, IPSW fill, pruning, argument checks and `ltm-build release`), run by hand |
 | `tests/activation/`, `tests/fixtures/` | C harnesses run by hand (`tests/activation/run.sh`: the activation finish and the lockdown zone writes); the fake preparer (`fake-firmwarekit`, bash), the store fixtures and `machines.json` the tests share |
 | `swift test --package-path Packages/FirmwareKit` | Also runs FirmwareKit's suites alone. Optional corpus tests report real skips unless `FK_TEST_CORPUS=1` or `FK_REQUIRE_FIXTURES=1` selects them; selected missing inputs fail. Format/bake oracle checks compare against qemu-ios's imgtools through `FIRMWAREKIT_QEMU_IOS` |
 
@@ -299,7 +298,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `Packages/ReleaseChecks/` | The checks of a built app (`Release.xctestplan`): signatures, entitlements, slices and load closure, bundle hygiene, the bundled tools, boots through the bundle |
 | `Packages/DeviceServices/` | One device's stock lockdown services: `HostServiceWire` (the request/event protocol, errors, timeouts, device paths, the Home screen layout) and `HostServiceClient` (the app's `DeviceServices` calls, `HostServiceWorkers`, `NotificationProxy`) |
 | `Packages/FirmwareKit/` | `FirmwareKit` (IPSW → device), `FirmwareSchema` (the wire types, `StorageCapacity`, `DeveloperTools`, `GuestArchive`: what the app links), the `firmwarekit` CLI (`Sources/FirmwareKitCLI`), `CActivation` |
-| `scripts/` | `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check`, `ltm-build` (Packages/BuildTools: vendor, machine-options, check-macho, merge-native, sources), `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
+| `scripts/` | `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check`, `ltm-build` (Packages/BuildTools: vendor, machine-options, release, check-macho, merge-native, sources), `ship` (and the deprecated `release`, which runs it) |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `sources.json` and `dependencies.json` (the pins), `recipes/` (the native builds `scripts/vendor` runs: `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-angle.sh`), build patches and checks |
 | `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), the targets' `App`, `Device`, `Services` and `Tool.xcconfig`, `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |

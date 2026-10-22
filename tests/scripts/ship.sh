@@ -1,8 +1,9 @@
 #!/bin/bash
-# scripts/ship's and scripts/release's logic that needs no Apple service: the next free tag, the notes check, the
-# notary config (environment, file, mode, partial keys), filling the IPSW cache (a local clone, a wrong copy refused,
-# a download checked), pruning old archives, the argument checks both scripts make before any work, and
-# release-helper.swift's catalog, release-id and appcast checks (a real Ed25519 signature, a tampered DMG).
+# scripts/ship's logic that needs no Apple service: the next free tag, the notes check, the Xcode pin (the running build
+# against build-support/sources.json's, both ways, and --pin-xcode), the notary config (environment, file, mode,
+# partial keys), filling the IPSW cache (a local clone, a wrong copy refused, a download checked), pruning old
+# archives, the argument checks it makes before any work (and the deprecated scripts/release's hand-over), and
+# `ltm-build release`'s catalog, Amore id and appcast checks (a real Ed25519 signature, a tampered DMG).
 # Prints ok/FAIL per check; exits 1 on any FAIL.
 #     tests/scripts/ship.sh
 set -uo pipefail
@@ -13,7 +14,7 @@ T="$(cd "$T" && pwd -P)"
 failed=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; failed=1; fi; }
 source "$SRC/scripts/ship"
-HELPER=(swift "$SRC/scripts/release-helper.swift")
+HELPER=("$SRC/scripts/ltm-build" release)
 
 # tags
 check "a free date is the bare tag" '[[ "$(next_tag v1.0-2026.10.21)" == v1.0-2026.10.21 ]]'
@@ -33,9 +34,9 @@ check "template text fails" '[[ "$(notes_problem "$T/todo.md")" == *"template te
 # notary config, each in a clean environment
 touch "$T/key.p8"
 nc() { env -i HOME="$T/home" PATH="$PATH" LTM_NOTARY_CONFIG="$T/notary.env" "$@" bash -c \
-    'source "$1"; notary_config || exit 1; echo "$NOTARY_FROM|${NOTARY[*]}|${LTM_SIGN_IDENTITY:-}"' _ "$SRC/scripts/release-common.sh"; }
+    'source "$1"; notary_config || exit 1; echo "$NOTARY_FROM|${NOTARY[*]}|${LTM_SIGN_IDENTITY:-}"' _ "$SRC/scripts/ship"; }
 mkdir -p "$T/home"
-check "nothing configured is the keychain profile" '[[ "$(nc)" == "keychain|--keychain-profile ltm-notary|" ]]'
+check "nothing configured is refused (no keychain profile)" '[[ "$(nc)" == "no App Store Connect API key"* ]]'
 check "the environment's key" '[[ "$(nc LTM_NOTARY_KEY="$T/key.p8" LTM_NOTARY_KEY_ID=K LTM_NOTARY_ISSUER=I)" == "the environment|--key $T/key.p8 --key-id K --issuer I|" ]]'
 check "a partial key is refused" '[[ "$(nc LTM_NOTARY_KEY_ID=K)" == *"go together"* ]]'
 check "a missing .p8 is refused" '[[ "$(nc LTM_NOTARY_KEY="$T/none.p8" LTM_NOTARY_KEY_ID=K LTM_NOTARY_ISSUER=I)" == *"no readable file" ]]'
@@ -48,6 +49,22 @@ check "the config file's key, quotes and ~ undone" '[[ "$(nc)" == "$T/notary.env
 check "the environment wins over the file" '[[ "$(nc LTM_NOTARY_KEY_ID=ENVKEY)" == *"--key-id ENVKEY --issuer FILEISS"* ]]'
 printf 'LTM_NOTARY_KEY=$HOME/key.p8\nLTM_NOTARY_KEY_ID=K\nLTM_NOTARY_ISSUER=I\n' > "$T/notary.env"
 check "a config path from \$HOME" '[[ "$(nc)" == *"|--key $T/home/key.p8 --key-id K "* ]]'
+
+# the Xcode pin
+printf '{"xcode": {"build": "27A266a", "comment": "x"}, "q": {"build_dir": "b"}}\n' > "$T/sources.json"
+check "the pinned Xcode passes" '[[ -z "$(xcode_problem "$T/sources.json" "$(printf "Xcode 27.0\nBuild version 27A266a")")" ]]'
+check "another Xcode is refused, saying how to pin it" \
+    '[[ "$(xcode_problem "$T/sources.json" "$(printf "Xcode 27.1\nBuild version 27B5")")" == "Xcode 27B5 is not the pinned 27A266a:"*"scripts/ship --pin-xcode"* ]]'
+check "no Xcode is refused" '[[ "$(xcode_problem "$T/sources.json" "")" == "Xcode (none) is not the pinned 27A266a:"* ]]'
+check "a sources.json without a pin is refused" '[[ "$(xcode_problem "$T/notes.md" "Build version 27A266a")" == *"pins no Xcode build" ]]'
+mkdir -p "$T/xcode/bin" "$T/repo/scripts" "$T/repo/build-support"
+printf '#!/bin/sh\nprintf "Xcode 27.9\\nBuild version 27Z9\\n"\n' > "$T/xcode/bin/xcodebuild"
+chmod +x "$T/xcode/bin/xcodebuild"
+check "ship refuses another Xcode before any work" \
+    'out="$(PATH="$T/xcode/bin:$PATH" "$SRC/scripts/ship" --notes "$T/notes.md" 2>&1)"; [[ $? == 2 && "$out" == "FAIL preflight: Xcode 27Z9 is not the pinned "* ]]'
+cp "$SRC/scripts/ship" "$T/repo/scripts/" && cp "$T/sources.json" "$T/repo/build-support/"
+check "--pin-xcode records the selected Xcode's build and nothing else" \
+    'PATH="$T/xcode/bin:$PATH" "$T/repo/scripts/ship" --pin-xcode >/dev/null && [[ "$(cat "$T/repo/build-support/sources.json")" == "{\"xcode\": {\"build\": \"27Z9\", \"comment\": \"x\"}, \"q\": {\"build_dir\": \"b\"}}" ]]'
 
 # IPSWs
 BUILT_IN=n72ap-7E18
@@ -80,17 +97,20 @@ mkdir -p "$T/X.xcarchive"
 refused() { out="$(LTM_NOTARY_CONFIG="${LTM_NOTARY_CONFIG:-/none}" "$@" 2>&1)"; [[ $? == 2 && "$out" == FAIL* ]]; }
 check "ship needs --notes" 'refused "$SRC/scripts/ship"'
 check "ship refuses empty notes" 'refused "$SRC/scripts/ship" --notes "$T/blank.md"'
-check "release --amore needs --notes" 'refused "$SRC/scripts/release" "$T/X.xcarchive" --amore'
-check "release --amore refuses template notes" 'refused "$SRC/scripts/release" "$T/X.xcarchive" --amore --notes "$T/todo.md"'
-check "release --publish needs --amore" 'refused "$SRC/scripts/release" "$T/X.xcarchive" --publish'
-check "release refuses a partial key" 'LTM_NOTARY_CONFIG=/none LTM_NOTARY_KEY_ID=K refused "$SRC/scripts/release" "$T/X.xcarchive" --dry-run'
+check "ship refuses a missing archive" 'refused "$SRC/scripts/ship" --notes "$T/notes.md" --archive "$T/none.xcarchive"'
+check "ship refuses a skipped prepare matrix outside a dry run" 'LTM_RELEASE_SKIP_PREPARE=1 refused "$SRC/scripts/ship" --notes "$T/notes.md"'
+check "ship refuses a partial key" 'LTM_NOTARY_KEY_ID=K refused "$SRC/scripts/ship" --notes "$T/notes.md" --dry-run'
+check "ship refuses no key" 'refused "$SRC/scripts/ship" --notes "$T/notes.md" --dry-run'
+check "the deprecated release hands its archive and notes to ship" \
+    '[[ "$("$SRC/scripts/release" "$T/X.xcarchive" --amore --notes "$T/todo.md" --publish 2>&1)" == *"running scripts/ship --archive $T/X.xcarchive --notes $T/todo.md"*"FAIL preflight: the notes at $T/todo.md still have template text"* ]]'
+check "the deprecated release still needs an archive" 'refused "$SRC/scripts/release" --amore'
 
 # the Amore release's id: the upload's answer first, else this app's cached details
 printf 'Uploading…\n{"release":{"bundleVersion":1601,"id":"AAAAAAAA-0000-0000-0000-000000000001","downloadURL":"https://cdn/x.dmg"}}\n' > "$T/upload.json"
 printf '{"bundleIdentifier":"other.app","releases":[{"bundleVersion":1601,"id":"BAD","downloadURL":"https://cdn/bad.dmg"}]}' > "$T/other.json"
 printf '{"bundleIdentifier":"gold.samhenri.LightTouchMac","releases":[{"bundleVersion":1600,"id":"OLD","downloadURL":"u"},{"bundleVersion":1601,"id":"CACHED","downloadURL":"https://cdn/c.dmg"}]}' > "$T/details.json"
-check "the id from the upload's answer" '[[ "$("${HELPER[@]}" release 1601 gold.samhenri.LightTouchMac "$T/upload.json" "$T/details.json")" == "AAAAAAAA-0000-0000-0000-000000000001 https://cdn/x.dmg" ]]'
-check "else from this app's cache, not another app's" '[[ "$("${HELPER[@]}" release 1601 gold.samhenri.LightTouchMac "$T/blank.md" "$T/other.json" "$T/details.json")" == "CACHED https://cdn/c.dmg" ]]'
+check "the id from the upload's answer" '[[ "$("${HELPER[@]}" amore-id 1601 gold.samhenri.LightTouchMac "$T/upload.json" "$T/details.json")" == "AAAAAAAA-0000-0000-0000-000000000001 https://cdn/x.dmg" ]]'
+check "else from this app's cache, not another app's" '[[ "$("${HELPER[@]}" amore-id 1601 gold.samhenri.LightTouchMac "$T/blank.md" "$T/other.json" "$T/details.json")" == "CACHED https://cdn/c.dmg" ]]'
 
 # the appcast: notes as HTML and an edSignature made here
 printf 'disk image' > "$T/cdn.dmg"

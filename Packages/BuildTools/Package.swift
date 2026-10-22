@@ -1,8 +1,8 @@
 // swift-tools-version: 6.0
 // The build's own tools (scripts/ltm-build runs them): scripts/vendor (with HostRuntime's machine options from the
 // vendored QEMU), the Mach-O closure check of the native builds (ReleaseChecks' MachOClosure), the universal merge of
-// per-architecture native roots, and the pinned dependency sources (fetch, stage-git, note) with the native and static
-// build records.
+// per-architecture native roots, the pinned dependency sources (fetch, stage-git, note) with the native and static
+// build records, and scripts/ship's release checks (catalog, Amore id, appcast).
 import PackageDescription
 
 let package = Package(

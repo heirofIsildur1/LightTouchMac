@@ -30,7 +30,7 @@ what to do and not do on a shared Mac.
 - Unit tests: `xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit -skipMacroValidation`, or
   `swift test --package-path Packages/<Package>` for one package. Tests live in `Packages/*/Tests`, `tests/offline`
   and `tests/sessions` (CONTRIBUTING.md, Gates); the scripts' shell tests in `tests/scripts`.
-- `sessions`, `scripts/release` and `scripts/ship` end with one line, `PASS <summary> <log>` or
+- `sessions` and `scripts/ship` end with one line, `PASS <summary> <log>` or
   `FAIL <first failure> <log>`; exit 0 pass, 1 fail, 2 refused or stale input, 3 infrastructure. Read that line, not
   the logs.
 - Before booting emulators, `scripts/host-ready` prints `READY …` (exit 0) or `WAIT <why>` (exit 1: load, all three
