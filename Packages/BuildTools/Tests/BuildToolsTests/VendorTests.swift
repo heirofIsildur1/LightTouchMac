@@ -130,7 +130,7 @@ struct VendorTests {
         var previous = first
         for name in [
             "build-support/patches/new.patch", "Packages/ReleaseChecks/Sources/New.swift",
-            "scripts/build-static-deps.sh"
+            "build-support/recipes/build-static-deps.sh"
         ] {
             try Data("changed".utf8).write(to: dir.appendingPathComponent(name))
             let key = try vendor.pinKey()

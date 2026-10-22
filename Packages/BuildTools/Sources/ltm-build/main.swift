@@ -16,19 +16,70 @@ struct LTMBuild: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "ltm-build",
         subcommands: [
-            VendorCommand.self, CheckMachO.self, MergeNativeCommand.self, Sources.self, StaticRecord.self,
-            NativeRecord.self
+            VendorCommand.self, MachineOptionsCommand.self, CheckMachO.self, MergeNativeCommand.self, Sources.self,
+            StaticRecord.self, NativeRecord.self, QemuCommand.self
         ]
     )
 }
 
+/// This tool's own path and its `qemu` subcommand: a process hosting libqemu-arm.dylib.
+let qemuHost = [Bundle.main.executablePath ?? CommandLine.arguments[0], "qemu"]
+
 struct VendorCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "vendor", discussion: Vendor.usage)
     @Flag(help: "Print the vendor directory for the current pins.") var print = false
+    @Flag(help: "Only check what a build needs.") var check = false
+    @Flag(help: "Also prepare the built-in iPod (scripts/ship).") var release = false
 
     func run() throws {
         let vendor = Vendor(root: repository)
-        Swift.print(try print ? vendor.directory().path : vendor.build().path)
+        if print { return Swift.print(try vendor.directory().path) }
+        let missing = try vendor.problems(release: release)
+        for (what, how) in missing { Swift.print("missing: \(what)\n    \(how)") }
+        fflush(stdout)
+        guard missing.isEmpty else { throw ToolError("vendor: install the above, then run scripts/vendor again") }
+        if check { return Swift.print("vendor: everything a build needs is here") }
+        Swift.print(try vendor.build(release: release, qemuHost: qemuHost).path)
+    }
+}
+
+struct MachineOptionsCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "machine-options",
+        abstract: "Print HostRuntime's MachineOptions.swift for a libqemu-arm.dylib (scripts/vendor writes it).",
+        discussion: "Default: the current pins' vendor directory's dylib."
+    )
+    @Argument(transform: path) var dylib: URL?
+
+    func run() throws {
+        let library =
+            try dylib ?? Vendor(root: repository).directory().appendingPathComponent("Frameworks/libqemu-arm.dylib")
+        print(
+            try MachineOptions.source(
+                qemu: qemuHost + [library.path],
+                machines: repository.appendingPathComponent("tests/fixtures/machines.json")
+            ),
+            terminator: ""
+        )
+    }
+}
+
+struct QemuCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "qemu",
+        abstract: "Run a libqemu-arm.dylib's qemu_ios_main with these arguments (machine-options' QMP host).",
+        shouldDisplay: false
+    )
+    @Argument var dylib: String
+    @Argument(parsing: .captureForPassthrough) var arguments: [String] = []
+
+    func run() throws {
+        guard let handle = dlopen(dylib, RTLD_NOW | RTLD_LOCAL), let main = dlsym(handle, "qemu_ios_main") else {
+            throw ToolError("qemu: \(String(cString: dlerror()))")
+        }
+        typealias Main = @convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Int32
+        var argv = (["qemu"] + arguments).map { strdup($0) } + [nil]
+        throw ExitCode(unsafeBitCast(main, to: Main.self)(Int32(argv.count - 1), &argv))
     }
 }
 

@@ -9,7 +9,7 @@
 set -euo pipefail
 CHECKOUT="${1:?usage: build-angle.sh checkout out-dir}"
 OUT="${2:?usage: build-angle.sh checkout out-dir}"
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
+HERE="$(cd "$(dirname "$0")/../.." && pwd)"
 DEPS="$HERE/build-support/dependencies.json"
 NINJA="${NINJA:-$(command -v ninja)}"   # resolved before depot_tools' wrapper shadows it on PATH
 [ -x "$NINJA" ] || { echo "missing build tool: ninja" >&2; exit 1; }
@@ -65,5 +65,5 @@ cp "$PATCH" "$OUT/licenses/"
 printf '%s\n' "ANGLE $COMMIT: $URL (depot_tools $TOOLS; the rest from its DEPS)" \
     "License: $LICENSE (LICENSE); libGLESv2 links in Abseil (Apache-2.0, LICENSE.abseil-cpp) and zlib (Zlib, LICENSE.zlib)." \
     "Modified: $(basename "$PATCH") (alongside) applied to that source." \
-    "Built by scripts/build-angle.sh: gn args $ARGS, for ${LTM_ARCH:-arm64 x86_64}." \
+    "Built by build-support/recipes/build-angle.sh: gn args $ARGS, for ${LTM_ARCH:-arm64 x86_64}." \
     "The emulator opens libEGL and libGLESv2 for its experimental ANGLE renderer (Settings ▸ General)." > "$OUT/licenses/SOURCE.txt"

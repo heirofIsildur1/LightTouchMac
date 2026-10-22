@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run after scripts/build-iboot32patcher.sh; uses synthetic instructions only.
+# Run after build-support/recipes/build-iboot32patcher.sh; uses synthetic instructions only.
 set -euo pipefail
 PATCHER="${1:?usage: check-iboot-rsa.sh extracted-patched-source-dir}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

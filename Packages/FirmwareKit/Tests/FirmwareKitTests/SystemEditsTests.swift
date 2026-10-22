@@ -31,7 +31,7 @@ enum K48Oracle {
 
     static var available: Bool { sources.values.allSatisfy(Oracle.exists) }
 
-    /// FIRMWAREKIT_GUEST_TOOLS: a flat guest-tools directory (build-guest-tools.sh's ipad-guest-tools, or the app's
+    /// FIRMWAREKIT_GUEST_TOOLS: a flat guest-tools directory (qemu-ios export-guest-artifacts.sh's ipad-guest-tools, or the app's
     /// Resources/guest-tools) that stands in for the qemu-ios build outputs where those aren't built.
     static let guestTools = ProcessInfo.processInfo.environment["FIRMWAREKIT_GUEST_TOOLS"].map {
         URL(fileURLWithPath: $0)

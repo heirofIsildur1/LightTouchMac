@@ -6,7 +6,8 @@
 #     scripts/vendor-check           Xcode's first phase (LightTouchServices): with VENDOR_DIR at its default,
 #                                    $(SRCROOT)/build/vendor, point that link at the current pins' directory; with
 #                                    VENDOR_DIR set in Local.xcconfig, check that it is the current
-#                                    pins' directory. Either way a missing or stale one fails the build.
+#                                    pins' directory. Either way a missing or stale one fails the build, and so
+#                                    does a MachineOptions.swift that isn't the one scripts/vendor wrote there.
 #
 # The key is the first 12 hex digits of a SHA-256 over every keyed file's relative path and content (directories
 # walked in byte order, without .build or .DS_Store, symlinks to files followed, symlinks to directories skipped).
@@ -19,8 +20,7 @@ pin_key() (
     cd "$ROOT"
     shopt -s dotglob nullglob
     local names=(
-        build-support/sources.json build-support/dependencies.json scripts/build-package-native.sh
-        scripts/build-static-deps.sh scripts/build-iboot32patcher.sh scripts/build-angle.sh
+        build-support/sources.json build-support/dependencies.json build-support/recipes
         build-support/developer-disk-images.json build-support/checks
         Packages/BuildTools/Package.swift Packages/BuildTools/Sources Packages/ReleaseChecks/Sources
         build-support/patches/*
@@ -48,6 +48,15 @@ stale() {
     exit 1
 }
 
+# The -machine options of these pins' QEMU (scripts/vendor writes them into the vendor directory and the checkout).
+options() {
+    local generated="$1/MachineOptions.swift" checkout="$ROOT/Packages/HostRuntime/Sources/HostRuntime/MachineOptions.swift"
+    cmp -s "$generated" "$checkout" && return
+    [[ -f "$generated" ]] || stale "$1 has no MachineOptions.swift"
+    echo "error: $checkout is not the -machine options of these pins' QEMU: run scripts/vendor (it rewrites the file) and commit it" >&2
+    exit 1
+}
+
 default_root="$HOME/Developer/ltm-vendor.noindex"
 case "${1:-}" in
     --key) [[ -z "${2:-}" ]] || ROOT="$(cd "$2" && pwd)"; pin_key; exit ;;
@@ -66,9 +75,11 @@ if [[ "$VENDOR_DIR" == "$link" ]]; then
     dir="${root/#\~/$HOME}/$key"
     [[ -f "$dir/vendor.json" ]] || stale "$dir"
     [[ "$(readlink "$link" 2>/dev/null)" == "$dir" ]] || { mkdir -p "$(dirname "$link")"; ln -sfn "$dir" "$link"; }
+    options "$dir"
 else
     # An override (Local.xcconfig) must still be these pins' build.
     real="$(cd "$VENDOR_DIR" 2>/dev/null && pwd -P)" || stale "VENDOR_DIR $VENDOR_DIR is missing"
     [[ "$(basename "$real")" == "$key" && -f "$real/vendor.json" ]] \
         || stale "VENDOR_DIR $VENDOR_DIR is not $key; drop the override or point it there"
+    options "$real"
 fi

@@ -1,18 +1,27 @@
 import Foundation
 import ReleaseChecks
 
-/// scripts/vendor: what Xcode can't build, from the pins, into a cached vendor directory that Archive copies into the
-/// app (see `usage`).
+/// scripts/vendor: checks what a build needs, then builds what Xcode can't, from the pins, into a cached vendor
+/// directory that Archive copies into the app (see `usage`).
 public struct Vendor {
     public static let usage = """
-            scripts/vendor               build (or reuse) ~/Developer/ltm-vendor.noindex/<pin-hash>/
+            scripts/vendor               check, then build (or reuse) ~/Developer/ltm-vendor.noindex/<pin-hash>/
+            scripts/vendor --check       only check: print each missing piece and where to get it (exit 1 on any)
+            scripts/vendor --release     also the built-in iPod (scripts/ship; needs the n72ap-7E18 IPSW)
             scripts/vendor --print       print the vendor directory for the current pins
 
+        The one setup command, on a fresh Mac and after a pin bump. The checks: an Apple Silicon Mac, the macOS SDK,
+        the Homebrew build tools, the qemu-ios and usbmuxd checkouts holding their pinned commits, the iPhoneOS 3.1.3
+        and 3.2 SDKs and the SecureROMs (and with --release the built-in iPod's IPSW). Nothing here downloads or copies
+        Apple's software or firmware. Every run also writes HostRuntime's MachineOptions.swift from the vendored QEMU
+        (commit it when it changed; scripts/vendor-check fails the build while it differs).
+
         The pin hash covers build-support/sources.json (qemu-ios and usbmuxd commits), dependencies.json,
-        developer-disk-images.json, the patches, the native recipes and these tools (Packages/BuildTools, ReleaseChecks'
-        Mach-O check). A run with the vendor directory complete does nothing; the built-in iPod is prepared again when FirmwareKit, the helper or the guest tools changed.
-        Nothing here deletes a vendor directory. One run at a time: a second run waits for the first (a flock on
-        <vendor root>/.lock).
+        developer-disk-images.json, the patches, the recipes (build-support/recipes) and these tools
+        (Packages/BuildTools, ReleaseChecks' Mach-O check). A run with the vendor directory complete only writes the
+        machine options; with --release the built-in iPod is prepared again when FirmwareKit, the helper or the guest
+        tools changed. Nothing here deletes a vendor directory. One run at a time: a second run waits for the first (a
+        flock on <vendor root>/.lock).
 
         <vendor>/Frameworks/   libqemu-arm.dylib and its closure, ANGLE's libEGL and libGLESv2 (the emulator opens them
                                for its experimental ANGLE renderer), libimobiledevice-1.0 and libplist-2.0: universal,
@@ -24,9 +33,10 @@ public struct Vendor {
         <vendor>/dSYMs/        symbols of what Frameworks and MacOS ship stripped
         <vendor>/work/         build trees and logs (reused by reruns)
 
-        Inputs besides the pins: ARMV6_SDK (default ~/Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk), LTM_ASSETS (the
-        SecureROMs, default ~/Developer/qemu-ios-files), the n72ap-7E18 IPSW in the app's IPSW cache (or
-        LTM_BUILT_IN_IPSW), network for the pinned source archives. LTM_VENDOR_ROOT moves the cache (default
+        Inputs besides the pins: ARMV6_SDK (default ~/Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk), IPAD_SDK (the
+        iPhoneOS3.2.sdk), LTM_ASSETS (the SecureROMs, default ~/Developer/qemu-ios-files), with --release the
+        n72ap-7E18 IPSW in the app's IPSW cache (or LTM_BUILT_IN_IPSW), network for the pinned source archives.
+        QEMU_IOS_DIR and USBMUXD_SOURCE_DIR move the checkouts; LTM_VENDOR_ROOT moves the cache (default
         ~/Developer/ltm-vendor.noindex, which Spotlight leaves alone).
         """
 
@@ -44,9 +54,17 @@ public struct Vendor {
             environment["ARMV6_SDK"] ?? home.appendingPathComponent("Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk").path
         )
     }
+    var ipadSDK: URL {
+        url(
+            environment["IPAD_SDK"]
+                ?? assets.appendingPathComponent(
+                    "ipad1/sdk/x-iPhoneSDK3_2_2/Payload/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS3.2.sdk"
+                ).path
+        )
+    }
     var assets: URL { url(environment["LTM_ASSETS"] ?? home.appendingPathComponent("Developer/qemu-ios-files").path) }
     var ipswCache: URL { home.appendingPathComponent("Library/Caches/gold.samhenri.LightTouchMac/IPSW") }
-    var scripts: URL { root.appendingPathComponent("scripts") }
+    var recipes: URL { root.appendingPathComponent("build-support/recipes") }
     static let archs = ["arm64", "x86_64"], minos = "14.4"
     static let bootROMs = ["bootrom_240_4", "ipod1g/bootrom_s5l8900"]  // the iPod touch 2G's and 1G's SecureROMs
     static let developerImages = "build-support/developer-disk-images.json"
@@ -63,7 +81,7 @@ public struct Vendor {
         "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources", "Packages/ReleaseChecks/Sources"
     ]
     static let staticKeyed = [
-        "scripts/build-static-deps.sh", "build-support/dependencies.json",
+        "build-support/recipes/build-static-deps.sh", "build-support/dependencies.json",
         "build-support/patches/libplist-bin-limits.patch",
         "Packages/BuildTools/Sources/BuildTools/DependencySources.swift",
         "Packages/BuildTools/Sources/BuildTools/Records.swift"
@@ -116,7 +134,7 @@ public struct Vendor {
 
     /// `scripts/vendor-check --key`, the one implementation of the pin key (Xcode's first phase keys with it too).
     func pinKey() throws -> String {
-        try output(["/bin/bash", scripts.appendingPathComponent("vendor-check").path, "--key", root.path])
+        try output(["/bin/bash", root.appendingPathComponent("scripts/vendor-check").path, "--key", root.path])
     }
 
     public func directory() throws -> URL {
@@ -150,7 +168,7 @@ public struct Vendor {
         return tree
     }
 
-    /// ANGLE's universal libEGL and libGLESv2, headers and licenses (scripts/build-angle.sh), from gclient's checkout of
+    /// ANGLE's universal libEGL and libGLESv2, headers and licenses (build-support/recipes/build-angle.sh), from gclient's checkout of
     /// the pinned commit, cached under <vendor root>/angle-src/<commit>.
     func angle(_ work: URL) throws -> URL {
         let out = work.appendingPathComponent("angle")
@@ -166,7 +184,7 @@ public struct Vendor {
         try files.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
         try run(
             [
-                "/bin/bash", scripts.appendingPathComponent("build-angle.sh").path,
+                "/bin/bash", recipes.appendingPathComponent("build-angle.sh").path,
                 vendorRoot.appendingPathComponent("angle-src/\(commit)").path, out.path
             ],
             log: log,
@@ -194,20 +212,21 @@ public struct Vendor {
             remove(slice)
             try files.createDirectory(at: slice.deletingLastPathComponent(), withIntermediateDirectories: true)
             let e = env([
-                "LTM_ARCH": arch, "QEMU_IOS_DIR": qemu.path,
+                "LTM_ARCH": arch, "QEMU_IOS_DIR": qemu.path, "USBMUXD_SOURCE_DIR": checkout("usbmuxd").path,
+                "USBMUXD_COMMIT": pin("usbmuxd")["commit"] ?? "",
                 "LTM_STATIC_DEPS": staticRoot.appendingPathComponent("prefix").path, "LTM_ANGLE": angle.path
             ])
             if !Self.staticComplete(staticRoot) {
                 remove(staticRoot)
                 try files.createDirectory(at: staticRoot.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try run(
-                    ["/bin/bash", scripts.appendingPathComponent("build-static-deps.sh").path, staticRoot.path],
+                    ["/bin/bash", recipes.appendingPathComponent("build-static-deps.sh").path, staticRoot.path],
                     log: log,
                     environment: e
                 )
             }
             try run(
-                ["/bin/bash", scripts.appendingPathComponent("build-package-native.sh").path, slice.path],
+                ["/bin/bash", recipes.appendingPathComponent("build-package-native.sh").path, slice.path],
                 log: log,
                 environment: e
             )
@@ -216,7 +235,7 @@ public struct Vendor {
         try MergeNative.merge(output: universal, roots: Self.archs.map { work.appendingPathComponent("native/\($0)") })
         try run(
             [
-                "/bin/bash", scripts.appendingPathComponent("build-iboot32patcher.sh").path,
+                "/bin/bash", recipes.appendingPathComponent("build-iboot32patcher.sh").path,
                 work.appendingPathComponent("native/arm64/src").path,
                 universal.appendingPathComponent("build/iBoot32Patcher").path
             ],
@@ -251,16 +270,18 @@ public struct Vendor {
         return fd
     }
 
-    /// qemu-ios's guest export (build-guest-tools.sh), checked for what the app and firmwarekit read.
+    /// qemu-ios's guest export (contrib/export-guest-artifacts.sh, where its recipes are), checked for what the app and
+    /// firmwarekit read: guest-tools/ (the flat iPod set the app uploads), ipad-guest-tools/ (the flat directory
+    /// firmwarekit reads) and manifest.json (source commit, sha256 per input and output).
     func guest(_ work: URL, qemu: URL) throws -> (URL, [String: Any]) {
         let guestRoot = work.appendingPathComponent("guest")
         if !files.fileExists(atPath: guestRoot.appendingPathComponent("manifest.json").path) {
             say("guest tools")
             remove(guestRoot)
             try run(
-                ["/bin/bash", scripts.appendingPathComponent("build-guest-tools.sh").path, guestRoot.path],
+                ["/bin/bash", qemu.appendingPathComponent("contrib/export-guest-artifacts.sh").path, guestRoot.path],
                 log: work.appendingPathComponent("logs/guest.log"),
-                environment: env(["QEMU_IOS_DIR": qemu.path, "ARMV6_SDK": sdk.path])
+                environment: env(["ARMV6_SDK": sdk.path, "IPAD_SDK": ipadSDK.path])
             )
         }
         let manifest = try readJSON(guestRoot.appendingPathComponent("manifest.json"))
@@ -295,9 +316,32 @@ public struct Vendor {
         return payload
     }
 
-    /// firmwarekit (host slice) and the Release helper it boots, staged as an app would hold them; the checkouts of
-    /// FirmwareKit's packages and of the project's (the app's own, Sparkle among them), for their licenses.
-    func firmwarekit(_ work: URL) throws -> (tool: URL, helper: URL, checkouts: [URL]) {
+    /// The checkouts of FirmwareKit's packages and of the project's (the app's own, Sparkle among them), for their
+    /// licenses: where firmwarekit's build below finds them too.
+    func packageCheckouts(_ work: URL) throws -> [URL] {
+        let log = work.appendingPathComponent("logs/packages.log")
+        let scratch = work.appendingPathComponent("firmwarekit-build")
+        let packages = work.appendingPathComponent("xcode/packages")
+        try run(
+            [
+                "swift", "package", "resolve", "--package-path",
+                root.appendingPathComponent("Packages/FirmwareKit").path, "--scratch-path", scratch.path
+            ],
+            log: log
+        )
+        try run(
+            [
+                "xcodebuild", "-resolvePackageDependencies", "-project",
+                root.appendingPathComponent("LightTouchMac.xcodeproj").path, "-clonedSourcePackagesDirPath",
+                packages.path
+            ],
+            log: log
+        )
+        return [scratch.appendingPathComponent("checkouts"), packages.appendingPathComponent("checkouts")]
+    }
+
+    /// firmwarekit (host slice) and the Release helper it boots, staged as an app would hold them.
+    func firmwarekit(_ work: URL) throws -> (tool: URL, helper: URL) {
         let log = work.appendingPathComponent("logs/device.log")
         let scratch = work.appendingPathComponent("firmwarekit-build")
         let swift = [
@@ -318,8 +362,7 @@ public struct Vendor {
         )
         return (
             url(bin).appendingPathComponent("firmwarekit"),
-            work.appendingPathComponent("xcode/Release/LightTouchDevice"),
-            [scratch.appendingPathComponent("checkouts"), work.appendingPathComponent("xcode/packages/checkouts")]
+            work.appendingPathComponent("xcode/Release/LightTouchDevice")
         )
     }
 
@@ -344,14 +387,7 @@ public struct Vendor {
             at: stage.appendingPathComponent("Resources/Device"),
             withDestinationURL: vendor.appendingPathComponent("Resources/Device")
         )
-        let catalog = try readJSON(root.appendingPathComponent("LightTouchMac/Resources/firmware-catalog.json"))
-        guard
-            let entry = (catalog["entries"] as? [[String: Any]] ?? []).first(where: {
-                $0["id"] as? String == Self.builtIn
-            }),
-            let sha1 = (entry["source"] as? [String: Any])?["sha1"] as? String
-        else { throw ToolError("vendor: no \(Self.builtIn) in the catalog") }
-        let ipsw = url(environment["LTM_BUILT_IN_IPSW"] ?? ipswCache.appendingPathComponent("\(sha1).ipsw").path)
+        let (entry, ipsw) = try builtInIPSW()
         guard files.fileExists(atPath: ipsw.path) else {
             throw ToolError(
                 "vendor: no \(Self.builtIn) IPSW at \(ipsw.path) (download it in the app, or set LTM_BUILT_IN_IPSW)"
@@ -710,49 +746,154 @@ public struct Vendor {
         )
     }
 
-    /// Builds what is missing or stale; returns the vendor directory.
-    public func build() throws -> URL {
+    /// The built-in iPod's catalog entry and where its IPSW is (LTM_BUILT_IN_IPSW, else the app's IPSW cache).
+    func builtInIPSW() throws -> ([String: Any], URL) {
+        let catalog = try readJSON(root.appendingPathComponent("LightTouchMac/Resources/firmware-catalog.json"))
+        guard
+            let entry = (catalog["entries"] as? [[String: Any]] ?? []).first(where: {
+                $0["id"] as? String == Self.builtIn
+            }),
+            let sha1 = (entry["source"] as? [String: Any])?["sha1"] as? String
+        else { throw ToolError("vendor: no \(Self.builtIn) in the catalog") }
+        return (entry, url(environment["LTM_BUILT_IN_IPSW"] ?? ipswCache.appendingPathComponent("\(sha1).ipsw").path))
+    }
+
+    /// What this Mac lacks for a vendor build: each a line saying what is missing and one saying where to get it.
+    /// Nothing here downloads or copies Apple's software or firmware.
+    public func problems(release: Bool) throws -> [(String, String)] {
+        var missing: [(String, String)] = []
+        if (try? output(["/usr/bin/uname", "-m"])) != "arm64" {
+            missing.append(("an Apple Silicon Mac", "the native recipes build both slices from arm64"))
+        }
+        if (try? output(["xcrun", "--sdk", "macosx", "--show-sdk-path"])) == nil {
+            missing.append(("the macOS SDK", "xcode-select --install; open Xcode once to finish its setup"))
+        }
+        // tool: Homebrew formula (curl, make, file, lipo and xcrun come with macOS and Xcode)
+        let path = (environment["PATH"] ?? "").split(separator: ":")
+        let formulas = [
+            ("pkg-config", "pkgconf"), ("ninja", "ninja"), ("meson", "meson"), ("glibtoolize", "libtool"),
+            ("autoreconf", "autoconf"), ("automake", "automake"), ("python3.12", "python@3.12"), ("jq", "jq"),
+            ("ldid", "ldid")
+        ].filter { tool, _ in !path.contains { files.isExecutableFile(atPath: "\($0)/\(tool)") } }.map(\.1)
+        if !formulas.isEmpty {
+            let brew = formulas.joined(separator: " ")
+            missing.append(("build tools: \(brew)", "brew install \(brew)  (Homebrew: https://brew.sh)"))
+        }
+        for name in ["qemu-ios", "usbmuxd"] {
+            let dir = checkout(name)
+            let commit = pin(name)["commit"] ?? ""
+            let variable = name == "qemu-ios" ? "QEMU_IOS_DIR" : "USBMUXD_SOURCE_DIR"
+            let found = try? output(["git", "-C", dir.path, "cat-file", "-e", "\(commit)^{commit}"])
+            if found == nil {
+                missing.append(
+                    (
+                        "\(name) at \(commit) in \(dir.path) (\(variable) moves it)",
+                        "git clone -b \(pin(name)["branch"] ?? "main") \(pin(name)["repository"] ?? "") \(dir.path)  (or git -C \(dir.path) fetch)"
+                    )
+                )
+            }
+        }
+        if !files.fileExists(atPath: sdk.appendingPathComponent("usr/lib/libSystem.dylib").path) {
+            missing.append(
+                (
+                    "the iPhoneOS 3.1.3 SDK at \(sdk.path) (ARMV6_SDK)",
+                    "Apple's \"iPhone SDK 3.1.3 with Xcode 3.1.4\" disk image (developer.apple.com/download/all): its iPhoneOS3.1.3.sdk"
+                )
+            )
+        }
+        if !files.fileExists(atPath: ipadSDK.appendingPathComponent("usr/lib/libSystem.dylib").path) {
+            missing.append(
+                (
+                    "the iPhoneOS 3.2 SDK at \(ipadSDK.path) (IPAD_SDK)",
+                    "Apple's \"Xcode 3.2.2 and iPhone SDK 3.2\" disk image (developer.apple.com/download/all): its iPhoneOS3.2.sdk"
+                )
+            )
+        }
+        for name in Self.bootROMs where !files.fileExists(atPath: assets.appendingPathComponent(name).path) {
+            missing.append(
+                (
+                    "the SecureROM \(assets.appendingPathComponent(name).path) (LTM_ASSETS)",
+                    "a dump of the device's own SecureROM (iPod touch 2G: 240.4; iPod touch 1G: S5L8900); never in a repository"
+                )
+            )
+        }
+        if release {
+            let (entry, ipsw) = try builtInIPSW()
+            let source = entry["source"] as? [String: Any] ?? [:]
+            if !files.fileExists(atPath: ipsw.path) {
+                missing.append(
+                    (
+                        "the iPod touch 2G 3.1.3 (\(Self.builtIn)) IPSW at \(ipsw.path) (LTM_BUILT_IN_IPSW)",
+                        "download it in Light Touch, or: curl -L --create-dirs -o \"\(ipsw.path)\" \(source["url"] ?? "")  (sha1 \(source["sha1"] ?? ""))"
+                    )
+                )
+            }
+        }
+        return missing
+    }
+
+    /// HostRuntime's MachineOptions.swift from this vendor directory's QEMU, into the vendor directory (which
+    /// scripts/vendor-check compares) and the checkout. `qemu` runs a command hosting libqemu-arm.dylib.
+    func machineOptions(_ vendor: URL, qemu: [String]) throws {
+        let text = try MachineOptions.source(
+            qemu: qemu + [vendor.appendingPathComponent("Frameworks/libqemu-arm.dylib").path],
+            machines: root.appendingPathComponent("tests/fixtures/machines.json")
+        )
+        try text.write(to: vendor.appendingPathComponent("MachineOptions.swift"), atomically: true, encoding: .utf8)
+        let checkout = root.appendingPathComponent(MachineOptions.path)
+        if (try? String(contentsOf: checkout, encoding: .utf8)) != text {
+            try text.write(to: checkout, atomically: true, encoding: .utf8)
+            say("wrote \(MachineOptions.path) for the pinned QEMU: commit it")
+        }
+    }
+
+    /// Builds what is missing or stale (with `release`, the built-in iPod too) and writes the machine options;
+    /// returns the vendor directory. `qemuHost` runs a command hosting libqemu-arm.dylib (ltm-build qemu).
+    public func build(release: Bool, qemuHost: [String]) throws -> URL {
         let lock = try Self.lock(vendorRoot) { say("waiting for another scripts/vendor run to finish") }
         defer { close(lock) }
         let vendor = try directory()
         let work = vendor.appendingPathComponent("work")
-        let stamp = ["recipe": try treeHash(Self.tools), "device": try treeHash(Self.deviceSources)]
+        let recipe = try treeHash(Self.tools)
+        let device = try treeHash(Self.deviceSources)
         let done = vendor.appendingPathComponent("vendor.json")
-        let previous = ((try? readJSON(done)) ?? [:]).compactMapValues { $0 as? String }
-        if previous == stamp { return vendor }
-        for name in Self.bootROMs where !files.fileExists(atPath: assets.appendingPathComponent(name).path) {
-            throw ToolError("vendor: no SecureROM \(assets.appendingPathComponent(name).path) (LTM_ASSETS)")
-        }
-        try files.createDirectory(at: work, withIntermediateDirectories: true)
-        let qemu = try qemuTree(work)
-        let angle = try angle(work)
-        let universal = try native(work, qemu: qemu, angle: angle)
-        let (guestRoot, manifest) = try guest(work, qemu: qemu)
-        let developer = try developerTools(work, qemu: qemu)
-        let (tool, helper, checkouts) = try firmwarekit(work)
-        if previous["recipe"] != stamp["recipe"]
-            || !files.fileExists(atPath: vendor.appendingPathComponent("Frameworks/libqemu-arm.dylib").path)
-        {
-            try binaries(vendor, universal: universal, qemu: qemu, angle: angle, work: work)
-            try resources(
-                vendor,
-                work: work,
-                universal: universal,
-                qemu: qemu,
-                angle: angle,
-                guestRoot: guestRoot,
-                manifest: manifest,
-                developer: developer,
-                checkouts: checkouts
-            )
-        }
+        var record = ((try? readJSON(done)) ?? [:]).compactMapValues { $0 as? String }
         let blob = vendor.appendingPathComponent("Resources/Device/\(Self.builtIn).itbase")
-        if previous["device"] != stamp["device"] || previous["recipe"] != stamp["recipe"]
-            || !files.fileExists(atPath: blob.path)
-        {
-            try copy(try builtInDevice(vendor, work, guestRoot: guestRoot, tool: tool, helper: helper), blob)
+        let rebuild =
+            record["recipe"] != recipe
+            || !files.fileExists(atPath: vendor.appendingPathComponent("Frameworks/libqemu-arm.dylib").path)
+        let builtIn = release && (rebuild || record["device"] != device || !files.fileExists(atPath: blob.path))
+        if rebuild || builtIn {
+            try files.createDirectory(at: work, withIntermediateDirectories: true)
+            let qemu = try qemuTree(work)
+            let (guestRoot, manifest) = try guest(work, qemu: qemu)
+            if rebuild {
+                let angle = try angle(work)
+                let universal = try native(work, qemu: qemu, angle: angle)
+                let developer = try developerTools(work, qemu: qemu)
+                try binaries(vendor, universal: universal, qemu: qemu, angle: angle, work: work)
+                try resources(
+                    vendor,
+                    work: work,
+                    universal: universal,
+                    qemu: qemu,
+                    angle: angle,
+                    guestRoot: guestRoot,
+                    manifest: manifest,
+                    developer: developer,
+                    checkouts: try packageCheckouts(work)
+                )
+                // A built-in iPod from before is no longer this build's until --release prepares it again.
+                record = ["recipe": recipe]
+            }
+            if builtIn {
+                let (tool, helper) = try firmwarekit(work)
+                try copy(try builtInDevice(vendor, work, guestRoot: guestRoot, tool: tool, helper: helper), blob)
+                record["device"] = device
+            }
+            try writeJSON(record, to: done)
         }
-        try writeJSON(stamp, to: done)
+        try machineOptions(vendor, qemu: qemuHost)
         return vendor
     }
 }

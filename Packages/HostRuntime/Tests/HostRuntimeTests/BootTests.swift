@@ -173,7 +173,7 @@ struct BootTests {
     }
 
     /// Every option of every board's -machine line is one its machine declares (Board.machineOptions, listed from
-    /// qemu-ios by scripts/machine-options): QEMU stops at one it lacks before the guest runs, and the device never
+    /// qemu-ios by scripts/vendor): QEMU stops at one it lacks before the guest runs, and the device never
     /// lights. Each strategy a base can have, with every option a lock, the device record and the caller can add.
     @Test func everyMachineOptionIsDeclared() throws {
         let lock = [

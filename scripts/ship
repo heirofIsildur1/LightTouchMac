@@ -12,7 +12,7 @@
 #    IPSW cache (the catalog's sha1), cloned from a local copy with that SHA-1 (LTM_BUILT_IN_IPSW for the built-in iPod, then any .ipsw of the
 #    catalog's size under LTM_IPSW_DIRS, colon-separated, default ~/Developer/ipod2g-re/OldSDK,
 #    ~/Developer/qemu-ios-files and ~/Downloads), else downloaded from the catalog's URL or its mirrors and checked;
-#    then scripts/vendor.
+#    then scripts/vendor --release (the native build and the built-in iPod).
 # 3. xcodebuild archive (Release) to release-<commit>.xcarchive, then scripts/release on it: export, notarize,
 #    staple, the release zip and SHA256SUMS, the static checks and the boots (retried once).
 # 4. Amore (scripts/release --amore --publish): the DMG signed, notarized, stapled, uploaded with the notes, the
@@ -152,7 +152,7 @@ main() {
     done < "$WORK/ipsws.txt"
 
     step "vendor"
-    "$ROOT/scripts/vendor" > "$WORK/vendor.log" 2>&1 || { tail -20 "$WORK/vendor.log"; fail vendor "scripts/vendor (its log: $WORK/vendor.log)"; }
+    "$ROOT/scripts/vendor" --release > "$WORK/vendor.log" 2>&1 || { tail -20 "$WORK/vendor.log"; fail vendor "scripts/vendor --release (its log: $WORK/vendor.log)"; }
 
     step "archive"
     local archive="$RELDIR/release-$SHORT.xcarchive"

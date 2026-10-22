@@ -226,7 +226,7 @@
       "repository": "https://chromium.googlesource.com/angle/angle",
       "depot_tools": "9cb87e7cca51147a3b8f39033e561736f8460652",
       "license": "BSD-3-Clause",
-      "checksum_source": "SHA-256 calculated from this GitHub archive of ANGLE's main on 2026-10-21, which records the source; scripts/build-angle.sh builds from gclient's checkout of the same commit (repository, with depot_tools at depot_tools and the rest from ANGLE's DEPS), Metal only and static, linking in Abseil (Apache-2.0), zlib (Zlib) and zstd (BSD-3-Clause). The emulator opens its libEGL and libGLESv2 for the experimental ANGLE renderer (Settings ▸ General); the CGL renderer runs without them."
+      "checksum_source": "SHA-256 calculated from this GitHub archive of ANGLE's main on 2026-10-21, which records the source; build-support/recipes/build-angle.sh builds from gclient's checkout of the same commit (repository, with depot_tools at depot_tools and the rest from ANGLE's DEPS), Metal only and static, linking in Abseil (Apache-2.0), zlib (Zlib) and zstd (BSD-3-Clause). The emulator opens its libEGL and libGLESv2 for the experimental ANGLE renderer (Settings ▸ General); the CGL renderer runs without them."
     },
     {
       "name": "ZIPFoundation",

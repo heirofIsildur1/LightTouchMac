@@ -18,7 +18,8 @@ public enum Records {
         record["deployment_target"] = "14.0"
         record["architecture"] = arch
         record["sources"] = try readJSON(root.appendingPathComponent("src/static-sources.json"))
-        record["recipe_sha256"] = try sha256(source.appendingPathComponent("scripts/build-static-deps.sh"))
+        record["recipe_sha256"] = try sha256(
+            source.appendingPathComponent("build-support/recipes/build-static-deps.sh"))
         try writeJSON(record, to: root.appendingPathComponent("static-build.json"))
     }
 
@@ -66,7 +67,8 @@ public enum Records {
 
     /// The recipe files whose hashes native-build.json records.
     static let recipeFiles = [
-        "scripts/build-package-native.sh", "scripts/build-static-deps.sh", "scripts/build-iboot32patcher.sh",
+        "build-support/recipes/build-package-native.sh", "build-support/recipes/build-static-deps.sh",
+        "build-support/recipes/build-iboot32patcher.sh",
         "build-support/dependencies.json", "build-support/patches/glib-pipe2-availability.patch",
         "build-support/patches/iBoot32Patcher-ltm.patch", "build-support/patches/libimobiledevice-sslv3-ios1.patch",
         "build-support/patches/libplist-bin-limits.patch", "build-support/patches/libimobiledevice-reply-limits.patch",

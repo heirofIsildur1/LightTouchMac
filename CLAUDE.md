@@ -23,8 +23,8 @@ what to do and not do on a shared Mac.
 
 ## Building and testing
 
-- First build: `scripts/bootstrap` (or `scripts/vendor` when only the pins moved). Xcode fails with one line when the
-  vendor directory is missing or stale; run what it says.
+- First build, and after a pin bump: `scripts/vendor` (`--check` only checks). Xcode fails with one line when the
+  vendor directory or the machine options it writes are missing or stale; run what it says.
 - Before `sessions`: `swift build --package-path tests/sessions`, then `swift run --package-path tests/sessions
   sessions …`.
 - Unit tests: `xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit -skipMacroValidation`, or
@@ -36,7 +36,7 @@ what to do and not do on a shared Mac.
 - Before booting emulators, `scripts/host-ready` prints `READY …` (exit 0) or `WAIT <why>` (exit 1: load, all three
   emulator slots taken, or disk); `sessions` holds a slot for its run and waits for one when none is free.
 - A new test must fail with the fix reverted; say so in the commit.
-- The pre-commit hook formats staged Swift and C (`scripts/format --staged`; `scripts/bootstrap` turns it on). When
+- The pre-commit hook formats staged Swift and C (`scripts/format --staged`; `scripts/vendor` turns it on). When
   it refuses a partly staged file, run the command it prints. `scripts/format --check` (run by the Unit plan) fails on
   an unformatted file or any swift-format lint finding: change the code, don't disable the rule.
 

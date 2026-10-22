@@ -43,7 +43,7 @@ struct K48IBootTests {
         }
     }
 
-    /// The patcher we build (scripts/build-iboot32patcher.sh: the pinned archive plus
+    /// The patcher we build (build-support/recipes/build-iboot32patcher.sh: the pinned archive plus
     /// build-support/patches/iBoot32Patcher-ltm.patch; FIRMWAREKIT_IBOOT_PATCHER, e.g. a native root's
     /// build/iBoot32Patcher/iBoot32Patcher or the app's Contents/MacOS copy) patches every k48 iBoot the unpatched
     /// tool could to the same bytes as the Legacy-iOS-Kit binary. Skipped per build without its cached IPSW.

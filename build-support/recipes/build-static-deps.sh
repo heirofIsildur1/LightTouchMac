@@ -9,7 +9,7 @@
 set -euo pipefail
 ROOT="${1:?usage: build-static-deps.sh new-work-directory}"
 [ ! -e "$ROOT" ] || { echo "use a new build directory: $ROOT" >&2; exit 1; }
-SRC="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$(cd "$(dirname "$0")/../.." && pwd)"
 JOBS="${LTM_JOBS:-$(sysctl -n hw.ncpu)}"
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || { echo 'LTM_JOBS must be a positive integer' >&2; exit 1; }
 for tool in curl make pkg-config xcrun; do

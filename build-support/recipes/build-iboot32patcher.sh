@@ -11,7 +11,7 @@
 set -euo pipefail
 SRC_DIR="${1:?usage: build-iboot32patcher.sh src-dir out-dir}"
 OUT="${2:?usage: build-iboot32patcher.sh src-dir out-dir}"
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
+HERE="$(cd "$(dirname "$0")/../.." && pwd)"
 ARCH_FLAGS=""
 for arch in ${LTM_ARCH:-arm64}; do ARCH_FLAGS="$ARCH_FLAGS-arch $arch "; done
 DEPS="$HERE/build-support/dependencies.json"
@@ -34,7 +34,7 @@ cp "$PATCH" "$OUT/"
 "$HERE/scripts/ltm-build" check-macho --no-weak-imports --minos 14.0 "$OUT/iBoot32Patcher"
 printf '%s\n' "iBoot32Patcher $COMMIT: $URL" "License: $LICENSE (LICENSE alongside)" \
     "Modified: $(basename "$PATCH") (alongside) applied to that source." \
-    "Built by scripts/build-iboot32patcher.sh: make CC=clang CFLAGS='-O2 $ARCH_FLAGS-mmacosx-version-min=14.0'" \
+    "Built by build-support/recipes/build-iboot32patcher.sh: make CC=clang CFLAGS='-O2 $ARCH_FLAGS-mmacosx-version-min=14.0'" \
     "firmwarekit runs it as a separate process for the iPad's real-iBoot boot chain (--rsa --debug -b boot-args)." \
     > "$OUT/SOURCE.txt"
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }

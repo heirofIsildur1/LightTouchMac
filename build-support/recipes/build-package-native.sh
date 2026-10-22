@@ -4,13 +4,14 @@
 # Usage: build-package-native.sh NEW-WORK-DIRECTORY
 # Builds static dependencies from pinned sources unless LTM_STATIC_DEPS is explicit.
 # LTM_ARCH=x86_64 cross-compiles the Intel slice (default arm64, built exactly as before);
-# scripts/vendor builds both and merges them (scripts/ltm-build merge-native).
+# scripts/vendor builds both and merges them (scripts/ltm-build merge-native), and passes the pinned checkouts:
+# QEMU_IOS_DIR (a tree at the qemu-ios pin), USBMUXD_SOURCE_DIR and USBMUXD_COMMIT (build-support/sources.json).
 set -euo pipefail
 ROOT="${1:?usage: build-package-native.sh new-work-directory}"
 [ ! -e "$ROOT" ] || { echo "use a new build directory: $ROOT" >&2; exit 1; }
-SRC="$(cd "$(dirname "$0")/.." && pwd)"
-QEMU="$("$SRC/scripts/sources" qemu-ios)"    # the pin; QEMU_IOS_DIR overrides
-USB="$("$SRC/scripts/sources" usbmuxd)"      # USBMUXD_SOURCE_DIR overrides
+SRC="$(cd "$(dirname "$0")/../.." && pwd)"
+QEMU="${QEMU_IOS_DIR:?set by scripts/vendor}"
+USB="${USBMUXD_SOURCE_DIR:?set by scripts/vendor}"
 TOOL="$SRC/scripts/ltm-build"
 MESON="${MESON:-meson}"
 JOBS="${LTM_JOBS:-$(sysctl -n hw.ncpu)}"
@@ -36,7 +37,7 @@ ROOT="$(cd "$ROOT" && pwd)"
 # usbmuxd from its pinned commit (build-support/sources.json) through a temporary worktree,
 # never the checkout's working tree (10-06: a one-step build shipped the checkout's
 # 41631a7 while the pin was e19fac2, and only recorded it).
-USB_COMMIT="$("$SRC/scripts/sources" commit usbmuxd)"
+USB_COMMIT="${USBMUXD_COMMIT:?set by scripts/vendor}"
 USB_TREE="$ROOT/usbmuxd-worktree"
 git -C "$USB" worktree add --detach "$USB_TREE" "$USB_COMMIT"
 "$TOOL" sources stage-git --source "$USB_TREE" \
@@ -49,7 +50,7 @@ STAGED="$(plutil -extract commit raw -o - "$ROOT/usbmuxd-source.json")"
 if [ -n "${LTM_STATIC_DEPS:-}" ]; then
     STATIC="$(cd "$LTM_STATIC_DEPS" && pwd)"
 else
-    LTM_ARCH="$ARCH" bash "$SRC/scripts/build-static-deps.sh" "$ROOT/static"
+    LTM_ARCH="$ARCH" bash "$SRC/build-support/recipes/build-static-deps.sh" "$ROOT/static"
     STATIC="$ROOT/static/prefix"
 fi
 P="$ROOT/prefix"
@@ -200,7 +201,7 @@ fi
 # iBoot32Patcher (GPL-3.0, the "tools" group of the manifest): firmwarekit runs it for the k48 real-iBoot
 # recipe. Built into build/iBoot32Patcher with its LICENSE, our patch and a SOURCE.txt; scripts/vendor ships them.
 fetch_group tools
-LTM_ARCH="$ARCH" bash "$SRC/scripts/build-iboot32patcher.sh" "$ROOT/src" "$ROOT/build/iBoot32Patcher"
+LTM_ARCH="$ARCH" bash "$SRC/build-support/recipes/build-iboot32patcher.sh" "$ROOT/src" "$ROOT/build/iBoot32Patcher"
 # AMC audio and incremental H.264 slices use libavcodec/libavutil. Keep the closure native
 # to macOS 14, with no automatically discovered Homebrew codec dependencies.
 (cd ffmpeg-9.0.1 && patch -p1 < "$QEMU/contrib/ffmpeg/h264-chunk-er.patch" && patch -p1 < "$QEMU/contrib/ffmpeg/h264-cavlc-pcm-offset.patch")
@@ -217,13 +218,13 @@ printf '%s\n' 'FFmpeg 9.0.1: https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz' \
     'SHA256: cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635' \
     'Apply h264-chunk-er.patch and h264-cavlc-pcm-offset.patch; build options are in build-package-native.sh.' \
     > "$P/share/licenses/ffmpeg/SOURCE.txt"
-cp "$SRC/scripts/build-package-native.sh" "$QEMU/contrib/ffmpeg/h264-chunk-er.patch" "$QEMU/contrib/ffmpeg/h264-cavlc-pcm-offset.patch" "$P/share/licenses/ffmpeg/"
+cp "$SRC/build-support/recipes/build-package-native.sh" "$QEMU/contrib/ffmpeg/h264-chunk-er.patch" "$QEMU/contrib/ffmpeg/h264-cavlc-pcm-offset.patch" "$P/share/licenses/ffmpeg/"
 # Retain the native UI, CGL renderer, CoreAudio and Wi-Fi/slirp; avoid accidental optional
 # Homebrew dependencies. Board AES/SHA use the declared static libcrypto; QEMU's own cipher API, the static Nettle.
 export PKG_CONFIG_LIBDIR="$P/lib/pkgconfig:$STATIC/lib/pkgconfig"
 mkdir "$ROOT/qemu-build"
 cd "$ROOT/qemu-build"
-# LTM_ANGLE (scripts/build-angle.sh's output): the experimental ANGLE renderer is built against its headers, beside CGL.
+# LTM_ANGLE (build-support/recipes/build-angle.sh's output): the experimental ANGLE renderer is built against its headers, beside CGL.
 "$QEMU/configure" ${QEMU_CROSS[@]+"${QEMU_CROSS[@]}"} --target-list=arm-softmmu --without-default-features --enable-cocoa --enable-coreaudio --enable-pixman --enable-slirp --enable-nettle --disable-pie \
     ${LTM_ANGLE:+"-Dltm_angle_prefix=$LTM_ANGLE"} \
     --python="${QEMU_PYTHON:-python3.12}" \

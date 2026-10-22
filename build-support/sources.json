@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "comment": "The source checkouts the app builds against, by commit. scripts/sources resolves them (QEMU_IOS_DIR, USBMUXD_SOURCE_DIR, QEMU_BUILD_DIR override the paths); scripts/vendor builds both at their pinned commits, into a vendor directory keyed by this file. The emulator and usbmuxd ship together (usb-zlp <-> qemu-zlp): bump both lines in one commit.",
+  "comment": "The source checkouts the app builds against, by commit. scripts/vendor checks them (QEMU_IOS_DIR and USBMUXD_SOURCE_DIR override the paths) and builds both at their pinned commits, into a vendor directory keyed by this file. The emulator and usbmuxd ship together (usb-zlp <-> qemu-zlp): bump both lines in one commit.",
   "qemu-ios": {
     "repository": "https://github.com/samhenrigold/qemu-ios",
     "branch": "main",

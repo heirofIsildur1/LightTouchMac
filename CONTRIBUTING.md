@@ -26,20 +26,20 @@ Catalog availability is distinct from measured acceptance.
 | Repo | What it is | How this app uses it |
 |---|---|---|
 | [LightTouchMac](https://github.com/samhenrigold/LightTouchMac) | This app, the per-device helper, the Swift preparer, the app tests, the product build | — |
-| [qemu-ios](https://github.com/samhenrigold/qemu-ios) (branch `main`) | The emulator (`hw/arm/ipod_touch_*.c`, `hw/arm/ipad1.c`, `hw/arm/s5l8930_*.c`), the guest tools under `contrib/` (agent, GL shims, AppSync, guest packages), Python format inspection tools and frozen bake references, and the emulator gates under `tests/` | Pinned by commit in `build-support/sources.json`. Loaded by the helper as `libqemu-arm.dylib` (`contrib/macos-app/make-dylib-macos.sh`), which it refuses unless `qemu_ios_api_version()`'s major matches `Qemu.apiMajor` (bump both when an entry point is removed or changed); its `contrib/export-guest-artifacts.sh` builds and stages the guest tools, GL tables, entitlements and headers with a manifest, and `scripts/build-guest-tools.sh` is a thin caller of it |
+| [qemu-ios](https://github.com/samhenrigold/qemu-ios) (branch `main`) | The emulator (`hw/arm/ipod_touch_*.c`, `hw/arm/ipad1.c`, `hw/arm/s5l8930_*.c`), the guest tools under `contrib/` (agent, GL shims, AppSync, guest packages), Python format inspection tools and frozen bake references, and the emulator gates under `tests/` | Pinned by commit in `build-support/sources.json`. Loaded by the helper as `libqemu-arm.dylib` (`contrib/macos-app/make-dylib-macos.sh`), which it refuses unless `qemu_ios_api_version()`'s major matches `Qemu.apiMajor` (bump both when an entry point is removed or changed); its `contrib/export-guest-artifacts.sh` builds and stages the guest tools, GL tables, entitlements and headers with a manifest, which `scripts/vendor` runs |
 | [usbmuxd](https://github.com/samhenrigold/usbmuxd) (fork, branch `idle-poll` on `qemu-zlp`) | The usbmuxd that bridges the emulated USB device to libimobiledevice | Built into the bundle from the commit pinned in `build-support/sources.json`; the emulator and this fork ship together, so bump both pins in one commit |
 
 The emulator side's own entry point is qemu-ios `README.md`.
 
 ## First build
 
-On a fresh Apple Silicon Mac, clone this repository and run `scripts/bootstrap`. It checks Xcode, the Homebrew
-build tools, the qemu-ios and usbmuxd checkouts at their pins, the iPhoneOS 3.1.3 and 3.2 SDKs, the SecureROMs and the
-built-in iPod's IPSW, prints each missing piece and where to get it (Apple's software and firmware are never
-downloaded or copied for you), and then runs `scripts/vendor` (about 15 minutes). After that, build the `LightTouchMac`
-scheme in Xcode. `scripts/bootstrap --check` only checks. Either way it turns on the pre-commit formatter
-(`git config core.hooksPath scripts/hooks`, and `git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'`
-so blame skips reformat commits); in a checkout set up before, run those two lines once.
+On a fresh Apple Silicon Mac, clone this repository and run `scripts/vendor`, the one setup command (run it again
+after a pin bump). It checks Xcode, the Homebrew build tools, the qemu-ios and usbmuxd checkouts holding their pinned
+commits, the iPhoneOS 3.1.3 and 3.2 SDKs and the SecureROMs, prints each missing piece and where to get it (Apple's
+software and firmware are never downloaded or copied for you), and then builds the vendor directory (below; about 15
+minutes). After that, build the `LightTouchMac` scheme in Xcode. `scripts/vendor --check` only checks. Either way it
+turns on the pre-commit formatter (`git config core.hooksPath scripts/hooks`, and `git config blame.ignoreRevsFile
+':(optional).git-blame-ignore-revs'` so blame skips reformat commits).
 
 ## Building
 
@@ -61,8 +61,8 @@ QEMU_BUILD_DIR = $(QEMU_IOS_DIR)/build-w1-native          # libqemu-arm.dylib, o
 These repeat **the pin**, `build-support/sources.json`: the qemu-ios commit, its expected checkout path and
 development build directory, and the usbmuxd commit; iBoot32Patcher and ANGLE (with its depot_tools) are pinned in
 `build-support/dependencies.json`.
-`scripts/sources` resolves the pin for every script (`sources qemu-ios | usbmuxd | qemu-build | commit NAME`,
-`sources check` for pinned vs actual; `QEMU_IOS_DIR`, `USBMUXD_SOURCE_DIR` and `QEMU_BUILD_DIR` override).
+`scripts/vendor` reads the pin (`QEMU_IOS_DIR` and `USBMUXD_SOURCE_DIR` move the checkouts) and hands the recipes
+(`build-support/recipes`) a tree at each pinned commit.
 To produce the dylib, build `qemu-system-arm` in that checkout and run `contrib/macos-app/make-dylib-macos.sh BUILD_DIR`.
 The services helper links libimobiledevice and libplist: from the vendor directory (below) when there is one,
 else Homebrew's. Put local overrides of any of these in `Configuration/Local.xcconfig` (gitignored).
@@ -81,19 +81,22 @@ device), `FIRMWAREKIT_IBOOT_PATCHER`/`IBOOT32PATCHER` (another iBoot32Patcher; D
 A release is an Xcode archive; nothing edits the bundle after Xcode.
 
 1. **`scripts/vendor`**, once per pin change (`build-support/sources.json`, `dependencies.json`, the patches or the
-   native recipes). It builds what Xcode can't, from the pins, into `~/Developer/ltm-vendor.noindex/<pin-hash>/`
+   recipes in `build-support/recipes`). It builds what Xcode can't, from the pins, into `~/Developer/ltm-vendor.noindex/<pin-hash>/`
    (`.noindex` keeps Spotlight out; `LTM_VENDOR_ROOT` moves it; only `scripts/clean` deletes one): the native dependencies, usbmuxd and QEMU for arm64 and
    x86_64, merged universal with final install names
    (`Frameworks/`, `MacOS/`), the guest tools and the developer SSH payload packed into
-   `Resources/Guest/guest.aar`, the SecureROMs and the built-in iPod (`Resources/Device/`), the licenses and
-   `build-inputs.json`. A rerun with nothing changed does nothing; one after a FirmwareKit or helper change only
-   prepares the built-in iPod again. Inputs: `ARMV6_SDK` (default
-   `~/Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk`), `LTM_ASSETS` (the SecureROMs, default
-   `~/Developer/qemu-ios-files`), the n72ap-7E18 IPSW in the app's IPSW cache, and the network for the pinned
-   source archives. Firmware and the iPhoneOS SDK are never downloaded or redistributed. Xcode finds the directory
+   `Resources/Guest/guest.aar`, the SecureROMs (`Resources/Device/`), the licenses and `build-inputs.json`; with
+   `--release` (which `scripts/ship` passes) also the built-in iPod (`Resources/Device/n72ap-7E18.itbase`, which only
+   an archive copies). A rerun with nothing changed builds nothing; with `--release`, one after a FirmwareKit or
+   helper change only prepares the built-in iPod again. Every run writes HostRuntime's `MachineOptions.swift` (each
+   board's -machine options, which a boot keeps to) from the vendored QEMU; commit it when it changed. Inputs:
+   `ARMV6_SDK` (default `~/Developer/ipod2g-re/OldSDK/iPhoneOS3.1.3.sdk`), `IPAD_SDK`, `LTM_ASSETS` (the SecureROMs,
+   default `~/Developer/qemu-ios-files`), with `--release` the n72ap-7E18 IPSW in the app's IPSW cache, and the
+   network for the pinned source archives. Firmware and the iPhoneOS SDK are never downloaded or redistributed. Xcode finds the directory
    itself: the services helper's first phase (`scripts/vendor-check`) keys the pins (`scripts/vendor` keys with it too), points
    the gitignored `build/vendor` (the default `VENDOR_DIR`) at that directory, and fails the build with "run
-   scripts/vendor" when there is none, rather than build with another pin's. `LTM_VENDOR_ROOT` counts for Debug builds
+   scripts/vendor" when there is none, rather than build with another pin's, or when the checkout's
+   `MachineOptions.swift` isn't the one written there. `LTM_VENDOR_ROOT` counts for Debug builds
    only. A `VENDOR_DIR` in `Configuration/Local.xcconfig` is held to the current pins the same way.
 2. **Xcode ▸ Product ▸ Archive** (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID). The archive's
    Copy Files phases bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity
@@ -214,7 +217,7 @@ apply, such as a for-in loop for `forEach`), and `scripts/format --all` reformat
 `.git-blame-ignore-revs`). BuildToolsTests runs `--check` in the Unit plan, so both stay at zero: a finding is fixed in
 the code (or in its generator), not by turning the rule off. Code from upstream projects (`build-support/patches`, the
 GPL fixture in `tests/offline/fixtures`) is left alone; a generator writes what the formatter would
-(`scripts/machine-options`).
+(`ltm-build machine-options`).
 
 **Warnings.** None. Fix the cause: a `@Sendable` closure or a lock-guarded `@unchecked Sendable` box for state shared
 across threads, `MainActor.assumeIsolated` in an AppKit completion that runs on the main thread, `nonisolated` on test
@@ -274,9 +277,8 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
   outside the three repositories; the app downloads or imports them on the user's Mac.
 - **Branches.** Both repositories work on `main`. Make a short branch per change and open a pull request;
   `main` doesn't accept force-pushes. A qemu-ios change the app needs lands there first, then the app's
-  pin (`build-support/sources.json`) moves to it in the same pull request as the app change, with
-  `scripts/machine-options BUILD/qemu-system-arm` run against a build at the new pin (each board's -machine options,
-  which a boot keeps to).
+  pin (`build-support/sources.json`) moves to it in the same pull request as the app change, with the
+  `MachineOptions.swift` that `scripts/vendor` writes for the new pin (the build fails until it is there).
 
 ## Layout
 
@@ -297,9 +299,9 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `Packages/ReleaseChecks/` | The checks of a built app (`Release.xctestplan`): signatures, entitlements, slices and load closure, bundle hygiene, the bundled tools, boots through the bundle |
 | `Packages/DeviceServices/` | One device's stock lockdown services: `HostServiceWire` (the request/event protocol, errors, timeouts, device paths, the Home screen layout) and `HostServiceClient` (the app's `DeviceServices` calls, `HostServiceWorkers`, `NotificationProxy`) |
 | `Packages/FirmwareKit/` | `FirmwareKit` (IPSW → device), `FirmwareSchema` (the wire types, `StorageCapacity`, `DeveloperTools`, `GuestArchive`: what the app links), the `firmwarekit` CLI (`Sources/FirmwareKitCLI`), `CActivation` |
-| `scripts/` | `bootstrap`, `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-angle.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
+| `scripts/` | `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check`, `ltm-build` (Packages/BuildTools: vendor, machine-options, check-macho, merge-native, sources), `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
-| `build-support/` | `dependencies.json` (pinned archives) and build patches |
+| `build-support/` | `sources.json` and `dependencies.json` (the pins), `recipes/` (the native builds `scripts/vendor` runs: `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-angle.sh`), build patches and checks |
 | `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), the targets' `App`, `Device`, `Services` and `Tool.xcconfig`, `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
 | `Models/` | The 3D device models and their lighting (`Resources/Models/` in the app) |
 | `LightTouchServices/` | The services helper: `Engine/` (libimobiledevice: installation_proxy, AFC, springboardservices, notification_proxy and lockdown on one `run` kernel, the serial gate and deadlines), and the lockdown writes (`Lockdown/`) it runs as child processes |
