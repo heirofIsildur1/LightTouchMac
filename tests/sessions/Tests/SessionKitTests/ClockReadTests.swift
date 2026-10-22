@@ -11,7 +11,7 @@ struct ClockReadTests {
         var bar = Line(text: "Light Touch 2:38 PM", x: 0.28, y: 0.02)
         bar.words = [
             Line(text: "Light", x: 0.06, y: 0.02), Line(text: "Touch", x: 0.18, y: 0.02),
-            Line(text: "2:38", x: 0.47, y: 0.02), Line(text: "PM", x: 0.55, y: 0.02),
+            Line(text: "2:38", x: 0.47, y: 0.02), Line(text: "PM", x: 0.55, y: 0.02)
         ]
         let clock = TextReader.clock(in: [Line(text: "Messages", x: 0.12, y: 0.2), bar])
         #expect(clock?.text == "2:38" && clock?.x == 0.47)

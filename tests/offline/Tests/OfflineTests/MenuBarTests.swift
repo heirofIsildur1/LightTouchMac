@@ -180,7 +180,7 @@ extension SharedState {
                 if m.contains(.command) { mods += "⌘" }
                 let arrows: [Int: String] = [
                     NSLeftArrowFunctionKey: "←", NSRightArrowFunctionKey: "→", NSUpArrowFunctionKey: "↑",
-                    NSDownArrowFunctionKey: "↓", 0x1b: "⎋", 0x7f: "⌫",
+                    NSDownArrowFunctionKey: "↓", 0x1b: "⎋", 0x7f: "⌫"
                 ]
                 let key =
                     item.keyEquivalent.unicodeScalars.first.flatMap { arrows[Int($0.value)] } ?? item.keyEquivalent
@@ -243,7 +243,7 @@ extension SharedState {
             #expect(
                 apps.items.map(\.title) == [
                     "Install App…", "Import Media…", "", "Open", "Uninstall…", "View on Legacy Store", "",
-                    "Refresh Apps",
+                    "Refresh Apps"
                 ]
                     && apps.items.allSatisfy { !$0.isEnabled },
                 "Apps reset"
@@ -297,7 +297,7 @@ extension SharedState {
             let capture = root.item(withTitle: "Capture")!.submenu!
             #expect(
                 capture.items.prefix(4).map(\.title) == [
-                    "Save Screenshot", "Save Screenshot As…", "Copy Screenshot", "Open Screenshot in Preview",
+                    "Save Screenshot", "Save Screenshot As…", "Copy Screenshot", "Open Screenshot in Preview"
                 ]
             )
             #expect(find("Save Screenshot", in: capture)?.keyEquivalent == "s")
@@ -307,7 +307,7 @@ extension SharedState {
                 capture.items.filter { !$0.isSeparatorItem }.map(\.title) == [
                     "Save Screenshot", "Save Screenshot As…", "Copy Screenshot", "Open Screenshot in Preview",
                     "Start Recording", "Discard Recording…",
-                    "Capture Screen Only", "Record Device Bezel",
+                    "Capture Screen Only", "Record Device Bezel"
                 ]
             )
             #expect(
@@ -317,7 +317,7 @@ extension SharedState {
             for (name, key, modifiers) in [
                 ("Save Screenshot As…", "s", NSEvent.ModifierFlags([.shift, .command])),
                 ("Start Recording", "r", [.command]),
-                ("Discard Recording…", "\u{1b}", []),
+                ("Discard Recording…", "\u{1b}", [])
             ] {
                 #expect(
                     find(name, in: capture)?.keyEquivalent == key
@@ -395,7 +395,7 @@ extension SharedState {
             let windows = root.item(withTitle: "Window")!.submenu!
             #expect(
                 windows.items.map(\.title) == [
-                    "Minimize", "Zoom", "", "Show Device", "Show iPod Files", "Device Logs", "", "Bring All to Front",
+                    "Minimize", "Zoom", "", "Show Device", "Show iPod Files", "Device Logs", "", "Bring All to Front"
                 ]
             )
             #expect(windows.item(withTitle: "Show Device")?.keyEquivalent == "1")
@@ -408,7 +408,7 @@ extension SharedState {
             }
             for name in [
                 "Volume Up", "Volume Down", "Shut Down…", "Force Stop…", "Rotate Automatically",
-                "Connect to the Internet",
+                "Connect to the Internet"
             ] {
                 #expect(find(name, in: device) != nil, "\(name)")
             }

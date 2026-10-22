@@ -21,7 +21,7 @@ struct RespringCheck: ParsableCommand {
 /// How long an app's close animation runs, as frames: Home, then the frames from 1.5 s to 4.5 s after it. At UIKit's
 /// own speed the animation is over by then (a still Home screen); at Slow Animations' 10x it is still running.
 private let closeApp = [
-    "agentop launch com.apple.Preferences", "wait 8", "button 0", "wait 1.5",
+    "agentop launch com.apple.Preferences", "wait 8", "button 0", "wait 1.5"
 ]
 
 func respringCheck(_ args: RespringCheck) -> Never {
@@ -35,19 +35,19 @@ func respringCheck(_ args: RespringCheck) -> Never {
     let wake = ["wait 20", unlock.replacingOccurrences(of: "drag", with: "wake"), "wait 3"]
     let list = "spawn /bin/launchctl list"
     var steps = [
-        "boot", "lit 0.1 400", "wait 20", "button 0", "wait 2", unlock, "wait 3", "waitagent 240", "wait 10",
+        "boot", "lit 0.1 400", "wait 20", "button 0", "wait 2", unlock, "wait 3", "waitagent 240", "wait 10"
     ]
     steps += closeApp + ["sample stock 3", list]
     // The key, then SpringBoard alone (what Respring did before)
     steps += [
-        "defaults com.apple.UIKit UIAnimationDragCoefficient int 10", "spawn /bin/launchctl stop com.apple.SpringBoard",
+        "defaults com.apple.UIKit UIAnimationDragCoefficient int 10", "spawn /bin/launchctl stop com.apple.SpringBoard"
     ]
     steps += wake + [list] + closeApp + ["sample springboard 3"]
     steps += ["respring"] + wake + [list] + closeApp + ["sample respring 3"]
     // A tap on the dock's first icon opens its app, once Slow Animations' Home screen has settled.
     steps += [
         "wait 15", "agentop frontmost", "tap 0.16 0.9", "wait 15", "agentop frontmost", "button 0", "wait 5", "quit",
-        "expectExit 60",
+        "expectExit 60"
     ]
     var s = preparedScenario(base, tools: tools, work: work, name: "respring", steps: steps)
     var prepared = s["prepared"] as? [String: Any] ?? [:]

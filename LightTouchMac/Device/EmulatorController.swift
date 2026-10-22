@@ -191,7 +191,7 @@ final class EmulatorController {
             },
             center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.hostDidWake() }
-            },
+            }
         ]
     }
 

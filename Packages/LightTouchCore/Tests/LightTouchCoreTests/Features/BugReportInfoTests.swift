@@ -105,7 +105,7 @@ struct BugReportInfoTests {
             "johnny@icloud.com", "00:1e:c2:aa:bb:cc", "00-1E-C2-AA-BB-CC",
             "6f1ed002ab5595859014ebf0951522d9a1b2c3d4", "00008020-001A2B3C4D5E6F70",
             "8874EC96-6945-4F6F-AD3D-96DDEBB6F52B", "012345678901237", "89014103211118510720", "C02XK1ZQJGH5",
-            "seed-4f8a2c",
+            "seed-4f8a2c"
         ]
         var device = iPhone("Running — Couldn’t connect to 00:1e:c2:aa:bb:cc")
         device.marketingName = "Johnny Appleseed’s iPhone"
@@ -116,7 +116,7 @@ struct BugReportInfoTests {
                 + "8874EC96-6945-4F6F-AD3D-96DDEBB6F52B/base on Johnny-Appleseeds-MacBook-Pro",
             "2026-10-08T04:23:41Z modem failed: imei 012345678901237 iccid 89014103211118510720",
             "2026-10-08T04:23:42Z lockdown failed: 00008020-001A2B3C4D5E6F70 serial C02XK1ZQJGH5 "
-                + "mac 00-1E-C2-AA-BB-CC user jappleseed",
+                + "mac 00-1E-C2-AA-BB-CC user jappleseed"
         ]
         let host = DiagnosticsExport.HostIdentity(
             home: identity.home,
@@ -142,7 +142,7 @@ struct BugReportInfoTests {
             let lines =
                 (1...8).map { "t\($0) boot: readiness failed \($0)" } + [
                     "t9 guest package: serial 19 judged good",
-                    "t10 Couldn’t save to disk " + String(repeating: "x", count: 300),
+                    "t10 Couldn’t save to disk " + String(repeating: "x", count: 300)
                 ]
             try lines.joined(separator: "\n").write(to: log, atomically: true, encoding: .utf8)
             let errors = BugReportInfo.recentErrors(log: log, limit: 3, width: 40)

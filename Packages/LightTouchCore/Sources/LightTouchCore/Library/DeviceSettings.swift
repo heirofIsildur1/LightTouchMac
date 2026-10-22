@@ -46,7 +46,7 @@ public nonisolated struct DeviceSettings: Codable, Equatable {
     /// its values written to its settings.plist, then every such key goes, a deleted device's too.
     public static func migrateDefaults(_ defaults: UserDefaults, state: URL, devices: [UUID]) {
         let names: Set = [
-            "deviceNotice", "motionPose", "keyboardInputEnabled", "autoRotateWithGuest", "debugPort", "carrier",
+            "deviceNotice", "motionPose", "keyboardInputEnabled", "autoRotateWithGuest", "debugPort", "carrier"
         ]
         var kept: [UUID: [String: Any]] = [:]
         var keys: [UUID: [String]] = [:]

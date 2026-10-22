@@ -199,7 +199,7 @@ extension MainWindowController {
             overlay.topAnchor.constraint(equalTo: content.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             stack.centerXAnchor.constraint(equalTo: content.safeAreaLayoutGuide.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: content.safeAreaLayoutGuide.centerYAnchor),
+            stack.centerYAnchor.constraint(equalTo: content.safeAreaLayoutGuide.centerYAnchor)
         ])
         deadOverlay = overlay
     }

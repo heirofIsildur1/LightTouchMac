@@ -96,7 +96,7 @@ struct ForegroundWatchTests {
             host.fronts = [
                 ("com.apple.purplebuddy", "Setup"), ("com.apple.springboard", "Home"), nil,
                 ("com.apple.springboard", "Home"), ("com.apple.mobilesafari", "Safari"),
-                ("com.apple.springboard", "Home"),
+                ("com.apple.springboard", "Home")
             ]
             watch.start()
             await eventually("lifted") { !host.finished.isEmpty }
@@ -131,7 +131,7 @@ struct ForegroundWatchTests {
             watch.liftsRestrict = false
             host.fronts = [
                 ("com.apple.purplebuddy", "Setup"), ("com.apple.springboard", "Home"),
-                ("com.apple.springboard", "Home"),
+                ("com.apple.springboard", "Home")
             ]
             watch.start()
             await eventually("finished") { !host.finished.isEmpty }

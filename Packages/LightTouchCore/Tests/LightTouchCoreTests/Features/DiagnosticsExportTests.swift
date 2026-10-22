@@ -19,7 +19,7 @@ struct DiagnosticsExportTests {
             for (name, age) in [
                 ("LightTouch-2026-10-07-101010.ips", 60.0), ("LightTouchDevice-2026-10-07-101011.ips", 30.0),
                 ("Safari-2026-10-07-101012.ips", 10.0), ("LightTouchServices-2026-08-01-101010.ips", 40 * 86_400.0),
-                ("LightTouchDevice-notes.txt", 5.0),
+                ("LightTouchDevice-notes.txt", 5.0)
             ] {
                 let url = reports.appendingPathComponent(name)
                 try Data("report".utf8).write(to: url)
@@ -31,7 +31,7 @@ struct DiagnosticsExportTests {
             )
             #expect(
                 found.map(\.lastPathComponent) == [
-                    "LightTouchDevice-2026-10-07-101011.ips", "LightTouch-2026-10-07-101010.ips",
+                    "LightTouchDevice-2026-10-07-101011.ips", "LightTouch-2026-10-07-101010.ips"
                 ]
             )
         }
@@ -99,7 +99,7 @@ struct DiagnosticsExportTests {
                 #expect(try children(exports).allSatisfy { !$0.lastPathComponent.hasPrefix(".LightTouch-") })
             }
             for (info, executable) in [
-                ("fail", helper), ("empty", helper), ("missing", root.appendingPathComponent("no-archiver")),
+                ("fail", helper), ("empty", helper), ("missing", root.appendingPathComponent("no-archiver"))
             ] {
                 await #expect(throws: (any Error).self, "\(info)") {
                     try await DiagnosticsExport.write(
@@ -183,10 +183,11 @@ struct DiagnosticsExportTests {
                 _ = try await FirmwareTool.admitBoot(device: root, managed: true, executable: worker, log: log)
             }
             #expect(
-                try text(log) == String(
-                    repeating: "NAND image migration: needs 9000 bytes free; the device stays in format 1\n",
-                    count: 2
-                )
+                try text(log)
+                    == String(
+                        repeating: "NAND image migration: needs 9000 bytes free; the device stays in format 1\n",
+                        count: 2
+                    )
             )
         }
     }
@@ -227,16 +228,16 @@ struct DiagnosticsExportTests {
             let leaks = [
                 "/Users/jappleseed", "jappleseed", "Johnny Appleseed", "Johnnys-MacBook-Pro", "johnny@icloud.com",
                 "00:1e:c2:aa:bb:cc", "6f1ed002ab5595859014ebf0951522d9a1b2c3d4", "00008020-001A2B3C4D5E6F70",
-                "8874EC96-6945-4F6F-AD3D-96DDEBB6F52B", "012345678901237", "C02XK1ZQJGH5", "seed-4f8a2c",
+                "8874EC96-6945-4F6F-AD3D-96DDEBB6F52B", "012345678901237", "C02XK1ZQJGH5", "seed-4f8a2c"
             ]
             let log = root.appendingPathComponent("serial.log")
             try """
-                2026-10-08T04:23:40Z opened /Users/jappleseed/Library/Devices/8874EC96-6945-4F6F-AD3D-96DDEBB6F52B
-                lockdown: UDID 6f1ed002ab5595859014ebf0951522d9a1b2c3d4 (00008020-001A2B3C4D5E6F70) seed seed-4f8a2c
-                wifi 00:1e:c2:aa:bb:cc imei 012345678901237 serial C02XK1ZQJGH5 on Johnnys-MacBook-Pro
-                Apple ID johnny@icloud.com, user jappleseed (Johnny Appleseed)
-                emulator build 1538771e7dcf3b9c933d599ef98c04ce
-                """.write(to: log, atomically: true, encoding: .utf8)
+            2026-10-08T04:23:40Z opened /Users/jappleseed/Library/Devices/8874EC96-6945-4F6F-AD3D-96DDEBB6F52B
+            lockdown: UDID 6f1ed002ab5595859014ebf0951522d9a1b2c3d4 (00008020-001A2B3C4D5E6F70) seed seed-4f8a2c
+            wifi 00:1e:c2:aa:bb:cc imei 012345678901237 serial C02XK1ZQJGH5 on Johnnys-MacBook-Pro
+            Apple ID johnny@icloud.com, user jappleseed (Johnny Appleseed)
+            emulator build 1538771e7dcf3b9c933d599ef98c04ce
+            """.write(to: log, atomically: true, encoding: .utf8)
             let rotated = root.appendingPathComponent("serial.log.1")
             try "older: Johnny Appleseed’s iPhone at /Users/jappleseed".write(
                 to: rotated,
@@ -250,25 +251,25 @@ struct DiagnosticsExportTests {
                 """
             let report = root.appendingPathComponent("LightTouch-2026-10-08-101010.ips")
             try """
-                {"app_name":"LightTouch","incident_id":"8231277F-99CB-4CC0-BC6A-EC990F9904ED","os_version":"macOS 27.0"}
-                {
-                  "procPath" : "/Users/jappleseed/Applications/Light Touch.app/Contents/MacOS/LightTouch",
-                  "crashReporterKey" : "4CE2ED4F-7491-7733-6730-2843A1FD34AD",
-                  "bootSessionUUID" : "B69885FD-2DD0-4563-A355-7844D18BF0A6",
-                  "sleepWakeUUID" : "0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9",
-                  "incident" : "8231277F-99CB-4CC0-BC6A-EC990F9904ED",
-                  "Hardware UUID" : "11111111-2222-3333-4444-555555555555",
-                  "responsibleProc" : "Johnnys-MacBook-Pro helper",
-                \(stacks)
-                }
-                """.write(to: report, atomically: true, encoding: .utf8)
+            {"app_name":"LightTouch","incident_id":"8231277F-99CB-4CC0-BC6A-EC990F9904ED","os_version":"macOS 27.0"}
+            {
+              "procPath" : "/Users/jappleseed/Applications/Light Touch.app/Contents/MacOS/LightTouch",
+              "crashReporterKey" : "4CE2ED4F-7491-7733-6730-2843A1FD34AD",
+              "bootSessionUUID" : "B69885FD-2DD0-4563-A355-7844D18BF0A6",
+              "sleepWakeUUID" : "0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9",
+              "incident" : "8231277F-99CB-4CC0-BC6A-EC990F9904ED",
+              "Hardware UUID" : "11111111-2222-3333-4444-555555555555",
+              "responsibleProc" : "Johnnys-MacBook-Pro helper",
+            \(stacks)
+            }
+            """.write(to: report, atomically: true, encoding: .utf8)
             // the device's own logs: a storage migration's failure in firmwarekit's, the helper's and the preparation's
             let device = root.appendingPathComponent("Devices/8874EC96-6945-4F6F-AD3D-96DDEBB6F52B")
             try fm.createDirectory(at: device, withIntermediateDirectories: true)
             let firmwareLog = device.appendingPathComponent("firmwarekit.log")
             try """
-                NAND image migration: couldn't read /Users/jappleseed/Library/Devices/8874EC96-6945-4F6F-AD3D-96DDEBB6F52B/overlay (UDID 6f1ed002ab5595859014ebf0951522d9a1b2c3d4, serial C02XK1ZQJGH5); the device stays in format 1
-                """.write(to: firmwareLog, atomically: true, encoding: .utf8)
+            NAND image migration: couldn't read /Users/jappleseed/Library/Devices/8874EC96-6945-4F6F-AD3D-96DDEBB6F52B/overlay (UDID 6f1ed002ab5595859014ebf0951522d9a1b2c3d4, serial C02XK1ZQJGH5); the device stays in format 1
+            """.write(to: firmwareLog, atomically: true, encoding: .utf8)
             let native = device.appendingPathComponent("native.log")
             try "helper: lease /Users/jappleseed/x on Johnnys-MacBook-Pro, wifi 00:1e:c2:aa:bb:cc".write(
                 to: native,
@@ -296,7 +297,7 @@ struct DiagnosticsExportTests {
             }
             let names = [
                 "serial.log", "serial.log.1", "info.txt", "Device/firmwarekit.log", "Device/native.log",
-                "Device/n90ap-11D257.log",
+                "Device/n90ap-11D257.log"
             ]
             let texts = try names.map(member)
             for (name, text) in zip(names, texts) {
@@ -311,7 +312,9 @@ struct DiagnosticsExportTests {
                 .map(String.init).filter { !$0.hasSuffix("/") && !$0.hasPrefix("__MACOSX/") }.sorted()
             #expect(
                 listing
-                    == (names + ["CrashReports/LightTouch-2026-10-08-101010.ips"]).map { "LightTouchMac-diagnostics/" + $0 }
+                    == (names + ["CrashReports/LightTouch-2026-10-08-101010.ips"]).map {
+                        "LightTouchMac-diagnostics/" + $0
+                    }
                     .sorted()
             )
             #expect(texts[0].contains("emulator build 1538771e7dcf3b9c933d599ef98c04ce"))
@@ -322,7 +325,7 @@ struct DiagnosticsExportTests {
             for leak in [
                 "/Users/jappleseed", "Johnnys-MacBook-Pro", "8231277F-99CB-4CC0-BC6A-EC990F9904ED",
                 "4CE2ED4F-7491-7733-6730-2843A1FD34AD", "B69885FD-2DD0-4563-A355-7844D18BF0A6",
-                "0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9", "11111111-2222-3333-4444-555555555555",
+                "0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9", "11111111-2222-3333-4444-555555555555"
             ] {
                 #expect(!crash.contains(leak), "\(leak)")
             }

@@ -146,7 +146,7 @@ extension SharedState {
         func model(_ name: String, _ profile: Board) async throws {
             try await MainBundle.with([
                 "Models/N72Studio.png": "Models/N72Studio.png", "Models/N45Rim.png": "Models/N45Rim.png",
-                "Models/N81Studio.png": "Models/N81Studio.png",
+                "Models/N81Studio.png": "Models/N81Studio.png"
             ]) {
                 guard #available(macOS 15, *) else { return }  // RealityKit's texture rotation and RealityRenderer
                 try await check(name, profile)
@@ -172,7 +172,7 @@ extension SharedState {
             // Resize the actual ARView synchronously: the projection must keep the
             // LCD's physical aspect and size before an asynchronous layout catches up.
             for size in [
-                CGSize(width: 400, height: 1000), CGSize(width: 1200, height: 450), CGSize(width: 800, height: 800),
+                CGSize(width: 400, height: 1000), CGSize(width: 1200, height: 450), CGSize(width: 800, height: 800)
             ] {
                 model.setFrameSize(size)
                 model.pose(scale: 0.3, rotation: 0, roll: 0, pitch: 0, animated: false)
@@ -202,7 +202,7 @@ extension SharedState {
             #expect(shell.width > cutout.width && shell.height > cutout.height)
             let points = [
                 CGPoint(x: 0.25, y: 0.25), CGPoint(x: 0.75, y: 0.25), CGPoint(x: 0.25, y: 0.75),
-                CGPoint(x: 0.75, y: 0.75),
+                CGPoint(x: 0.75, y: 0.75)
             ]
             var homeLevels: [CGFloat] = []
             // No panel turns its surface with the device.
@@ -327,7 +327,7 @@ extension SharedState {
             for (names, expected) in [
                 (["SleepWakeButton", "Sleep_wake___black_fitted_button"], [DeviceModelView.Control.sleepWake]),
                 (["VolumeButton", "Volume___continuous_recessed_centre_rocker"], [.volumeUp, .volumeDown]),
-                (["VolumeUpButton"], [.volumeUp]), (["VolumeDownButton"], [.volumeDown]),
+                (["VolumeUpButton"], [.volumeUp]), (["VolumeDownButton"], [.volumeDown])
             ] {  // N81: two buttons
                 guard let entity = names.lazy.compactMap({ view.scene.findEntity(named: $0) }).first else { continue }
                 found.append(entity.name)

@@ -14,7 +14,7 @@ import Testing
     private func record(_ device: URL, base: String) throws -> Data {
         try DeviceRecord.data([
             "id": device.lastPathComponent,
-            "unknown": ["preserved": true], "base": ["path": base], "storage": ["overlay": "missing-overlay"],
+            "unknown": ["preserved": true], "base": ["path": base], "storage": ["overlay": "missing-overlay"]
         ])
     }
     @Test func selectedDeviceResolvesLatestRecordOnlyAfterAdmission() async throws {

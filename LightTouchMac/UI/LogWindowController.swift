@@ -132,7 +132,7 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
             log.topAnchor.constraint(equalTo: controls.bottomAnchor, constant: 12),
             log.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
             log.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
-            log.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            log.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16)
         ])
     }
 
@@ -208,7 +208,7 @@ final class DeviceNoticeViewController: NSTitlebarAccessoryViewController {
             buttons.trailingAnchor.constraint(equalTo: dismiss.leadingAnchor, constant: -8),
             dismiss.widthAnchor.constraint(equalToConstant: 24),
             dismiss.heightAnchor.constraint(equalToConstant: 24),
-            dismiss.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            dismiss.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12)
         ])
     }
 

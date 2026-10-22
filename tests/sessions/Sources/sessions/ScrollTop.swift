@@ -34,12 +34,12 @@ func scrollTopCheck(_ args: ScrollTopCheck) -> Never {
             steps: [
                 // wake twice: on a loaded host the first can run out of tries while the display is still asleep.
                 "boot", "lit 0.03 300", "wait 5", "wake 0.18 0.9 0.92 0.9", "wake 0.18 0.9 0.92 0.9",
-                "agentop launch com.apple.Preferences", "wait 10", "agentop frontmost", "dump top",
+                "agentop launch com.apple.Preferences", "wait 10", "agentop frontmost", "dump top"
             ]
                 + (1...args.taps).flatMap {
                     [
                         "dragshown 0.5 0.8 0.5 0.3", "wait 4", "dump scrolled\($0)",
-                        "tapshown 0.5 \(args.y) \(args.hold)", "wait 4", "dump after\($0)",
+                        "tapshown 0.5 \(args.y) \(args.hold)", "wait 4", "dump after\($0)"
                     ]
                 } + ["quit", "expectExit 60"]
         )

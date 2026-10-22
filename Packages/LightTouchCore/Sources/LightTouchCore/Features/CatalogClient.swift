@@ -213,7 +213,7 @@ public enum CatalogClient {
                     ? []
                     : [
                         URLQueryItem(name: "q", value: query),
-                        URLQueryItem(name: "incompatible", value: "include"),
+                        URLQueryItem(name: "incompatible", value: "include")
                     ])
                 + target(device: device, os: os)
         )

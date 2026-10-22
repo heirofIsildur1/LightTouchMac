@@ -35,11 +35,11 @@ public actor HostServiceWorkers {
                     .path(FilePath(executable)),
                     arguments: Arguments([
                         "--socket", endpoint.socket, "--udid", endpoint.udid ?? "", "--session",
-                        endpoint.session.uuidString,
+                        endpoint.session.uuidString
                     ]),
                     environment: .inherit.updating([
                         "USBMUXD_SOCKET_ADDRESS": endpoint.socket,
-                        "LTM_SERVICE_UDID": endpoint.udid,
+                        "LTM_SERVICE_UDID": endpoint.udid
                     ]),
                     input: .inputWriter,
                     output: .sequence,
@@ -159,11 +159,11 @@ actor HostServiceWorker {
                     .path(FilePath(executable)),
                     arguments: Arguments([
                         "--socket", endpoint.socket, "--udid", endpoint.udid ?? "", "--session",
-                        endpoint.session.uuidString,
+                        endpoint.session.uuidString
                     ]),
                     environment: .inherit.updating([
                         "USBMUXD_SOCKET_ADDRESS": endpoint.socket,
-                        "LTM_SERVICE_UDID": endpoint.udid, "LTM_SERVICE_STAGING_SESSION": staging,
+                        "LTM_SERVICE_UDID": endpoint.udid, "LTM_SERVICE_STAGING_SESSION": staging
                     ]),
                     input: .inputWriter,
                     output: .sequence,

@@ -63,7 +63,7 @@ public enum KBoot {
         51_300_000, 200_000_000, 48_857_142, 0, 2_000_000, 342_000_000, 0, 200_000_000, 100_000_000, 200_000_000,
         166_666_666, 200_000_000, 171_000_000, 100_000_000, 102_600_000, 100_000_000, 100_000_000, 68_400_000,
         54_000_000, 0, 68_400_000, 342_000_000, 51_300_000, 0, 51_300_000, 0, 0, 12_000_000, 24_000_000,
-        24_000_000, 24_000_000, 24_000_000, 24_000_000, 1_000_000, 1_000_000, 1_000_000,
+        24_000_000, 24_000_000, 24_000_000, 24_000_000, 1_000_000, 1_000_000, 1_000_000
     ]
     /// A real iPhone 4's on 4.3 (iBoot-1072.58): the iPad's but for its 800 MHz APLL (1, 7, 9), MPLL at 500 MHz (2),
     /// 160 MHz for 166.67 (13, 29), 51.3 MHz for 68.4 (14, 36) and 48.86 MHz in 49.
@@ -71,7 +71,7 @@ public enum KBoot {
         var c = k48Clocks
         for (i, hz) in [
             1: 800_000_000, 2: 500_000_000, 7: 800_000_000, 9: 800_000_000, 13: 160_000_000, 14: 51_300_000,
-            29: 160_000_000, 36: 51_300_000, 49: 48_857_142,
+            29: 160_000_000, 36: 51_300_000, 49: 48_857_142
         ] as [Int: UInt32] { c[i] = hz }
         return c
     }()
@@ -102,7 +102,7 @@ public enum KBoot {
         ("ppn-device", 0),
         // iBoot-1219 (5.x): the populated CEs numbered across the buses (bus b's at 8b + n); AppleIOPFMI-49's
         // _fmiInitVirtToPhysMap loops forever on an empty one. 4 CEs on each of 2 buses.
-        ("ce-bitmap", 0x0F0F),
+        ("ce-bitmap", 0x0F0F)
     ]
     /// The nodes the geometry goes in: iBoot-1219 DTs carry it on flash-controller0 itself as well as on its disk.
     static let nandNodes = ["arm-io/flash-controller0", "arm-io/flash-controller0/disk"]
@@ -197,7 +197,7 @@ public enum KBoot {
             chipID: 0x8920,
             productID: [
                 0x87, 0x84, 0xae, 0x8d, 0x70, 0x66, 0xb0, 0xf0, 0x13, 0x6b,
-                0xe9, 0x1d, 0xcf, 0xe6, 0x32, 0xa4, 0x36, 0xff, 0xd6, 0xfb,
+                0xe9, 0x1d, 0xcf, 0xe6, 0x32, 0xa4, 0x36, 0xff, 0xd6, 0xfb
             ]
         )
         /// iPod touch 3G (S5L8922): -M n18, model MC008; NOR-less, so it takes the graft.
@@ -237,7 +237,7 @@ public enum KBoot {
                 ("compatible", .string("nor-flash,spi")), ("#address-cells", .u32(1)),
                 ("device_type", .string("nor-flash")), ("#size-cells", .u32(1)),
                 ("ranges", .words([0, 0, 0x10_0000])), ("reg", .words([0, 0x53, 0x0801_0000, 0, 0, 0, 0, 0])),
-                ("AAPL,phandle", .u32(0x0091_70E0)),
+                ("AAPL,phandle", .u32(0x0091_70E0))
             ]
         ),
         (
@@ -245,30 +245,30 @@ public enum KBoot {
             [
                 ("compatible", .string("diagnostic-data,format1")),
                 ("device_type", .string("diagnostic-data")),
-                ("reg", .words([0x6000, 0x2000, 0x4000, 0x2000])), ("AAPL,phandle", .u32(0x0091_74F0)),
+                ("reg", .words([0x6000, 0x2000, 0x4000, 0x2000])), ("AAPL,phandle", .u32(0x0091_74F0))
             ]
         ),
         (
             "arm-io/spi0/nor-flash", "nvram",
             [
                 ("compatible", .string("nvram,chrp")), ("device_type", .string("nvram")),
-                ("reg", .words([0xF_C000, 0x2000, 0xF_E000, 0x2000])), ("AAPL,phandle", .u32(0x0091_7880)),
+                ("reg", .words([0xF_C000, 0x2000, 0xF_E000, 0x2000])), ("AAPL,phandle", .u32(0x0091_7880))
             ]
         ),
         (
             "arm-io/spi0/nor-flash", "raw-device",
             [
                 ("compatible", .string("raw-device,non-nvram")), ("device_type", .string("raw-device")),
-                ("reg", .words([0x8000, 0xF_2000, 0, 0x1000])), ("AAPL,phandle", .u32(0x0091_7860)),
+                ("reg", .words([0x8000, 0xF_2000, 0, 0x1000])), ("AAPL,phandle", .u32(0x0091_7860))
             ]
         ),
         (
             "arm-io/spi0/nor-flash", "effaceable",
             [
                 ("compatible", .string("effaceable,nor")), ("device_type", .string("effaceable")),
-                ("reg", .words([0xF_A000, 0x1000, 0xF_B000, 0x1000])), ("AAPL,phandle", .u32(0x0091_7F70)),
+                ("reg", .words([0xF_A000, 0x1000, 0xF_B000, 0x1000])), ("AAPL,phandle", .u32(0x0091_7F70))
             ]
-        ),
+        )
     ]
 
     /// A NOR-less board: graft the NOR in. Either way take the NAND off boot duty (the N88 has its own NOR
@@ -370,12 +370,12 @@ public enum KBoot {
         let root: [(String, DeviceTree.Value)] =
             [
                 ("serial-number", .string(try need("serial-number"))),
-                ("mlb-serial-number", .string(try need("mlb-serial-number"))),
+                ("mlb-serial-number", .string(try need("mlb-serial-number")))
             ]
             + model.map { k, v in (k, .string(id[k] ?? (k == "model-number" ? board.modelNumber : v))) }
         let chosen: [(String, DeviceTree.Value)] = [
             ("unique-chip-id", .words([UInt32(ecid & 0xFFFF_FFFF), UInt32(ecid >> 32)])),
-            ("die-id", .words(dieWords)),
+            ("die-id", .words(dieWords))
         ]
         // Bluetooth hangs off whichever UART the board wires it to (K48 uart3, N81 uart1): fillDT finds it.
         return (root, chosen, [("arm-io/sdio", try mac(need("wifi-mac"))), ("bluetooth", try mac(need("bt-mac")))])
@@ -416,13 +416,13 @@ public enum KBoot {
         // cs_enforcement_disable) only with it, and an n90ap-8C148 boot never lit with it 0.
         let flags: [(String, DeviceTree.Value)] = [
             "debug-enabled", "production-cert", "secure-boot", "gid-aes-key",
-            "uid-aes-key", "system-trusted",
+            "uid-aes-key", "system-trusted"
         ].map { ($0, .u32(1)) }
         for (k, v) in flags + [("board-id", .u32(board.boardID)), ("chip-id", .u32(board.chipID))] + chosen
             + [
                 ("firmware-version", .string(iboot)), ("display-rotation", .u32(board.rotation)),
                 ("display-scale", .u32(board.scale)),
-                ("root-matching", .string(rootMatching)),
+                ("root-matching", .string(rootMatching))
             ]
         {
             // 3.1.3's DTs (N88 7E18) have none of these: nothing to fill.
@@ -447,7 +447,7 @@ public enum KBoot {
         }
         for (k, hz) in [
             ("clock-frequency", cpuHz), ("memory-frequency", memHz), ("bus-frequency", busHz),
-            ("peripheral-frequency", periphHz), ("fixed-frequency", fixedHz), ("timebase-frequency", timebaseHz),
+            ("peripheral-frequency", periphHz), ("fixed-frequency", fixedHz), ("timebase-frequency", timebaseHz)
         ] {
             try dt.set("cpus/cpu0", k, .u32(hz))
         }
@@ -587,7 +587,7 @@ public enum KBoot {
             UInt32(vbase), physBase, board.memSize, topOfKernel,
             board.vramPA, verbose ? 0 : 1, UInt32(board.fbWidth * fbDepth / 8), UInt32(board.fbWidth),
             UInt32(board.fbHeight), UInt32(fbDepth) | (board.scale - 1) << 16,
-            0, UInt32(dtVA), UInt32(dtLen),
+            0, UInt32(dtVA), UInt32(dtLen)
         ])
         ba += cmdline + [UInt8](repeating: 0, count: 256 - cmdline.count)
         image.replaceSubrange(argsVA - vbase..<argsVA - vbase + ba.count, with: ba)

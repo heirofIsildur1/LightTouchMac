@@ -20,7 +20,7 @@ struct HomeVerdictTests {
     ) -> Events {
         Events([
             ["event": "screenshot", "path": path, "brightness": brightness],
-            ["event": "home", "generation": 1, "frontmost": frontmost, "screen": screen],
+            ["event": "home", "generation": 1, "frontmost": frontmost, "screen": screen]
         ])
     }
 

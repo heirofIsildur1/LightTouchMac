@@ -120,7 +120,7 @@ public nonisolated enum DeviceStateStorage {
                 userInfo: [
                     NSFilePathErrorKey: url.path,
                     NSLocalizedDescriptionKey:
-                        "Light Touch can’t start this device because \(url.path) isn’t its writable storage.",
+                        "Light Touch can’t start this device because \(url.path) isn’t its writable storage."
                 ]
             )
         }

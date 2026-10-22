@@ -130,7 +130,7 @@ struct ShutdownLadderTests {
             // Storage failed, or the helper gone: no Shut Down.
             for change: (FakeSession) -> Void in [
                 { $0.storageFailed = true }, { $0.fakeHelper!.isDead = true },
-                { $0.isErasing = true },
+                { $0.isErasing = true }
             ] {
                 let s = session(directory, state: .running)
                 change(s)

@@ -67,7 +67,7 @@ nonisolated public struct WebProxyCA: @unchecked Sendable {
                 rsa as CFData,
                 [
                     kSecAttrKeyType: kSecAttrKeyTypeRSA,
-                    kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+                    kSecAttrKeyClass: kSecAttrKeyClassPrivate
                 ] as CFDictionary,
                 nil
             ),
@@ -154,7 +154,7 @@ nonisolated public struct WebProxyCA: @unchecked Sendable {
                     critical: false,
                     DER.seq(ip.map { DER.tlv(0x87, $0) } ?? DER.tlv(0x82, Data(host.utf8)))
                 ),
-                DER.extension("2.5.29.37", critical: false, DER.seq(DER.oid("1.3.6.1.5.5.7.3.1"))),
+                DER.extension("2.5.29.37", critical: false, DER.seq(DER.oid("1.3.6.1.5.5.7.3.1")))
             ]  // serverAuth
         } else {
             extensions = [
@@ -163,7 +163,7 @@ nonisolated public struct WebProxyCA: @unchecked Sendable {
                     critical: true,
                     DER.seq(DER.tlv(0x01, Data([0xff])), DER.integer(Data([0])))
                 ),  // CA, pathlen 0
-                DER.extension("2.5.29.15", critical: true, Data([0x03, 0x02, 0x01, 0x06])),
+                DER.extension("2.5.29.15", critical: true, Data([0x03, 0x02, 0x01, 0x06]))
             ]  // keyCertSign, cRLSign
         }
         let sha1RSA = DER.seq(DER.oid("1.2.840.113549.1.1.5"), DER.null)

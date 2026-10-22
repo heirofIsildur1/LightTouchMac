@@ -13,7 +13,7 @@ import Foundation
         var events: [VirtualInputEvent] = [
             .button(0, down: true, at: 0), .button(0, down: false, at: 150),
             .button(1, down: true, at: 2650), .button(1, down: false, at: release),
-            .touch(phase: 0, x: 65.0 / 320, y: Double(knobY) / 480, at: touchStart),
+            .touch(phase: 0, x: 65.0 / 320, y: Double(knobY) / 480, at: touchStart)
         ]
         for step in 1...24 {
             // Preserve the observed integer panel-coordinate interpolation.

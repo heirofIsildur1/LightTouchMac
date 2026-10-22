@@ -209,7 +209,7 @@ extension DeviceServices {
             }
         var properties: [String: Any] = [
             kLSQuarantineAgentNameKey as String: "Light Touch",
-            kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String
         ]
         properties[kLSQuarantineDataURLKey as String] = origin.url
         var values = URLResourceValues()

@@ -43,7 +43,7 @@ struct DeviceServices: Sendable {
             ? [DeviceFile(name: app ?? "Folder", path: app ?? "Folder", isDirectory: true, isRegular: false, size: 0)]
             : [
                 DeviceFile(name: "file.bin", path: "\(path)/file.bin", isDirectory: false, isRegular: true, size: 10),
-                DeviceFile(name: "note.txt", path: "\(path)/note.txt", isDirectory: false, isRegular: true, size: 5),
+                DeviceFile(name: "note.txt", path: "\(path)/note.txt", isDirectory: false, isRegular: true, size: 5)
             ]
     }
     func installedApps() async throws -> [InstalledApp] {

@@ -30,7 +30,7 @@ public nonisolated enum BootStage: Int, Comparable, Sendable {
         "Loading kernel cache": .loading,
         "Darwin Kernel Version": .kernel,
         "iBoot version: ": .kernel,  // the kernel's line, not iBoot's
-        "launchd[1] has started up": .system,
+        "launchd[1] has started up": .system
     ]
 
     /// Stages only move forward: a late marker never takes the boot back.

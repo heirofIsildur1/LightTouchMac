@@ -166,7 +166,7 @@ struct Feature: Identifiable {
             Feature(id: "File System", symbol: "folder", supported: f.fileSystem),
             Feature(id: "Debug Port", symbol: "ladybug", supported: f.debugPort),
             Feature(id: "SSH and SFTP", symbol: "terminal", supported: f.developerTools),
-            Feature(id: "Guest Tools", symbol: "wrench.and.screwdriver", supported: f.guestTools),
+            Feature(id: "Guest Tools", symbol: "wrench.and.screwdriver", supported: f.guestTools)
         ]
     }
 }

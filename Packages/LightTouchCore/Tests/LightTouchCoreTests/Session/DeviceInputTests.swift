@@ -87,7 +87,7 @@ struct DeviceInputTests {
             host.link.commands == [
                 .key(macKeyCode: 56, down: true), .key(macKeyCode: a, down: true),
                 .key(macKeyCode: a, down: false), .key(macKeyCode: 56, down: false),
-                .key(macKeyCode: b, down: true), .key(macKeyCode: b, down: false),
+                .key(macKeyCode: b, down: true), .key(macKeyCode: b, down: false)
             ]
         )
         input.typeText("A", shiftHeld: true)

@@ -247,7 +247,7 @@ extension SharedState {
             for (event, name) in [
                 (key(NSDeleteCharacter, 51, []), "Delete"),
                 (key(NSDeleteFunctionKey, 117, []), "Forward Delete"),
-                (key(NSDeleteCharacter, 51, [.shift, .command]), "Shift-Command-Delete"),
+                (key(NSDeleteCharacter, 51, [.shift, .command]), "Shift-Command-Delete")
             ] {
                 #expect(!vc.handleBrowserKey(event) && questions.isEmpty, "\(name) deletes nothing")
             }

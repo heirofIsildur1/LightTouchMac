@@ -43,7 +43,7 @@ struct DeviceRowTests {
     /// A stopped device's commands before iOS 5, which takes no jailbreak yet.
     static let recordCommands: Set = [
         "start", "erase", "showInFinder", "delete", "openFilesystem", "commitFilesystem", "discardFilesystem",
-        "recoverFilesystem",
+        "recoverFilesystem"
     ]
 
     /// Jailbreak…: a prepared device while it is stopped where the sandbox patch resolves, as the preparation's
@@ -65,7 +65,7 @@ struct DeviceRowTests {
         // 4 selected: 2 running, 2 prepared and stopped (one of them the iPod touch 2G's iOS 4, which takes no jailbreak yet).
         let rows = [
             row(iPod, instance: UUID(), session: .running), row(iPad, instance: UUID(), session: .running),
-            row(iPad5, instance: UUID()), row(iPod4, instance: UUID()),
+            row(iPad5, instance: UUID()), row(iPod4, instance: UUID())
         ]
         func batch(_ action: DeviceAction, _ rows: [DeviceRow] = rows) throws -> DeviceBatch<DeviceRow> {
             try #require(DeviceBatch(action, rows) { $0.allows(action, canDownload: true) })

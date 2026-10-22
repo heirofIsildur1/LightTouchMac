@@ -89,7 +89,7 @@ public struct MediaSong: Sendable {
             let formats = try await track.load(.formatDescriptions)
             let supported: Set<AudioFormatID> = [
                 kAudioFormatMPEG4AAC, kAudioFormatMPEG4AAC_HE,
-                kAudioFormatMPEGLayer3, kAudioFormatAppleLossless, kAudioFormatLinearPCM,
+                kAudioFormatMPEGLayer3, kAudioFormatAppleLossless, kAudioFormatLinearPCM
             ]
             guard !formats.isEmpty,
                 formats.allSatisfy({ format in
@@ -245,7 +245,7 @@ public struct MediaSong: Sendable {
         "Cult", "Gangsta",
         "Top 40", "Christian Rap", "Pop/Funk", "Jungle", "Native American", "Cabaret", "New Wave", "Psychadelic",
         "Rave", "Showtunes",
-        "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz", "Polka", "Retro", "Musical", "Rock & Roll", "Hard Rock",
+        "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz", "Polka", "Retro", "Musical", "Rock & Roll", "Hard Rock"
     ]
 
     /// Stream raw ADTS AAC into an M4A file using macOS audio codecs. The
@@ -266,7 +266,7 @@ public struct MediaSong: Sendable {
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: format.sampleRate,
                 AVNumberOfChannelsKey: format.channelCount,
-                AVEncoderBitRateKey: 96000 * Int(format.channelCount),
+                AVEncoderBitRateKey: 96000 * Int(format.channelCount)
             ]
             let output = try AVAudioFile(
                 forWriting: destination,

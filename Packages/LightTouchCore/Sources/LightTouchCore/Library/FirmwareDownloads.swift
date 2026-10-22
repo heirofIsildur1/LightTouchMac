@@ -186,7 +186,7 @@ public nonisolated final class FirmwareDownloads: NSObject, URLSessionDownloadDe
     /// Errors that mean the source is gone rather than the network flaking: the next source, not resume data.
     private static let unreachable: Set<Int> = [
         NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed, NSURLErrorCannotConnectToHost,
-        NSURLErrorFileDoesNotExist, NSURLErrorBadServerResponse,
+        NSURLErrorFileDoesNotExist, NSURLErrorBadServerResponse
     ]
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {

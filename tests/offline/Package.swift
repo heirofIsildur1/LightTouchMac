@@ -8,7 +8,7 @@ import PackageDescription
 let settings: [SwiftSetting] = [
     .defaultIsolation(MainActor.self),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
-    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("InferIsolatedConformances")
 ]
 
 /// Where the libimobiledevice and libplist headers are (Homebrew's), for the modules that import the engine.
@@ -22,7 +22,7 @@ let package = Package(
         .package(path: "../../Packages/HostRuntime"),
         .package(path: "../../Packages/DeviceRuntime"),
         .package(path: "../../Packages/DeviceServices"),
-        .package(path: "../../Packages/FirmwareKit"),
+        .package(path: "../../Packages/FirmwareKit")
     ],
     targets: [
         // The app's views and windows that stand alone: production files whole, with the stand-ins in StandIns.swift.
@@ -32,7 +32,7 @@ let package = Package(
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
                 .product(name: "HostRuntime", package: "HostRuntime"),
                 .product(name: "HostServiceClient", package: "DeviceServices"),
-                .product(name: "HostServiceWire", package: "DeviceServices"),
+                .product(name: "HostServiceWire", package: "DeviceServices")
             ],
             swiftSettings: settings
         ),
@@ -42,7 +42,7 @@ let package = Package(
             dependencies: [
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
                 .product(name: "FirmwareSchema", package: "FirmwareKit"),
-                .product(name: "HostRuntime", package: "HostRuntime"),
+                .product(name: "HostRuntime", package: "HostRuntime")
             ],
             swiftSettings: settings
         ),
@@ -51,7 +51,7 @@ let package = Package(
             name: "Menus",
             dependencies: [
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
-                .product(name: "HostRuntime", package: "HostRuntime"),
+                .product(name: "HostRuntime", package: "HostRuntime")
             ],
             swiftSettings: settings
         ),
@@ -61,7 +61,7 @@ let package = Package(
             dependencies: [
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
                 .product(name: "HostRuntime", package: "HostRuntime"),
-                .product(name: "DeviceRuntime", package: "DeviceRuntime"),
+                .product(name: "DeviceRuntime", package: "DeviceRuntime")
             ],
             swiftSettings: settings
         ),
@@ -70,7 +70,7 @@ let package = Package(
             name: "Model",
             dependencies: [
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
-                .product(name: "HostRuntime", package: "HostRuntime"),
+                .product(name: "HostRuntime", package: "HostRuntime")
             ],
             swiftSettings: settings
         ),
@@ -79,7 +79,7 @@ let package = Package(
             name: "Helper",
             dependencies: [
                 .product(name: "DeviceRuntime", package: "DeviceRuntime"),
-                .product(name: "HostRuntime", package: "HostRuntime"),
+                .product(name: "HostRuntime", package: "HostRuntime")
             ],
             swiftSettings: settings
         ),
@@ -102,10 +102,10 @@ let package = Package(
             name: "OfflineTests",
             dependencies: [
                 "AppViews", "Display", "Engine", "Helper", "Menus", "Model", "Sidebar", "OfflineIsolation",
-                .product(name: "DeviceRuntime", package: "DeviceRuntime"),
+                .product(name: "DeviceRuntime", package: "DeviceRuntime")
             ],
             swiftSettings: settings + [.unsafeFlags(imobiledevice)]
-        ),
+        )
     ],
     swiftLanguageModes: [.v5]
 )

@@ -92,7 +92,7 @@ private struct Movie {
             outputSettings: [
                 AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
                 AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false, AVSampleRateKey: 44100,
-                AVNumberOfChannelsKey: 2,
+                AVNumberOfChannelsKey: 2
             ]
         )
         reader.add(output)

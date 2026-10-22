@@ -88,7 +88,7 @@ struct PhoneRemoteRequestTests {
         let der = dir.appendingPathComponent("certificate.der").path
         _ = try openssl([
             "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=mac.local", "-keyout",
-            dir.appendingPathComponent("key.pem").path, "-outform", "DER", "-out", der,
+            dir.appendingPathComponent("key.pem").path, "-outform", "DER", "-out", der
         ])
         let printed = try openssl(["x509", "-inform", "DER", "-in", der, "-noout", "-fingerprint", "-sha256"])
         let expected = try #require(printed.split(separator: "=").last).trimmingCharacters(in: .whitespacesAndNewlines)

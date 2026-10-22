@@ -29,7 +29,7 @@ struct DeviceProcessTests {
             (nil, nil, true, true, .signaled(11), .unexpected),
             (nil, nil, true, true, .exited(70), .unexpected),
             (nil, nil, true, true, .unknown, .unexpected),
-            (.helperFailure("not booted"), nil, true, true, .signaled(9), .startFailed(.helperFailure("not booted"))),
+            (.helperFailure("not booted"), nil, true, true, .signaled(9), .startFailed(.helperFailure("not booted")))
         ]
         for (failure, code, requested, killed, termination, expected) in cases {
             #expect(

@@ -96,7 +96,7 @@ public enum DependencySources {
     public static func curl(_ address: String, _ to: URL) throws {
         try run([
             "/usr/bin/curl", "--fail", "--location", "--show-error", "--proto", "=https", "--proto-redir", "=https",
-            "--output", to.path, address,
+            "--output", to.path, address
         ])
     }
 
@@ -142,7 +142,7 @@ public enum DependencySources {
             [
                 "schema_version": 1, "source": source.path, "staged_source": destination.path,
                 "commit": try git("rev-parse", "HEAD"),
-                "tracked_diff_sha256": sha256Hex(Data(diff.utf8)), "modified": !diff.isEmpty, "files": records,
+                "tracked_diff_sha256": sha256Hex(Data(diff.utf8)), "modified": !diff.isEmpty, "files": records
             ],
             to: record
         )

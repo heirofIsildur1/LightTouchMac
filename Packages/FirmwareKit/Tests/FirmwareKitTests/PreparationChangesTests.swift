@@ -24,7 +24,7 @@ struct PreparationChangesTests {
         content["recipe"] = r
         var lock: [String: Any] = [
             "format": 1, "created": created, "board": row.board, "build": row.build,
-            "entry": ["id": id, "content": content], "tool": ["name": "firmwarekit", "version": "0.2.0"],
+            "entry": ["id": id, "content": content], "tool": ["name": "firmwarekit", "version": "0.2.0"]
         ]
         if let serial { lock["preparation"] = serial }
         return lock

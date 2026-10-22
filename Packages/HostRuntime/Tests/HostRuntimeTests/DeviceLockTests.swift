@@ -14,15 +14,15 @@ struct DeviceLockTests {
                 "id": "n90ap-8A293", "sha256": "ab",
                 "content": [
                     "board": "n90ap", "recipe": ["version": 2, "storage": "16g"],
-                    "keys": ["iBSS": "a", "iBEC": "b", "iBoot": "c", "kernelcache": "d"],
-                ],
+                    "keys": ["iBSS": "a", "iBEC": "b", "iBoot": "c", "kernelcache": "d"]
+                ]
             ],
             "inputs": [
-                "ipsw": ["path": "/a/b c/iPhone.ipsw", "sha1": "00"], "activation": NSNull(), "lockdown": NSNull(),
+                "ipsw": ["path": "/a/b c/iPhone.ipsw", "sha1": "00"], "activation": NSNull(), "lockdown": NSNull()
             ],
             "guest_package": ["family": "k48-ios4", "gles": true, "seed": 7, "hooks": ["/usr/lib/libappsync.dylib"]],
             "outputs": ["nand": ["listing_sha256": "cd", "pages": 12_345_678_901]], "gid_components": NSNull(),
-            "fit": ["ratio": 0.5, "warnings": [] as [Any], "ok": false], "created": "2026-10-06T22:07:58Z",
+            "fit": ["ratio": 0.5, "warnings": [] as [Any], "ok": false], "created": "2026-10-06T22:07:58Z"
         ]
         let written = try JSONSerialization.data(
             withJSONObject: record,
@@ -35,7 +35,7 @@ struct DeviceLockTests {
         #expect(lock.pinsClock && !lock.activated && lock.bootStrategy == "kboot")
         #expect(
             lock.machineOptions(base: URL(fileURLWithPath: "/nonexistent")) == [
-                "imei": "000000008926131", "rtc-epoch": "1293840000",
+                "imei": "000000008926131", "rtc-epoch": "1293840000"
             ]
         )
     }

@@ -124,7 +124,7 @@ struct BootRecipeTests {
             try writeLock("k48ap", [:])
             #expect(try options().isEmpty, "K48 takes no N72 ECID option")
             try writeIdentity([
-                "wifi-mac": "02:11:22:33:44:66", "bt-mac": "02:11:22:33:44:67", "unique-chip-id": "0x234",
+                "wifi-mac": "02:11:22:33:44:66", "bt-mac": "02:11:22:33:44:67", "unique-chip-id": "0x234"
             ])
             #expect(try options() == ["wifi-mac": "02:11:22:33:44:66"], "an existing K48 unit provisions its card")
             try writeLock("k48ap", ["wifi-mac": "02:11:22:33:44:88"])
@@ -224,7 +224,7 @@ struct BootRecipeTests {
             (nil, nil), (nil, nil), (springBoard, "Lock Screen"), (springBoard, "Lock Screen"),
             (springBoard, "Lock Screen"),
             (purpleBuddy, "Setup"), (purpleBuddy, "Setup"), (purpleBuddy, "Setup"), (springBoard, "Home Screen"),
-            (springBoard, "Home Screen"),
+            (springBoard, "Home Screen")
         ]
         #expect(lifts(fresh) == 9, "a fresh 5.x lifts at the second Home poll")
         #expect(lifts(Array(repeating: (springBoard, "Lock Screen"), count: 20)) == nil, "never on the lock screen")
@@ -232,7 +232,7 @@ struct BootRecipeTests {
         #expect(
             lifts([
                 (springBoard, "Lock Screen"), (springBoard, "Home Screen"), (purpleBuddy, "Setup"),
-                (purpleBuddy, "Setup"),
+                (purpleBuddy, "Setup")
             ]) == nil,
             "one stray unlocked poll"
         )
@@ -243,7 +243,7 @@ struct BootRecipeTests {
         )
         let reused: [Poll] = [
             (springBoard, "Lock Screen"), (springBoard, "Lock Screen"), ("com.apple.mobilesafari", "Safari"),
-            ("com.apple.mobilesafari", "Safari"),
+            ("com.apple.mobilesafari", "Safari")
         ]
         #expect(lifts(reused) == 3, "a device past Setup with no mark lifts at its first unlocked screen")
         var once = BootRecipe.SetupNetworkGate()

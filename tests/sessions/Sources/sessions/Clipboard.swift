@@ -36,7 +36,7 @@ func clipboardCheck(_ args: ClipboardCheck) -> Never {
             "boot", "waitagent 900", "wait 50", wake, "agentput \(tool.path) \(remote)",
             "guestpb \(remote) set \(fromGuest)", "wait 4",
             "hostpb \(fromMac)", "wait 4", wake, "guestpb \(remote) get", "wait 2",
-            "quit", "expectExit 60",
+            "quit", "expectExit 60"
         ]
     )
     if var prepared = scenario["prepared"] as? [String: Any] {

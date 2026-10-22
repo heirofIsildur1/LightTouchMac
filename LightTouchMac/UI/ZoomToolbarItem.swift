@@ -16,7 +16,7 @@ extension NSToolbarItem {
         let symbols = [
             ("minus.magnifyingglass", "Zoom Out", "⌘−"),
             ("arrow.up.left.and.down.right.magnifyingglass", "Zoom to Fit", "⌘0"),
-            ("plus.magnifyingglass", "Zoom In", "⌘+"),
+            ("plus.magnifyingglass", "Zoom In", "⌘+")
         ]
         for (index, (symbol, label, key)) in symbols.enumerated() {
             control.setImage(NSImage(systemSymbolName: symbol, accessibilityDescription: label), forSegment: index)

@@ -62,7 +62,7 @@ struct K48IBootTests {
         .enabled(if: FixtureRequirements.corpusEnabled, "Firmware corpus test; set FK_TEST_CORPUS=1 to run"),
         arguments: [
             "k48ap-7B367", "k48ap-7B500", "k48ap-8C148", "k48ap-8F190", "k48ap-8G4", "k48ap-8H7", "k48ap-8J3",
-            "k48ap-8K2", "k48ap-8L1", "k48ap-9A334", "k48ap-9A405", "k48ap-9B176", "k48ap-9B206", "k48ap-9A5288d",
+            "k48ap-8K2", "k48ap-8L1", "k48ap-9A334", "k48ap-9A405", "k48ap-9B176", "k48ap-9B206", "k48ap-9A5288d"
         ]
     )
     func patcherMatchesReference(id: String) throws {

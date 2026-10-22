@@ -20,7 +20,7 @@ public enum FirmwareDecryptor {
     /// Output name -> BuildManifest component.
     public static let components = [
         ("iBSS", "iBSS"), ("iBEC", "iBEC"), ("iBoot", "iBoot"), ("LLB", "LLB"),
-        ("DeviceTree", "DeviceTree"), ("AppleLogo", "AppleLogo"), ("Kernelcache", "KernelCache"),
+        ("DeviceTree", "DeviceTree"), ("AppleLogo", "AppleLogo"), ("Kernelcache", "KernelCache")
     ]
 
     public struct Result: Sendable {

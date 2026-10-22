@@ -12,7 +12,7 @@ import Testing
     for url in [
         Bundled.stateDirectory, Bundled.logsDirectory,
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0],
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     ] {
         #expect(!url.path.hasPrefix(real + "/Library"), "\(url.path) is the real library")
     }

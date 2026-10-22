@@ -24,7 +24,7 @@ struct StagingNamesTests {
         #expect(!DeviceServices.isOrphanedMediaUpload("audio.m4a.upload-" + DeviceServices.stagingSession + "-" + uuid))
         for name in [
             "audio.m4a", "image.jpg", ".photo-receipt", "song.json", "audio.m4a.upload-invalid",
-            "../image.jpg.upload-" + uuid,
+            "../image.jpg.upload-" + uuid
         ] {
             #expect(!DeviceServices.isOrphanedMediaUpload(name), "\(name)")
         }

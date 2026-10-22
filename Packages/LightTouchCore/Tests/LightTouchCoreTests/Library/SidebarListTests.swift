@@ -53,7 +53,7 @@ struct SidebarListTests {
         #expect(list.add(["n72ap-8B117"]) == false, "added twice")
         #expect(
             list.entries(in: catalog).map(\.id) == [
-                "k48ap-7B367", "k48ap-7B500", "n72ap-5F138", "n72ap-8B5080c", "n72ap-8B117", "n72ap-8C148",
+                "k48ap-7B367", "k48ap-7B500", "n72ap-5F138", "n72ap-8B5080c", "n72ap-8B117", "n72ap-8C148"
             ]
         )
     }

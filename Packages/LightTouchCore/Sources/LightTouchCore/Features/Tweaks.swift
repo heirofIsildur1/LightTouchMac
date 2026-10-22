@@ -408,7 +408,7 @@ public nonisolated struct HiddenApp: Equatable, Sendable, Identifiable {
         HiddenApp(name: "TrustMe", bundleID: "com.apple.TrustMe", bundle: "TrustMe"),
         HiddenApp(name: "WebSheet", bundleID: "com.apple.WebSheet", bundle: "WebSheet"),
         HiddenApp(name: "iAd Opt Out", bundleID: "com.apple.iad.iAdOptOut", bundle: "iAdOptOut"),
-        HiddenApp(name: "Copilot", bundleID: "com.apple.Copilot", bundle: "Copilot"),
+        HiddenApp(name: "Copilot", bundleID: "com.apple.Copilot", bundle: "Copilot")
     ]
 
     /// The candidates this guest has: its bundle there under the same identifier.

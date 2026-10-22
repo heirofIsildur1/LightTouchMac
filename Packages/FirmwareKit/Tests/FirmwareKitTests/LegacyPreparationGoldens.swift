@@ -8,7 +8,7 @@ enum LegacyPreparationGoldens {
     // Historical reference below remains unchanged for the other48 pages.
     static let n72ExactPartitionGPT = [
         "1 256": "6c9e22f327f6adbeda01579125ea9d10d844275b0510d47beb32ff47a64c075e",
-        "2 256": "ed87cbf501e2c060dc212f6f73b661956092494630f16c247093bbf7a2f63688",
+        "2 256": "ed87cbf501e2c060dc212f6f73b661956092494630f16c247093bbf7a2f63688"
     ]
     static let n72Metadata = [
         "0 0 d50120672cd8297fc9f3100f3493a29f33b52788ec5b1eb02d90a10aa83ec62f",
@@ -60,7 +60,7 @@ enum LegacyPreparationGoldens {
         "3 134 6050b8f302ab045bd8cbaaabeba62a1f17508cc31ed4c92e1a6017bbb24f8750",
         "3 135 6050b8f302ab045bd8cbaaabeba62a1f17508cc31ed4c92e1a6017bbb24f8750",
         "3 255 43d923800461745b644ebabdde371a25639269a1b851032a88191f8c50af64e6",
-        "3 524161 5b786fda3624538a14788e8b3bf408f8d7b40a55266ba12bcabbfedad1506210",
+        "3 524161 5b786fda3624538a14788e8b3bf408f8d7b40a55266ba12bcabbfedad1506210"
     ]
     /// SHSH wrapped under the UID encrypt of N72NOR.kdfConst, as iBoot derives it (it was the decrypt before).
     static let n72NOR = "35c8a2706659767f0676d438a319157de362c6e49deff9a7e57ab86147b25546"
@@ -68,12 +68,12 @@ enum LegacyPreparationGoldens {
         "k48ap-7B500": [
             "iBoot.bin": "414d1e6da26b62a507e5961d49768ab7b831842c474053e1bab09b8638ae72dd",
             "nor.bin": "76deefe8d7476c05390138897cfc97c9100d5a80574c5a5e2e01fffeb5d252b6",
-            "gid-blobs.bin": "235447077f673664c5012e9b01e2e0d424fa8673017b1f22fd8e2cf254782bb0",
+            "gid-blobs.bin": "235447077f673664c5012e9b01e2e0d424fa8673017b1f22fd8e2cf254782bb0"
         ],
         "k48ap-8C148": [
             "iBoot.bin": "c69c7425b3d204cbc0e92d1d38254d74a23120d2da7f88a2a81509134b24fd94",
             "nor.bin": "17e6a7a0c01dd86a856dc022dd04d0282b96f82b90faf18e7470db35ffc03606",
-            "gid-blobs.bin": "895b3affcf9b25ec61dc2ce16c924f934e3d41adf6ee363bfb9287c9dcdb448b",
-        ],
+            "gid-blobs.bin": "895b3affcf9b25ec61dc2ce16c924f934e3d41adf6ee363bfb9287c9dcdb448b"
+        ]
     ]
 }

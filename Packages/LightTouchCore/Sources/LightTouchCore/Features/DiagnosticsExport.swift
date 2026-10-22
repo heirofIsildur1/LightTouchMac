@@ -108,7 +108,8 @@ public nonisolated enum DiagnosticsExport {
                 let log = tail(of: source, limit: logLimit)
                 try fm.createDirectory(at: folder, withIntermediateDirectories: true)
                 try scrub((log.cut ? "(earlier lines cut)\n" : "") + log.text, secrets: secrets, identity: identity)
-                    .write(to: folder.appendingPathComponent(source.lastPathComponent), atomically: false, encoding: .utf8)
+                    .write(
+                        to: folder.appendingPathComponent(source.lastPathComponent), atomically: false, encoding: .utf8)
             }
         }
         try scrub(info, secrets: secrets, identity: identity)
@@ -119,7 +120,9 @@ public nonisolated enum DiagnosticsExport {
             for report in crashReports {
                 guard let data = try? Data(contentsOf: report) else { continue }
                 try scrubCrashReport(String(decoding: data, as: UTF8.self), identity: identity)
-                    .write(to: reports.appendingPathComponent(report.lastPathComponent), atomically: false, encoding: .utf8)
+                    .write(
+                        to: reports.appendingPathComponent(report.lastPathComponent), atomically: false, encoding: .utf8
+                    )
             }
         }
 
@@ -191,7 +194,7 @@ nonisolated extension DiagnosticsExport {
         (#"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}\b"#, "<udid>"),
         (#"\b[0-9A-Fa-f]{40}\b"#, "<udid>"),
         (#"\b\d{14,20}\b"#, "<number>"),
-        (#"\b(?=[A-Z0-9]*[0-9])(?=[A-Z0-9]*[A-Z])[A-Z0-9]{11,12}\b"#, "<serial>"),
+        (#"\b(?=[A-Z0-9]*[0-9])(?=[A-Z0-9]*[A-Z])[A-Z0-9]{11,12}\b"#, "<serial>")
     ].map { (try! NSRegularExpression(pattern: $0.0), $0.1) }
 
     /// A crash report's identifying members (its header's and its body's), whose values become <redacted>.

@@ -221,7 +221,8 @@ struct Image {
         var off = 28
         for _ in 0..<le32(b, 16) {
             guard off + 8 <= b.count else { break }
-            let cmd = le32(b, off), size = Int(le32(b, off + 4))
+            let cmd = le32(b, off)
+            let size = Int(le32(b, off + 4))
             guard size >= 8, off + size <= b.count else { break }
             if cmd == 1 {  // LC_SEGMENT
                 sg.append((le32(b, off + 24), le32(b, off + 28), le32(b, off + 32), le32(b, off + 36)))
@@ -229,8 +230,10 @@ struct Image {
                 var so = off + 56
                 for _ in 0..<nsects where so + 68 <= off + size {
                     sc.append(
-                        (Image.cstr(b, so, 16), Image.cstr(b, so + 16, 16), le32(b, so + 32), le32(b, so + 36),
-                            le32(b, so + 40)))
+                        (
+                            Image.cstr(b, so, 16), Image.cstr(b, so + 16, 16), le32(b, so + 32), le32(b, so + 36),
+                            le32(b, so + 40)
+                        ))
                     so += 68
                 }
             }
@@ -302,11 +305,14 @@ struct Image {
 
     /// The kext Mach-O's own __text (addr, size) given its load address.
     func kextText(_ kaddr: UInt32) -> (UInt32, UInt32)? {
-        guard let koff = addrToOff(kaddr), koff + 28 <= bytes.count, le32(bytes, koff) == 0xFEED_FACE else { return nil }
+        guard let koff = addrToOff(kaddr), koff + 28 <= bytes.count, le32(bytes, koff) == 0xFEED_FACE else {
+            return nil
+        }
         var off = koff + 28
         for _ in 0..<le32(bytes, koff + 16) {
             guard off + 8 <= bytes.count else { break }
-            let cmd = le32(bytes, off), size = Int(le32(bytes, off + 4))
+            let cmd = le32(bytes, off)
+            let size = Int(le32(bytes, off + 4))
             guard size >= 8 else { break }
             if cmd == 1 {
                 let nsects = Int(le32(bytes, off + 48))

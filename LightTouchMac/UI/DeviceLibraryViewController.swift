@@ -103,7 +103,7 @@ final class DeviceLibraryViewController: NSViewController, NSOutlineViewDataSour
             scroll.topAnchor.constraint(equalTo: container.topAnchor),
             scroll.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             addButton.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            addButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            addButton.centerYAnchor.constraint(equalTo: container.centerYAnchor)
         ])
         view = container
 
@@ -111,7 +111,7 @@ final class DeviceLibraryViewController: NSViewController, NSOutlineViewDataSour
         refresh()
 
         for name in [
-            DeviceLibrary.didChangeNotification, FirmwareJobs.didChangeNotification, IPSWStore.didChangeNotification,
+            DeviceLibrary.didChangeNotification, FirmwareJobs.didChangeNotification, IPSWStore.didChangeNotification
         ] {
             NotificationCenter.default.addObserver(self, selector: #selector(stateDidChange), name: name, object: nil)
         }
@@ -485,7 +485,7 @@ final class DeviceLibraryViewController: NSViewController, NSOutlineViewDataSour
         (.openFilesystem, "Show File System in Finder"), (.commitFilesystem, "Save File System Changes"),
         (.discardFilesystem, "Discard File System Changes"), (.recoverFilesystem, "Finish File System Recovery"),
         (nil, ""),
-        (.jailbreak, "Jailbreak…"), (.erase, "Erase All Content and Settings…"),
+        (.jailbreak, "Jailbreak…"), (.erase, "Erase All Content and Settings…")
     ]
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -713,7 +713,7 @@ final class DeviceRowCell: NSTableCellView {
             icon.widthAnchor.constraint(equalToConstant: 30),
             icon.heightAnchor.constraint(equalTo: icon.widthAnchor),
             ring.widthAnchor.constraint(equalToConstant: 16),
-            ring.heightAnchor.constraint(equalToConstant: 16),
+            ring.heightAnchor.constraint(equalToConstant: 16)
         ])
     }
 
@@ -742,7 +742,7 @@ final class DeviceRowCell: NSTableCellView {
             ([
                 "iOS \(row.entry.version) (\(row.entry.build))",
                 row.supportNote,
-                row.accessory == .notDownloaded ? size.map { "Not downloaded, \($0)" } ?? "Not downloaded" : nil,
+                row.accessory == .notDownloaded ? size.map { "Not downloaded, \($0)" } ?? "Not downloaded" : nil
             ]
             + [row.progressHeadline] + row.progressDetail + [row.progressLine]).compactMap { $0 }.joined(
                 separator: "\n"

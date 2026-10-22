@@ -20,7 +20,7 @@ public struct Events {
     public init(jsonLines text: String) {
         all = text.split(separator: "\n").map { line in
             (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? Event ?? [
-                "event": "text", "text": String(line),
+                "event": "text", "text": String(line)
             ]
         }
     }
@@ -193,7 +193,7 @@ public enum SessionJudge {
             guard lstat(root.appendingPathComponent(rel).path, &st) == 0 else { continue }
             out[rel] = [
                 Int(st.st_size), Int(st.st_mode),
-                Int(st.st_mtimespec.tv_sec) * 1_000_000_000 + Int(st.st_mtimespec.tv_nsec),
+                Int(st.st_mtimespec.tv_sec) * 1_000_000_000 + Int(st.st_mtimespec.tv_nsec)
             ]
         }
         return out

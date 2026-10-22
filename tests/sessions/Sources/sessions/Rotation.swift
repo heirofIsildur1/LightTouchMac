@@ -63,7 +63,7 @@ func rotationCheck(_ args: RotationCheck) -> Never {
                 "autorotate off", "button 0", "wait 6", "follow locked",
                 "agentop launch com.apple.mobilesafari", "wait 8", "tapword Safari -0.06", "wait 10",
                 "follow locked-back", "autorotate on",
-                "quit", "expectExit 60",
+                "quit", "expectExit 60"
             ]
         )
     )
@@ -116,7 +116,7 @@ private func heldChecks(_ d: HelperDriver, _ r: Report, iPad: Bool, major: Int, 
     let kept = followed["back"]?.int("degrees") ?? -2
     let want: [(String, interface: Int?, shell: Int?)] = [
         ("held", 270, 270), ("home", home, home), ("back", back, back), ("locked", home, kept),
-        ("locked-back", back, kept),
+        ("locked-back", back, kept)
     ]
     for (name, interface, shell) in want {
         let e = followed[name]

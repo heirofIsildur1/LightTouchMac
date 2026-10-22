@@ -479,7 +479,7 @@ extension SharedState {
                 split.leadingAnchor.constraint(equalTo: host.leadingAnchor),
                 split.trailingAnchor.constraint(equalTo: host.trailingAnchor),
                 split.topAnchor.constraint(equalTo: host.topAnchor),
-                split.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+                split.bottomAnchor.constraint(equalTo: host.bottomAnchor)
             ])
             func resize(_ height: CGFloat) {
                 hostHeight.constant = height + ConsoleBar.height
@@ -521,7 +521,7 @@ extension SharedState {
             bar.source.selectItem(withTitle: "USB")
             bar.source.sendAction(bar.source.action, to: bar.source.target)
             split.sources = [
-                URL(fileURLWithPath: "/elsewhere/serial.log"), URL(fileURLWithPath: "/elsewhere/usbmuxd.log"),
+                URL(fileURLWithPath: "/elsewhere/serial.log"), URL(fileURLWithPath: "/elsewhere/usbmuxd.log")
             ]
             #expect(
                 bar.source.titleOfSelectedItem == "USB" && log.url?.path == "/elsewhere/usbmuxd.log",

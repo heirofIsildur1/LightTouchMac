@@ -13,7 +13,7 @@ nonisolated func logEvent(_ message: String) {
         // The lockdown writes (Lockdown/Lockdown.h): one per process, which exits with the operation's status.
         let operations = [
             "lockdown-tz": ltm_lockdown_tz, "lockdown-mcinstall": ltm_lockdown_mcinstall,
-            "lockdown-ddi": ltm_lockdown_ddi, "lockdown-ax": ltm_lockdown_ax,
+            "lockdown-ddi": ltm_lockdown_ddi, "lockdown-ax": ltm_lockdown_ax
         ]
         if let name = args.first, let operation = operations[name] {
             exit(operation(CommandLine.argc - 1, CommandLine.unsafeArgv + 1))

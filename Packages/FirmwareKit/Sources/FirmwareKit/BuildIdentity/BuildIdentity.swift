@@ -194,7 +194,7 @@ public enum BuildComponents {
             "iBoot": af + "iBoot.\(board).RELEASE.\(x)", "LLB": af + "LLB.\(board).RELEASE.\(x)",
             "DeviceTree": af + "DeviceTree.\(board).\(x)",
             "AppleLogo": af + (img2 ? "applelogo.img2" : "applelogo.\(plat).img3"),
-            "KernelCache": kc, "OS": os, "RestoreRamDisk": user,
+            "KernelCache": kc, "OS": os, "RestoreRamDisk": user
         ]
         if let update = r.updateRamDisk {
             comp["UpdateRamDisk"] = update

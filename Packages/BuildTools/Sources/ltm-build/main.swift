@@ -17,7 +17,7 @@ struct LTMBuild: ParsableCommand {
         commandName: "ltm-build",
         subcommands: [
             VendorCommand.self, CheckMachO.self, MergeNativeCommand.self, Sources.self, StaticRecord.self,
-            NativeRecord.self,
+            NativeRecord.self
         ]
     )
 }

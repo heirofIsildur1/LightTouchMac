@@ -14,7 +14,7 @@ struct VMStateTransitionTests {
             "booting→booting", "booting→running", "booting→poweredOff", "booting→dead",
             "running→paused", "running→booting", "running→poweredOff", "running→dead",
             "paused→running", "paused→booting", "paused→poweredOff", "paused→dead",
-            "poweredOff→booting", "poweredOff→poweredOff", "poweredOff→dead",
+            "poweredOff→booting", "poweredOff→poweredOff", "poweredOff→dead"
         ]
         func name(_ state: VMState) -> String { state.isDead ? "dead" : "\(state)" }
         for from in Self.states {

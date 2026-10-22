@@ -40,7 +40,7 @@ import Testing
             try fm.createDirectory(at: sc, withIntermediateDirectories: true)
             let service: [String: Any] = [
                 "Interface": ["DeviceName": "en0", "Hardware": "AirPort", "Type": "Ethernet"],
-                "UserDefinedName": "AirPort",
+                "UserDefinedName": "AirPort"
             ]
             try PropertyListSerialization.data(
                 fromPropertyList: ["NetworkServices": ["CONFIGD": service]],
@@ -58,7 +58,7 @@ import Testing
         let dirs = [
             "private", "private/var", "private/var/root", N45Board.rootLibrary, N45Board.rootLibrary + "/Preferences",
             Self.scPrefs,
-            Self.scPrefs + "/preferences.plist", Self.scPrefs + "/com.apple.wifi.plist",
+            Self.scPrefs + "/preferences.plist", Self.scPrefs + "/com.apple.wifi.plist"
         ]
         // root's, as the recipe leaves them
         try HFSPlusVolume(image, writable: true).setOwner(dirs, uid: 0, gid: 0, mode: 0o755)
@@ -73,13 +73,13 @@ import Testing
         // the app pinned it at first boot
         try Data("old".utf8).write(to: overlay.appendingPathComponent(".base-identity"))
         let lock: [String: Any] = [
-            "board": "m68ap", "entry": ["id": "m68ap-1A543a", "content": ["recipe": ["name": "m68", "version": 1]]],
+            "board": "m68ap", "entry": ["id": "m68ap-1A543a", "content": ["recipe": ["name": "m68", "version": 1]]]
         ]
         try JSONSerialization.data(withJSONObject: lock).write(to: base.appendingPathComponent("device.lock.json"))
         let record: [String: Any] = [
             "id": UUID().uuidString, "board": "m68ap", "firmware": "m68ap-1A543a",
             "base": ["kind": "prepared", "path": base.path],
-            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"],
+            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         #expect(try N45Migration.pending(device: device, policy: .standalone) == 2)
@@ -193,15 +193,15 @@ import Testing
             let lock: [String: Any] = [
                 "board": "n45ap", "preparation": serial,
                 "entry": [
-                    "id": "n45ap-4A102", "content": ["version": version, "recipe": ["name": "n45", "version": 3]],
-                ],
+                    "id": "n45ap-4A102", "content": ["version": version, "recipe": ["name": "n45", "version": 3]]
+                ]
             ]
             try JSONSerialization.data(withJSONObject: lock).write(to: base.appendingPathComponent("device.lock.json"))
         }
         let record: [String: Any] = [
             "id": UUID().uuidString, "board": "n45ap", "firmware": "n45ap-4A102",
             "base": ["kind": "prepared", "path": base.path],
-            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"],
+            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         try lock(version: "1.1.4", serial: 15)

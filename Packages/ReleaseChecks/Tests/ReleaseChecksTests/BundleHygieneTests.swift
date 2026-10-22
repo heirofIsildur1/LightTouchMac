@@ -16,7 +16,7 @@ struct BundleHygieneTests {
             try "int main(void) { return 0; }\n".write(to: main, atomically: true, encoding: .utf8)
             for args in [
                 ["-g", "-c", main.path, "-o", root.appendingPathComponent("main.o").path],
-                [root.appendingPathComponent("main.o").path, "-o", root.appendingPathComponent("debug").path],
+                [root.appendingPathComponent("main.o").path, "-o", root.appendingPathComponent("debug").path]
             ] {
                 try #require(try Shell.run(["cc"] + args).succeeded)
             }
@@ -55,13 +55,13 @@ struct BundleHygieneTests {
             let app = root.appendingPathComponent("\(label).app")
             for (name, salt) in [
                 ("Contents/MacOS/usbmuxd", "u"), ("Contents/Frameworks/libplist-2.0.4.dylib", "p"),
-                ("Contents/MacOS/inetcat", "i"), ("Contents/MacOS/LightTouchServices", "w"),
+                ("Contents/MacOS/inetcat", "i"), ("Contents/MacOS/LightTouchServices", "w")
             ] {
                 try write(stripped + Data(salt.utf8), name, in: app)  // distinct contents, still a Mach-O
             }
             try guest(["guest-tools/it_agent": stripped + Data("a".utf8)], into: app)
             for directory in [
-                "usbmuxd", "libimobiledevice-glue", "libplist", "qemu", "inetcat", "libusbmuxd",
+                "usbmuxd", "libimobiledevice-glue", "libplist", "qemu", "inetcat", "libusbmuxd"
             ] {
                 try write(Data("license text".utf8), "Contents/Resources/licenses/\(directory)/COPYING", in: app)
                 try write(
@@ -87,7 +87,7 @@ struct BundleHygieneTests {
             let root = "Contents/Resources/Device/n72ap-7E18.itbase"
             let files: [(String, Data)] = [
                 ("device.lock.json", try JSONSerialization.data(withJSONObject: ["identity": ["seed": seed]])),
-                ("identity.json", try JSONSerialization.data(withJSONObject: ["seed": seed])),
+                ("identity.json", try JSONSerialization.data(withJSONObject: ["seed": seed]))
             ]
             for (name, data) in files { try write(data, "\(root)/files/\(name)", in: app) }
             let chunk = Data(repeating: UInt8(ascii: "p"), count: 5000) + extra
@@ -95,7 +95,7 @@ struct BundleHygieneTests {
             let index: [String: Any] = [
                 "format": 2, "chunkBytes": 1 << 20,
                 "files": files.map { ["name": $0.0, "size": $0.1.count, "mode": 0o444, "sha256": ""] },
-                "images": [["name": "nand/cs0.pages", "size": chunk.count, "mode": 0o444, "chunks": ["000000": ""]]],
+                "images": [["name": "nand/cs0.pages", "size": chunk.count, "mode": 0o444, "chunks": ["000000": ""]]]
             ]
             try write(try JSONSerialization.data(withJSONObject: index), "\(root)/index.json", in: app)
         }
@@ -215,7 +215,7 @@ struct BundleHygieneTests {
             try f.guest(
                 [
                     "guest-tools/it_agent": f.stripped + Data("a".utf8),
-                    "guest-tools/it.plist": Data("/Users/someone/x".utf8),
+                    "guest-tools/it.plist": Data("/Users/someone/x".utf8)
                 ],
                 into: broken
             )

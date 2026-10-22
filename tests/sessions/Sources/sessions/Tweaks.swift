@@ -44,7 +44,7 @@ func tweaksCheck(_ args: TweaksCheck) -> Never {
         ? "com.apple.fieldtest" : !before("4.2") ? "com.apple.iosdiagnostics" : "com.apple.DemoApp"
     let first = ["signalNumbers"] + (keynote ? ["keynoteClock"] : []) + (colors ? ["coreAnimationColors"] : [])
     var steps = [
-        "boot", "lit 0.1 400", "wait 20", "button 0", "wait 2", unlock, "wait 3", "waitagent 240", "ocr before",
+        "boot", "lit 0.1 400", "wait 20", "button 0", "wait 2", unlock, "wait 3", "waitagent 240", "ocr before"
     ]
     steps += ["tweaks \(first.joined(separator: ","))", "wait 2"] + wake + ["ocr on"]
     // The same set with the Marketing Status Bar: the overrides need no respring, the keys do. Then a respring from
@@ -60,7 +60,7 @@ func tweaksCheck(_ args: TweaksCheck) -> Never {
     }
     steps +=
         ["hidden \(hidden)", "button 0", "wait 3", "tweaks none", "wait 2"] + wake + [
-            "ocr off", "quit", "expectExit 60",
+            "ocr off", "quit", "expectExit 60"
         ]
     func scenario(_ name: String, _ steps: [String], clock: Double? = nil) -> [String: Any] {
         var s = preparedScenario(base, tools: tools, work: work, name: name, steps: steps)
@@ -149,7 +149,7 @@ func tweaksCheck(_ args: TweaksCheck) -> Never {
                 "boot", "lit 0.1 400", "wait 20", "button 0", "wait 2", unlock, "wait 3", "waitagent 240",
                 // Time Machine writes no keys: network time stays on and the machine's network answers NTP in its
                 // clock, so 5.x to 7.x timed keeps the pinned time all the boot
-                "tweaks timeMachine", "wait 30", "ocr clock", "quit", "expectExit 60",
+                "tweaks timeMachine", "wait 30", "ocr clock", "quit", "expectExit 60"
             ],
             clock: 1_168_364_460  // 9:41 AM in San Francisco, January 9, 2007
         )

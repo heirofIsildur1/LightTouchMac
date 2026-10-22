@@ -34,7 +34,7 @@ struct MediaSupportTests {
             "n81ap-10B500", "n88ap-10A403", "n88ap-10A523", "n88ap-10B141", "n88ap-10B146", "n88ap-10B329",
             "n88ap-10B500", "n90ap-10A403", "n90ap-10A523", "n90ap-10B144", "n90ap-10B146", "n90ap-10B329",
             "n90ap-11A465", "n90ap-11A501", "n90ap-11B511", "n90ap-11B554a", "n90ap-11B651", "n90ap-11D169",
-            "n90ap-11D201", "n90ap-11D257",
+            "n90ap-11D201", "n90ap-11D257"
         ].map { ($0, all) }
     )
     static let nouns = ["Music": "music", "Videos": "videos", "Photos": "photos"]

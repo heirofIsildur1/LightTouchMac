@@ -128,7 +128,7 @@ struct DeveloperToolsTests {
         ),
         arguments: [
             "missing-binary", "tampered-binary", "missing-source", "tampered-source", "missing-notice",
-            "tampered-notice", "private-key", "symlink",
+            "tampered-notice", "private-key", "symlink"
         ]
     )
     func releaseAuditRejectsIncompleteOrPrivatePayload(damage: String) throws {

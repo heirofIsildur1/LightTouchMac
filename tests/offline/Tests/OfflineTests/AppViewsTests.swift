@@ -17,7 +17,7 @@ extension SharedState {
         @Test func jailbreakAlertNamesWhatItAdds() throws {
             for (version, name, substrate) in [
                 ("4.2.1", "iPhone 4 (4.2.1)", true), ("7.1.2", "iPhone 4 (7.1.2)", false),
-                ("2.2.1", "iPod touch (2.2.1)", false),
+                ("2.2.1", "iPod touch (2.2.1)", false)
             ] {
                 let alert = JailbreakAlert.make(name: name, version: version)
                 #expect(alert.messageText == "Jailbreak \(name)?")
@@ -47,7 +47,7 @@ extension SharedState {
                 "No apps installed", "Waiting for the device…", "Legacy Store isn’t responding. Try again in a moment.",
                 "Couldn’t reach Legacy Store — The Internet connection appears to be offline.",
                 "Couldn’t reach Legacy Store — A server with the specified hostname could not be found.",
-                "Legacy Store sent a response Light Touch couldn’t read.",
+                "Legacy Store sent a response Light Touch couldn’t read."
             ]
             for width in [280.0, 320.0, 400.0] {
                 for text in messages {
@@ -86,7 +86,7 @@ extension SharedState {
                         message.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 16),
                         message.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -16),
                         retry.topAnchor.constraint(equalTo: message.bottomAnchor, constant: 12),
-                        retry.centerXAnchor.constraint(equalTo: pane.centerXAnchor),
+                        retry.centerXAnchor.constraint(equalTo: pane.centerXAnchor)
                     ])
                     host.layoutSubtreeIfNeeded()
                     let name = "\(Int(width)) “\(text)”"

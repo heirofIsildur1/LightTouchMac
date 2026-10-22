@@ -24,7 +24,7 @@ final class DeviceContentView: NSView {
             screen.leadingAnchor.constraint(equalTo: leadingAnchor),
             screen.trailingAnchor.constraint(equalTo: trailingAnchor),
             screen.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
-            screen.bottomAnchor.constraint(equalTo: bottomAnchor),
+            screen.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         statuses.orientation = .vertical
         statuses.alignment = .centerX
@@ -34,7 +34,7 @@ final class DeviceContentView: NSView {
         NSLayoutConstraint.activate([
             statuses.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
             statuses.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -8),
-            statuses.widthAnchor.constraint(lessThanOrEqualTo: overlay.widthAnchor, constant: -16),
+            statuses.widthAnchor.constraint(lessThanOrEqualTo: overlay.widthAnchor, constant: -16)
         ])
     }
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -66,13 +66,13 @@ final class DeviceContentView: NSView {
         }
         for name in [
             NSApplication.didBecomeActiveNotification, NSApplication.didUnhideNotification,
-            NSApplication.didResignActiveNotification,
+            NSApplication.didResignActiveNotification
         ] {
             NotificationCenter.default.addObserver(self, selector: #selector(refreshOverlay), name: name, object: NSApp)
         }
         for name in [
             NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didDeminiaturizeNotification,
-            NSWindow.didMoveNotification, NSWindow.didResizeNotification,
+            NSWindow.didMoveNotification, NSWindow.didResizeNotification
         ] {
             NotificationCenter.default.addObserver(
                 self,

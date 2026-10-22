@@ -44,7 +44,8 @@ struct VibrationBuzzTests {
         let missed = render(buzz, seconds: 0.3)
         let rate = VibrationBuzz.sampleRate
         #expect(loud(missed.prefix(Int(VibrationBuzz.missedPulse * rate))) > Int(0.05 * rate))
-        #expect(missed.dropFirst(Int((VibrationBuzz.missedPulse + 2 * VibrationBuzz.ramp) * rate)).allSatisfy { $0 == 0 })
+        #expect(
+            missed.dropFirst(Int((VibrationBuzz.missedPulse + 2 * VibrationBuzz.ramp) * rate)).allSatisfy { $0 == 0 })
         #expect(buzz.isIdle)
     }
 

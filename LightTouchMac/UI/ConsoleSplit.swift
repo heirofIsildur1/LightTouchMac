@@ -53,7 +53,7 @@ final class ConsoleSplitView: NSView {
             log.leadingAnchor.constraint(equalTo: leadingAnchor),
             log.trailingAnchor.constraint(equalTo: trailingAnchor),
             log.bottomAnchor.constraint(equalTo: bottomAnchor),
-            consoleHeight, topMinimum,
+            consoleHeight, topMinimum
         ])
         bar.onToggle = { [weak self] in self?.toggle() }
         bar.onDragBegan = { [weak self] y in
@@ -252,7 +252,7 @@ final class ConsoleBar: NSView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor), stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            filter.widthAnchor.constraint(equalToConstant: 180),
+            filter.widthAnchor.constraint(equalToConstant: 180)
         ])
         isExpanded = false
     }

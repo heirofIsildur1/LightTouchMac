@@ -26,7 +26,7 @@ public enum SetupPages {
     public static func kind(of page: String) -> String? {
         [
             "language": "list", "country": "list", "location": "location", "wi-fi": "wi-fi", "set up": "set up",
-            "apple id": "apple id", "diagnostics": "diagnostics", "thank you": "thank you",
+            "apple id": "apple id", "diagnostics": "diagnostics", "thank you": "thank you"
         ][page]
     }
 
@@ -68,7 +68,7 @@ public enum SetupPlan {
         "Start Using iPod touch", "Start Using iPod", "Start Using iPhone", "Get Started",
         "Set Up as New iPod touch", "Set Up as New iPod", "Set Up as New iPhone",
         "Disable Location Services", "Skip This Step", "Agree", "Don't Add Passcode",
-        "Don't Use iCloud", "Don't Send", country,
+        "Don't Use iCloud", "Don't Send", country
     ]
     /// The country row the walk picks, by its name wherever the list puts it: 7.x's list has no suggestions and starts
     /// at Afghanistan, and a row picked by place gave the device a Persian or Arabic region.

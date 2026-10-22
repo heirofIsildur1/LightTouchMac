@@ -288,7 +288,7 @@ import os
                 string: "\t\(fingerprint)\n",
                 attributes: [
                     .font: NSFont.monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular),
-                    .paragraphStyle: paragraph,
+                    .paragraphStyle: paragraph
                 ]
             )
         )
@@ -310,7 +310,7 @@ import os
             stack.widthAnchor.constraint(equalToConstant: 380),
             tile.widthAnchor.constraint(equalToConstant: 180),
             tile.heightAnchor.constraint(equalToConstant: 180),
-            steps.widthAnchor.constraint(equalToConstant: 260),
+            steps.widthAnchor.constraint(equalToConstant: 260)
         ])
         stack.frame.size = stack.fittingSize
         alert.accessoryView = stack
@@ -361,11 +361,11 @@ import os
         try openssl([
             "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "825", "-subj", "/CN=\(host)",
             "-addext", "subjectAltName=DNS:\(host)", "-addext", "extendedKeyUsage=serverAuth",
-            "-keyout", key, "-out", certificate,
+            "-keyout", key, "-out", certificate
         ])
         try? FileManager.default.removeItem(at: p12)
         try openssl([
-            "pkcs12", "-export", "-inkey", key, "-in", certificate, "-passout", "pass:\(passphrase)", "-out", p12.path,
+            "pkcs12", "-export", "-inkey", key, "-in", certificate, "-passout", "pass:\(passphrase)", "-out", p12.path
         ])
     }
 

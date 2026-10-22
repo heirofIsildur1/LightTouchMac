@@ -9,7 +9,7 @@ struct HomeScreenLayoutTests {
     let page: [Any] = [
         ["displayIdentifier": "com.apple.MobileAddressBook"],
         ["displayIdentifier": "com.shazam.Shazam"],
-        ["displayIdentifier": "com.condenet.Epicurious"],
+        ["displayIdentifier": "com.condenet.Epicurious"]
     ]
     var state: [Any] { [dock, page] }
 
@@ -17,7 +17,7 @@ struct HomeScreenLayoutTests {
         #expect(
             HomeScreenLayout.flatten(state) == [
                 "com.apple.mobilemusic", "com.apple.MobileAddressBook",
-                "com.shazam.Shazam", "com.condenet.Epicurious",
+                "com.shazam.Shazam", "com.condenet.Epicurious"
             ]
         )
     }
@@ -44,7 +44,7 @@ struct HomeScreenLayoutTests {
         #expect(
             HomeScreenLayout.flatten(moved) == [
                 "com.apple.mobilemusic", "com.apple.MobileAddressBook",
-                "com.condenet.Epicurious", "com.shazam.Shazam",
+                "com.condenet.Epicurious", "com.shazam.Shazam"
             ]
         )
         #expect((moved[0] as? [Any])?.count == 1)

@@ -20,7 +20,7 @@ struct FirmwareCatalogTests {
         var e: [String: Any] = [
             "id": "\(board.0)-\(build)", "board": board.0, "product_type": board.1, "version": version, "build": build,
             "status": "available", "source": ["kind": "ipsw"], "keys": [:] as [String: Any],
-            "emulator": ["min_protocol": 1], "estimates": ["seconds": 1, "prepared_bytes": 1, "peak_bytes": 1],
+            "emulator": ["min_protocol": 1], "estimates": ["seconds": 1, "prepared_bytes": 1, "peak_bytes": 1]
         ]
         if let prerelease { e["prerelease"] = prerelease }
         if let number { e["prerelease_number"] = number }
@@ -43,7 +43,7 @@ struct FirmwareCatalogTests {
             entry(ipad, "5.0", "9A334", released: "2011-10-12"), entry(ipad, "4.3.5", "8L1", released: "2011-07-25"),
             entry(ipad, "5.0", "9A5220p", "beta", 1, released: "2011-06-07"),
             entry(ipad, "4.3.4", "8K2", released: "2011-07-15"),
-            entry(ipad, "4.3.3", "8J3", released: "2011-05-04"),
+            entry(ipad, "4.3.3", "8J3", released: "2011-05-04")
         ]
     }()
 
@@ -57,7 +57,7 @@ struct FirmwareCatalogTests {
                     "n72ap 4.1 8B5080c", "n72ap 4.1 8B5091b", "n72ap 4.1 8B117",
                     "n72ap 4.2 8C5115c", "n72ap 4.2 8C134", "n72ap 4.2 8C134b", "n72ap 4.2.1 8C148",
                     "k48ap 3.2 7B367", "k48ap 3.2.2 7B500", "k48ap 4.2.1 8C148",
-                    "k48ap 4.3.3 8J3", "k48ap 4.3.4 8K2", "k48ap 4.3.5 8L1", "k48ap 5.0 9A5220p", "k48ap 5.0 9A334",
+                    "k48ap 4.3.3 8J3", "k48ap 4.3.4 8K2", "k48ap 4.3.5 8L1", "k48ap 5.0 9A5220p", "k48ap 5.0 9A334"
                 ]
             )
             #expect(
@@ -107,7 +107,7 @@ struct FirmwareCatalogTests {
         )
         #expect(
             s.entries.filter { $0.board == "n72ap" && $0.version == "4.1" }.map(\.build) == [
-                "8B5080c", "8B5091b", "8B5097d", "8B117",
+                "8B5080c", "8B5091b", "8B5097d", "8B117"
             ]
         )
         #expect(s.entries.allSatisfy { $0.prerelease == nil || $0.prereleaseBadge?.last?.isNumber == true })

@@ -33,7 +33,7 @@ let fixtureMachines: Void = {
             surfaces[key]
             ?? {
                 let s = IOSurface(properties: [
-                    .width: Int(frameWidth), .height: Int(frameHeight), .bytesPerElement: 4, .pixelFormat: 0x4247_5241,
+                    .width: Int(frameWidth), .height: Int(frameHeight), .bytesPerElement: 4, .pixelFormat: 0x4247_5241
                 ])!
                 s.lock(options: [], seed: nil)
                 for y in 0..<Int(frameHeight) {

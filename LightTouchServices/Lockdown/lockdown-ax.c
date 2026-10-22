@@ -63,7 +63,8 @@ int ltm_lockdown_ax(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         char key[128];
         size_t n = strchr(argv[i], '=') - argv[i];
-        if (n >= sizeof key) n = sizeof key - 1;
+        if (n >= sizeof key)
+            n = sizeof key - 1;
         memcpy(key, argv[i], n);
         key[n] = 0;
         int on = argv[i][strlen(argv[i]) - 1] == '1';

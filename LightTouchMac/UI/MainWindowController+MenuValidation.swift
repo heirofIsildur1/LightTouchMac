@@ -13,7 +13,7 @@ extension MainWindowController: NSMenuItemValidation {
         #selector(toggleDeviceRunning(_:)): (.start, "Start"),
         #selector(deviceForceStop(_:)): (.forceStop, "Force Stop…"),
         #selector(jailbreakDevice(_:)): (.jailbreak, "Jailbreak…"),
-        #selector(eraseDevice(_:)): (.erase, "Erase All Content and Settings…"),
+        #selector(eraseDevice(_:)): (.erase, "Erase All Content and Settings…")
     ]
 
     /// The selected device as the Device menu's items see it (DeviceMenuState).

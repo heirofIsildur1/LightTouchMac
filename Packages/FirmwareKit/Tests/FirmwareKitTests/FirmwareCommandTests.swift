@@ -35,13 +35,13 @@ struct FirmwareCommandTests {
             FirmwareCommand.Unmount(out: url),
             FirmwareCommand.CachePrune(root: url),
             FirmwareCommand.DetachImages(root: url),
-            FirmwareCommand.Unwrap(entry: url, archive: url, out: url),
+            FirmwareCommand.Unwrap(entry: url, archive: url, out: url)
         ]
         // The ones only people and scripts type, in `arguments`' order.
         let typed = [
             [
                 "create", "--catalog", "c", "--id", "x", "--ipsw", "i", "--out", "o", "--stop-after", "volumes",
-                "--gl-test",
+                "--gl-test"
             ],
             ["export", "--device", "/d", "--volume", "data", "--out", "/o", "--record-policy", "managed"],
             ["verify-keys", "--entry", "/e", "--ipsw", "/i"],
@@ -49,9 +49,9 @@ struct FirmwareCommandTests {
             ["fetch", "--entry", "/e", "--out", "/o"],
             [
                 "developer-offer", "--offer", "/o", "--payload", "/p", "--state", "/s", "--instance", "U",
-                "--public-key", "/k", "--serial", "3",
+                "--public-key", "/k", "--serial", "3"
             ],
-            ["developer-audit", "--payload", "/p"],
+            ["developer-audit", "--payload", "/p"]
         ]
         var covered: Set<String> = []
         for arguments in built.map(\.arguments) + typed {
@@ -66,14 +66,16 @@ struct FirmwareCommandTests {
     /// The app's Skip Setup Assistant choice reaches the preparer as --skip-setup, and only when chosen.
     @Test func createPassesSkipSetupOnlyWhenChosen() {
         let url = URL(fileURLWithPath: "/tmp/x")
-        #expect(FirmwareCommand.Create(entry: url, ipsw: url, out: url, skipSetup: true).arguments.last == "--skip-setup")
+        #expect(
+            FirmwareCommand.Create(entry: url, ipsw: url, out: url, skipSetup: true).arguments.last == "--skip-setup")
         #expect(!FirmwareCommand.Create(entry: url, ipsw: url, out: url).arguments.contains("--skip-setup"))
     }
 
     /// The app's Jailbreak choice reaches the preparer as --jailbreak, and only when chosen.
     @Test func createPassesJailbreakOnlyWhenChosen() {
         let url = URL(fileURLWithPath: "/tmp/x")
-        #expect(FirmwareCommand.Create(entry: url, ipsw: url, out: url, jailbreak: true).arguments.last == "--jailbreak")
+        #expect(
+            FirmwareCommand.Create(entry: url, ipsw: url, out: url, jailbreak: true).arguments.last == "--jailbreak")
         #expect(!FirmwareCommand.Create(entry: url, ipsw: url, out: url).arguments.contains("--jailbreak"))
     }
 
@@ -81,7 +83,7 @@ struct FirmwareCommandTests {
         #expect(throws: (any Error).self) { try FirmwareCommand.Create.parse(["--ipsw", "i", "--out", "o"]) }
         #expect(throws: (any Error).self) {
             try FirmwareCommand.Create.parse([
-                "--entry", "e", "--catalog", "c", "--id", "x", "--ipsw", "i", "--out", "o",
+                "--entry", "e", "--catalog", "c", "--id", "x", "--ipsw", "i", "--out", "o"
             ])
         }
         #expect(throws: (any Error).self) {

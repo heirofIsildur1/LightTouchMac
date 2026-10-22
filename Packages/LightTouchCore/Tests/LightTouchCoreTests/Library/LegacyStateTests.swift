@@ -73,7 +73,7 @@ import Testing
         try JSONSerialization.data(withJSONObject: [
             "format": 1, "entry": ["id": "n72ap-7E18"], "machine": ["aes-uid": "engine"],
             "identity": ["udid": udid, "seed": "fixture"],
-            "inputs": ["activation": ["input_sha256": "0", "output_sha256": "0"]],
+            "inputs": ["activation": ["input_sha256": "0", "output_sha256": "0"]]
         ]).write(to: base.appendingPathComponent("device.lock.json"))
         return base
     }
@@ -92,7 +92,7 @@ import Testing
             let state = root.appendingPathComponent("state")
             for json in [
                 "{", "[]", #"{"boot_strategy":null}"#, #"{"boot_strategy":17}"#, #"{"boot_strategy":false}"#,
-                #"{"boot_strategy":[]}"#, #"{"boot_strategy":{}}"#,
+                #"{"boot_strategy":[]}"#, #"{"boot_strategy":{}}"#
             ] {
                 let id = UUID()
                 let staging = PreparationJob.preparing(state).appendingPathComponent(id.uuidString)
@@ -262,7 +262,7 @@ import Testing
         try put(page, "device/nand-ultimate-\(digest)/cs0/0.page", in: state)
         try put(
             JSONSerialization.data(withJSONObject: [
-                "key": "nand-ultimate-\(digest)", "directory": "device/nand-ultimate-\(digest)",
+                "key": "nand-ultimate-\(digest)", "directory": "device/nand-ultimate-\(digest)"
             ]),
             "device/active-nand-ultimate.json",
             in: state
@@ -296,9 +296,9 @@ import Testing
                 "storage": [
                     "key": "nand-ultimate", "overlay": "nandrw-nand-ultimate",
                     "writableNOR": "nandrw-nand-ultimate/nor.bin",
-                    "snapshot": "snapshot-nand-ultimate", "usbmuxConf": "work/usbmuxd-conf",
+                    "snapshot": "snapshot-nand-ultimate", "usbmuxConf": "work/usbmuxd-conf"
                 ],
-                "legacy": ["filesRoot": "/x", "nand": "nand-ultimate", "pointer": "device/active-nand-ultimate.json"],
+                "legacy": ["filesRoot": "/x", "nand": "nand-ultimate", "pointer": "device/active-nand-ultimate.json"]
             ]),
             "Devices/\(record.uuidString)/device.json",
             in: state
@@ -327,7 +327,7 @@ import Testing
             #expect(
                 names.isSuperset(of: [
                     "device", "nandrw-nand-ultimate", "snapshot-nand-ultimate", "IPAs", "app.log", "usbmuxd.pid",
-                    "session.env", "AppCache",
+                    "session.env", "AppCache"
                 ])
             )
             #expect(
@@ -365,7 +365,7 @@ import Testing
             #expect(!fm.fileExists(atPath: LegacyState.marker(state).path), "the marker goes with the erase")
             for name in [
                 "device", "nandrw-nand-ultimate", "snapshot-nand-ultimate", "IPAs", "app.log", "AppCache",
-                "work/usbmuxd.pid", "work/session.env",
+                "work/usbmuxd.pid", "work/session.env"
             ] {
                 #expect(!fm.fileExists(atPath: state.appendingPathComponent(name).path), "\(name) erased")
             }

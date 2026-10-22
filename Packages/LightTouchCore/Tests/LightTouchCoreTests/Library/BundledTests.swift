@@ -30,7 +30,7 @@ struct BundledTests {
                 "/usr/bin/aa",
                 [
                     "archive", "-d", packed.deletingLastPathComponent().path,
-                    "-o", contents.appendingPathComponent("Resources/Guest/guest.aar").path,
+                    "-o", contents.appendingPathComponent("Resources/Guest/guest.aar").path
                 ]
             )
             let bundle = try #require(Bundle(url: contents.deletingLastPathComponent()))

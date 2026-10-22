@@ -22,7 +22,7 @@ struct EmulatorSlotTests {
         holder.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
         holder.arguments = [
             "-e", #"use Fcntl ":flock"; open F, ">>", $ARGV[0]; flock(F, LOCK_EX) or die; sleep 30"#,
-            dir.appendingPathComponent("slot-0").path,
+            dir.appendingPathComponent("slot-0").path
         ]
         try holder.run()
         let deadline = Date().addingTimeInterval(10)

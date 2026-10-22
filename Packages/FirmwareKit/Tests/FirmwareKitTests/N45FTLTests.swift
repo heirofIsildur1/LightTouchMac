@@ -216,7 +216,7 @@ import Testing
         let record: [String: Any] = [
             "id": UUID().uuidString, "board": "m68ap", "firmware": "test",
             "base": ["kind": "prepared", "path": base.path],
-            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"],
+            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         let before = try Self.tree(overlay)

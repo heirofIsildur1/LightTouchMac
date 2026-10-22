@@ -53,9 +53,9 @@ public actor ScreenMovieWriter {
                 AVVideoColorPropertiesKey: [
                     AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                     AVVideoTransferFunctionKey: transfer,
-                    AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+                    AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
                 ],
-                AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: max(3_000_000, width * height * 8)],
+                AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: max(3_000_000, width * height * 8)]
             ]
         )
         input.expectsMediaDataInRealTime = true
@@ -66,7 +66,7 @@ public actor ScreenMovieWriter {
                 kCVPixelBufferWidthKey as String: width,
                 kCVPixelBufferHeightKey as String: height,
                 kCVPixelBufferCGImageCompatibilityKey as String: true,
-                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
             ]
         )
         guard writer.canAdd(input) else { throw CaptureError.failed("Video encoding is unavailable.") }
@@ -77,7 +77,7 @@ public actor ScreenMovieWriter {
                 mediaType: .audio,
                 outputSettings: [
                     AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44100,
-                    AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 128000,
+                    AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 128000
                 ]
             )
             audio.expectsMediaDataInRealTime = true

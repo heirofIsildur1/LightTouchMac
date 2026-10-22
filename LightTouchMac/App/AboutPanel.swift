@@ -29,7 +29,7 @@ extension AboutCredits {
         paragraph.tabStops = [NSTextTab(textAlignment: .left, location: 170)]
         let body: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: size), .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: paragraph,
+            .paragraphStyle: paragraph
         ]
         let out = NSMutableAttributedString()
         for run in runs(buildInputs: buildInputs, licenses: licenses) {

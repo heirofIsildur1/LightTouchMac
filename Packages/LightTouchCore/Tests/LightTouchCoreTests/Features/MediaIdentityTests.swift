@@ -39,7 +39,7 @@ struct MediaIdentityTests {
         Data([0, 0, 0, 1] as [UInt8]) + Data("moov".utf8) + Data(repeating: 255, count: 8),
         // an unknown version
         Data([0, 0, 0, 28] as [UInt8]) + Data("mvhd".utf8) + Data([2, 0, 0, 0] as [UInt8]) + Data(count: 16),
-        Data([0, 0, 0] as [UInt8]),  // a truncated header
+        Data([0, 0, 0] as [UInt8])  // a truncated header
     ]
 
     @Test(arguments: malformed)

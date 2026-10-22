@@ -121,7 +121,7 @@ struct DeviceFilesTests {
             }
             for name in [
                 "web-proxy.conf", "web-proxy.plist", "web-proxy.conf.ca.der", "web-proxy.conf.ca.pem", "usbmuxd-conf",
-                "usbmuxd.log",
+                "usbmuxd.log"
             ] {
                 try Data(name.utf8).write(to: device.appendingPathComponent(name), options: .atomic)
             }

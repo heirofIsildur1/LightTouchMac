@@ -14,7 +14,7 @@ struct WorkPruneTests {
             "rotation/scenario.json": 10, "create.err": 10,
             "rotation/overlay/bus0-ce0.pages": 10, "rotation/overlay/nor.bin": 10, "rotation/overlay/kboot.bin": 10,
             "rotation/home.png": 10, "guest/guest-tools/armv7.itpack": 10, "guest/guest-tools/it_agent": 10,
-            "single/guest.wav": 10, "rotation/huge.log": WorkPrune.maxBytes + 1,
+            "single/guest.wav": 10, "rotation/huge.log": WorkPrune.maxBytes + 1
         ]
         for (path, bytes) in files {
             let url = work.appendingPathComponent(path)
@@ -28,7 +28,7 @@ struct WorkPruneTests {
         #expect(
             WorkPrune.kept(under: work) == [
                 "create.err", "rotation/driver.jsonl", "rotation/scenario.json", "rotation/serial.log", "summary.txt",
-                "xcodebuild.log",
+                "xcodebuild.log"
             ]
         )
     }

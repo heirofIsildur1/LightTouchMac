@@ -25,12 +25,12 @@ struct KBootTests {
                 node(
                     [
                         ("name", Data("chosen\0".utf8)), ("firmware-version", z(256)), ("root-matching", z(256)),
-                        ("unique-chip-id", z(8)), ("die-id", z(8)),
+                        ("unique-chip-id", z(8)), ("die-id", z(8))
                     ]
                         + [
                             "debug-enabled", "production-cert", "secure-boot", "gid-aes-key", "uid-aes-key",
                             "system-trusted",
-                            "board-id", "chip-id", "display-rotation", "display-scale",
+                            "board-id", "chip-id", "display-rotation", "display-scale"
                         ].map { ($0, z(4)) },
                     [node([("name", Data("memory-map\0".utf8))] + (0..<16).map { ("MemoryMapReserved-\($0)", z(8)) })]
                 ),
@@ -41,7 +41,7 @@ struct KBootTests {
                             [("name", Data("cpu0\0".utf8))]
                                 + [
                                     "clock-frequency", "memory-frequency", "bus-frequency",
-                                    "peripheral-frequency", "fixed-frequency", "timebase-frequency",
+                                    "peripheral-frequency", "fixed-frequency", "timebase-frequency"
                                 ].map { ($0, z(4)) }
                         )
                     ]
@@ -51,14 +51,14 @@ struct KBootTests {
                     [node([("name", Data("usb-complex\0".utf8))], [node([("name", Data("usb-ehci\0".utf8))])])] + extra
                 ),
                 node([("name", Data("pram\0".utf8)), ("reg", z(8))]),
-                node([("name", Data("vram\0".utf8)), ("reg", z(8))]),
+                node([("name", Data("vram\0".utf8)), ("reg", z(8))])
             ] + top
         )
     }
     static let placeholder = UnitIdentity(fields: [
         ("serial-number", .string("EMU000000000")), ("mlb-serial-number", .string("EMU0000000000")),
         ("unique-chip-id", .string("0x0000000001")), ("die-id", .list(["0x0", "0x0"])),
-        ("wifi-mac", .string("02:00:00:00:00:01")), ("bt-mac", .string("02:00:00:00:00:02")),
+        ("wifi-mac", .string("02:00:00:00:00:01")), ("bt-mac", .string("02:00:00:00:00:02"))
     ])
 
     static func kernel(at base: UInt32) -> Data {
@@ -88,7 +88,7 @@ struct KBootTests {
             Self.node(
                 [("name", n("uart1"))],
                 [Self.node([("name", n("bluetooth")), ("local-mac-address", Self.z(6))])]
-            ),
+            )
         ]
         var tree = try DeviceTree(Self.deviceTree(armIO: armIO))
         try tree.add("", "compatible", Data("N81AP\0iPod4,1\0AppleARM\0".utf8))
@@ -114,7 +114,7 @@ struct KBootTests {
         #expect(
             [
                 "nor-flash", "nor-flash/nvram", "nor-flash/effaceable", "nor-flash/raw-device",
-                "nor-flash/diagnostic-data",
+                "nor-flash/diagnostic-data"
             ]
             .allSatisfy { dt.contains("arm-io/spi0/" + $0) }
         )
@@ -186,7 +186,7 @@ struct KBootTests {
             [1, 2, 3, 13, 14, 27, 33, 39, 44, 49, 52, 55].map { clocks[$0] }
                 == [
                     800_000_000, 500_000_000, 1_026_000_000, 160_000_000, 51_300_000, 100_000_000, 102_600_000,
-                    68_400_000, 0, 48_857_142, 1_000_000, 0,
+                    68_400_000, 0, 48_857_142, 1_000_000, 0
                 ]
         )
         // The IPSW's candidate parents, as iBoot hands them over: the kernel settles them.
@@ -229,11 +229,11 @@ struct KBootTests {
                 [("name", n("flash-controller0"))],
                 [Self.node([("name", n("disk")), ("boot-from-nand", DeviceTree.Value.le([1]))])]
             ),
-            Self.node([("name", n("audio-complex")), ("ncoref-frequency", Self.z(4))]),
+            Self.node([("name", n("audio-complex")), ("ncoref-frequency", Self.z(4))])
         ]
         let bb = Self.node([
             ("name", n("baseband")), ("compatible", n("baseband,n88")), ("device_type", n("baseband")),
-            ("device-imei", Self.z(16)), ("snum", Self.z(12)),
+            ("device-imei", Self.z(16)), ("snum", Self.z(12))
         ])
         var tree = try DeviceTree(Self.deviceTree(armIO: armIO, top: [bb]))
         try tree.add("", "compatible", Data("N88AP\0iPhone2,1\0AppleARM\0".utf8))
@@ -272,7 +272,7 @@ struct KBootTests {
             Self.node(
                 [("name", n("flash-controller0"))],
                 [Self.node([("name", n("disk")), ("boot-from-nand", DeviceTree.Value.le([1]))])]
-            ),
+            )
         ]
         var tree = try DeviceTree(Self.deviceTree(armIO: armIO))
         try tree.add("", "compatible", Data("N18AP\0iPod3,1\0AppleARM\0".utf8))
@@ -428,7 +428,7 @@ struct KBootTests {
             0x200..<0x210,
             with: Data([
                 0x43, 0x88, 0x03, 0x2B, 0x00, 0xD0, 0x4F, 0xF6, 0xEE, 0x61,
-                0xCF, 0xF6, 0xFF, 0x71, 0x79, 0x44,
+                0xCF, 0xF6, 0xFF, 0x71, 0x79, 0x44
             ])
         )
         #expect(try MachO(k).bootArgsVersion() == 3)
@@ -502,7 +502,7 @@ struct KBootTests {
             "k48ap-7B367", "018-7225-009-ramdisk.dmg",
             "2bad2b498e7fca57f32f747fd2bf274681f1d008dd06a5fd9c165b191f56c6be",
             "a68995bb8b64a8f646834dbfb89cbec088cfd2386ef47bc30be8898d6c00c7b8"
-        ),
+        )
     ]
 
     /// The whole Swift chain (IPSW -> FirmwareDecryptor -> KBoot) against kboot.bin's recorded digests: the Swift chain's own,

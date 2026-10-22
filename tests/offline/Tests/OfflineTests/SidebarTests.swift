@@ -126,7 +126,7 @@ extension SharedState {
             if seen.map({ Array($0.prefix(1)) + $0.filter { $0.hasPrefix("iOS") } }) != [
                 ["iPod touch (2nd generation)", "iOS 3.1.3"], ["iPod touch (2nd generation)", "iOS 4.1 beta 1"],
                 ["iPod touch (2nd generation)", "iOS 4.1"],
-                ["iPod touch (2nd generation)", "iOS 4.2.1"],
+                ["iPod touch (2nd generation)", "iOS 4.2.1"]
             ]
                 || seen.contains(where: { $0.count != 2 })
             {
@@ -144,7 +144,7 @@ extension SharedState {
             seen = rows(vc)
             if seen != [
                 ["iPad", "iOS 3.2.2"], ["iPod touch", "iOS 1.1.5"], ["iPod touch (2nd generation)", "iOS 4.1 beta 1"],
-                ["iPod touch (2nd generation)", "iOS 4.2.1"],
+                ["iPod touch (2nd generation)", "iOS 4.2.1"]
             ] {
                 fail("mixed: \(seen)")
             }
@@ -307,7 +307,7 @@ extension SharedState {
             // is always there, dimmed while nothing can be cancelled (never hidden, only disabled).
             if ![
                 "Start", "Cancel Download", "Show File System in Finder", "Jailbreak…",
-                "Erase All Content and Settings…",
+                "Erase All Content and Settings…"
             ]
             .allSatisfy({ t in commands.contains { $0.title == t } })
                 || commands.contains(where: { $0.title == "Shut Down…" }) || !live.contains("Start")
@@ -340,7 +340,7 @@ extension SharedState {
             // The Dock's bar: running jobs averaged, each as its row's bar; nothing running, no bar.
             let dock = FirmwareJob.dockProgress([
                 .downloading(fraction: 0.5),
-                .preparing(Preparation(step: 1, steps: 2, name: "x", fraction: 0.5, startsAt: 0.5)), .failed("x"),
+                .preparing(Preparation(step: 1, steps: 2, name: "x", fraction: 0.5, startsAt: 0.5)), .failed("x")
             ])
             if dock.map({ abs($0 - 0.4375) > 0.0001 }) ?? true { fail("Dock progress: \(String(describing: dock))") }
             if FirmwareJob.dockProgress([FirmwareJob.failed("x")]) != nil
@@ -448,7 +448,7 @@ extension SharedState {
             let severalTitles = several.items.filter { !$0.isSeparatorItem }.map(\.title)
             if severalTitles != [
                 "Start 1 Device", "Force Stop 1 Device…", "Jailbreak Devices…", "Erase 2 Devices…",
-                "Delete 3 Devices…",
+                "Delete 3 Devices…"
             ]
                 // Jailbreak is dimmed: the stopped device is iOS 4.2.1, which takes no jailbreak yet.
                 || several.items.filter({ !$0.isSeparatorItem }).map(vc.validateMenuItem)
@@ -602,7 +602,7 @@ extension SharedState {
             if sheet.groups.map(\.name) != [
                 "iPad", "iPod touch", "iPod touch (2nd generation)", "iPod touch (3rd generation)",
                 "iPod touch (4th generation)", "iPhone", "iPhone 3GS",
-                "iPhone 4",
+                "iPhone 4"
             ] {
                 fail("sheet groups: \(sheet.groups.map(\.name))")
             }
@@ -879,7 +879,7 @@ extension SharedState {
                 ("iphone4-7.1.2", ["n90ap-11D257"], "n90ap"),
                 ("ipod1g-1.1.4", ["n45ap-4A102"], "n45ap"),
                 ("ipad-5.1.1", ["k48ap-9B206"], "k48ap"),
-                ("several", ["n88ap-10B500", "n90ap-11D257", "k48ap-9B206"], "n90ap"),
+                ("several", ["n88ap-10B500", "n90ap-11D257", "k48ap-9B206"], "n90ap")
             ]
             for (name, selection, device) in picks {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {

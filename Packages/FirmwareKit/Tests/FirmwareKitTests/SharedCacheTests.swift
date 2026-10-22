@@ -41,7 +41,7 @@ enum Fixtures {
         "7B367": (
             URL(fileURLWithPath: ProcessInfo.processInfo.environment["FK_7B367_ROOTFS"] ?? "/nonexistent"), false,
             "dyld_shared_cache_armv7"
-        ),
+        )
     ]
     static func hasRootfs(_ b: String) -> Bool { rootfs[b].map { exists($0.image) } ?? false }
 

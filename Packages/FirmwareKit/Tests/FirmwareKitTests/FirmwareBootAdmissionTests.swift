@@ -17,7 +17,7 @@ import Testing
         let ident = try UnitIdentity.synthesize(seed: "iphone4-test", modelNumber: "MC603")
         func write(board: String, version: Int, identity: UnitIdentity) throws {
             try JSONSerialization.data(withJSONObject: [
-                "board": board, "entry": ["content": ["board": board, "recipe": ["version": version]]],
+                "board": board, "entry": ["content": ["board": board, "recipe": ["version": version]]]
             ])
             .write(to: base.appendingPathComponent("device.lock.json"))
             try identity.json().write(to: base.appendingPathComponent("identity.json"))
@@ -54,8 +54,8 @@ import Testing
             "base": ["kind": "prepared", "path": base.path],
             "storage": [
                 "key": "current", "overlay": overlay.path,
-                "writableNOR": device.appendingPathComponent("nor.bin").path,
-            ],
+                "writableNOR": device.appendingPathComponent("nor.bin").path
+            ]
         ]
         let bytes = try DeviceRecord.data(record)
         try bytes.write(to: device.appendingPathComponent(DeviceRecord.name))

@@ -128,7 +128,7 @@ private struct StorageRow: View {
         self.canDelete = canDelete
         observers = [
             DeviceLibrary.didChangeNotification, FirmwareJobs.didChangeNotification,
-            DeviceSessionHost.didChangeNotification,
+            DeviceSessionHost.didChangeNotification
         ].map {
             NotificationCenter.default.addObserver(forName: $0, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { if self?.isShown() == true { self?.reload() } }

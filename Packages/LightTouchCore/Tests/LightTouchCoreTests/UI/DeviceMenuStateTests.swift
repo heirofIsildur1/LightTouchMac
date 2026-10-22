@@ -41,7 +41,7 @@ struct DeviceMenuStateTests {
         state.machine = .poweredOff
         #expect(state.validate(.restart).isEnabled)
         for change: (inout DeviceMenuState) -> Void in [
-            { $0.machine = .dead(exitCode: nil) }, { $0.shuttingDown = true }, { $0.storageFailed = true },
+            { $0.machine = .dead(exitCode: nil) }, { $0.shuttingDown = true }, { $0.storageFailed = true }
         ] {
             var stopped = running()
             change(&stopped)

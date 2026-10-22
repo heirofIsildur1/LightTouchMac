@@ -55,7 +55,7 @@ struct FreeFormResizeTests {
         let model = FreeFormResize(board: board)
         let start = board.uprightScreenPixels
         for edges in [
-            CGVector(dx: 1, dy: 0), CGVector(dx: -1, dy: 0), CGVector(dx: 0, dy: 1), CGVector(dx: -1, dy: -1),
+            CGVector(dx: 1, dy: 0), CGVector(dx: -1, dy: 0), CGVector(dx: 0, dy: 1), CGVector(dx: -1, dy: -1)
         ] {
             for delta in [-150, -13, 9, 77, 400] as [CGFloat] {
                 for turned in [false, true] {

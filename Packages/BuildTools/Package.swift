@@ -10,7 +10,7 @@ let package = Package(
     products: [.executable(name: "ltm-build", targets: ["ltm-build"])],
     dependencies: [
         .package(path: "../ReleaseChecks"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2")
     ],
     targets: [
         .target(name: "BuildTools", dependencies: [.product(name: "ReleaseChecks", package: "ReleaseChecks")]),
@@ -21,6 +21,6 @@ let package = Package(
         .testTarget(
             name: "BuildToolsTests",
             dependencies: ["BuildTools", .product(name: "ReleaseChecks", package: "ReleaseChecks")]
-        ),
+        )
     ]
 )

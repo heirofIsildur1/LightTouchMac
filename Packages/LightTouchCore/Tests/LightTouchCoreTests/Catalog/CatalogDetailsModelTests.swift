@@ -10,7 +10,7 @@ extension SharedState {
         nonisolated static let server: @Sendable (URLComponents) -> LegacyStoreStub.Reply = { request in
             var name: String? = [
                 "/api/v1/apps/com.playfirst.hoteldash/versions": "versions-hoteldash.json",
-                "/api/v1/apps/com.secondarm.taptapdash/versions": "versions-taptapdash.json",
+                "/api/v1/apps/com.secondarm.taptapdash/versions": "versions-taptapdash.json"
             ][request.path]
             if request.path.hasPrefix("/api/v1/copies/") {
                 name = "copy-" + request.path.split(separator: "/").last! + ".json"

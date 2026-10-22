@@ -66,7 +66,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
         hiddenMenu.addItem(.separator())
         for (title, action, key) in [
             ("New Folder…", #selector(newFolder(_:)), ""), ("Rename…", #selector(renameItem(_:)), ""),
-            ("Delete…", #selector(deleteItems(_:)), "\u{7f}"),
+            ("Delete…", #selector(deleteItems(_:)), "\u{7f}")
         ] {
             hiddenMenu.addItem(withTitle: title, action: action, keyEquivalent: key).target = self
         }
@@ -92,7 +92,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
         browser.setAccessibilityLabel("Device files")
         for (button, action) in [
             (upload, #selector(importFile)), (download, #selector(exportFile)),
-            (refresh, #selector(refreshFiles(_:))), (cancel, #selector(cancelTransfer)),
+            (refresh, #selector(refreshFiles(_:))), (cancel, #selector(cancelTransfer))
         ] {
             button.target = self
             button.action = action
@@ -154,7 +154,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
             progress.centerYAnchor.constraint(equalTo: status.centerYAnchor),
             progress.trailingAnchor.constraint(equalTo: cancel.leadingAnchor, constant: -8),
             cancel.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -12),
-            cancel.centerYAnchor.constraint(equalTo: status.centerYAnchor),
+            cancel.centerYAnchor.constraint(equalTo: status.centerYAnchor)
         ])
         idleStatusWidth = status.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -12)
         activeStatusWidth = status.trailingAnchor.constraint(equalTo: progress.leadingAnchor, constant: -12)

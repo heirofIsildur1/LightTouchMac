@@ -58,7 +58,7 @@ public enum ReleaseApp {
     public static let debugOverrides = [
         "LTM_HOST_SERVICE_WORKER", "LTM_QEMU_DYLIB", "LTM_USBMUXD", "LTM_FIRMWAREKIT", "LTM_FILES",
         "LTM_GUEST_PACKAGE", "LTM_STATE_DIR", "LTM_DEV_BASE", "LTM_TEST_MIGRATION_KILL", "FIRMWAREKIT_IBOOT_PATCHER",
-        "IBOOT32PATCHER", "FIRMWAREKIT_DISK_IMAGE",
+        "IBOOT32PATCHER", "FIRMWAREKIT_DISK_IMAGE"
     ]
 
     /// Each of `binaries` that names a Debug override, with the names it holds.

@@ -77,7 +77,7 @@ public struct MediaPhoto: Sendable {
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceShouldCacheImmediately: true
         ]
         guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary),
             CGImageSourceGetStatusAtIndex(imageSource, 0) == .statusComplete,
@@ -115,7 +115,7 @@ public struct MediaPhoto: Sendable {
         let encoding: [CFString: Any] = [
             kCGImageDestinationLossyCompressionQuality: 0.9,
             kCGImagePropertyOrientation: 1,
-            kCGImagePropertyJFIFDictionary: [kCGImagePropertyJFIFIsProgressive: false],
+            kCGImagePropertyJFIFDictionary: [kCGImagePropertyJFIFIsProgressive: false]
         ]
         CGImageDestinationAddImage(destination, image, encoding as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {

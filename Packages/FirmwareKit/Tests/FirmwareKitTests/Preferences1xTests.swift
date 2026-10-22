@@ -56,14 +56,14 @@ import Testing
         let record: [String: Any] = [
             "id": UUID().uuidString, "board": mobile ? "n45ap" : "m68ap", "firmware": "test",
             "base": ["kind": "prepared", "path": base.path],
-            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"],
+            "storage": ["key": "old", "overlay": overlay.path, "snapshot": "old-snapshot"]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
 
         let set: [[String: Any]] = [
             ["domain": "com.apple.springboard", "key": "SBFakeTime", "value": true],
             ["domain": "com.apple.springboard", "key": "SBFakeTimeString", "value": "9:41 AM"],
-            ["domain": "com.apple.mobilesafari", "key": "ConsoleEnabled", "value": true],
+            ["domain": "com.apple.mobilesafari", "key": "ConsoleEnabled", "value": true]
         ]
         #expect(try await Preferences1x.write(device: device, changes: set))
         #expect(try await Preferences1x.write(device: device, changes: set) == false, "the overlay holds them")
@@ -105,7 +105,7 @@ import Testing
         let removed: [[String: Any]] = [
             ["domain": "com.apple.springboard", "key": "SBFakeTimeString", "value": "9:41 AM"],
             ["domain": "com.apple.mobilesafari", "key": "ConsoleEnabled", "value": true],
-            ["domain": "com.apple.springboard", "key": "SBFakeTime"],
+            ["domain": "com.apple.springboard", "key": "SBFakeTime"]
         ]
         #expect(try await Preferences1x.write(device: device, changes: removed))
         v = try volume()

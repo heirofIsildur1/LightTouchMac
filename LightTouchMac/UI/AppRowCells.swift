@@ -80,7 +80,7 @@ import LightTouchCore
             text.bottomAnchor.constraint(equalTo: cell.centerYAnchor, constant: 0),
             subtitle.leadingAnchor.constraint(equalTo: text.leadingAnchor),
             subtitle.trailingAnchor.constraint(lessThanOrEqualTo: button.leadingAnchor, constant: -6),
-            subtitle.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1),
+            subtitle.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1)
         ])
         return cell
     }
@@ -166,7 +166,7 @@ import LightTouchCore
             text.bottomAnchor.constraint(equalTo: cell.centerYAnchor, constant: 0),
             subtitle.leadingAnchor.constraint(equalTo: text.leadingAnchor),
             subtitle.trailingAnchor.constraint(lessThanOrEqualTo: progress.leadingAnchor, constant: -6),
-            subtitle.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1),
+            subtitle.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1)
         ])
         return cell
     }

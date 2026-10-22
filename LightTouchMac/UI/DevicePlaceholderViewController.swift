@@ -138,7 +138,7 @@ final class DevicePlaceholderViewController: NSViewController {
         // column stayed as wide as Skip Setup Assistant, and a lone Jailbreak sat at its left edge.
         for (stacks, priority) in [
             ([identity, state, options, actions], NSLayoutConstraint.Priority(700)),
-            ([versionLine, statusLine], NSLayoutConstraint.Priority(710)),
+            ([versionLine, statusLine], NSLayoutConstraint.Priority(710))
         ] {
             for stack in stacks {
                 stack.setHuggingPriority(priority, for: .horizontal)
@@ -148,7 +148,7 @@ final class DevicePlaceholderViewController: NSViewController {
         // And the views in them keep their own width: a label's or a button's hugging is low too, so a label could
         // take a column's slack and draw its text at the left, or either of two buttons in a row take the row's.
         for content in [
-            model, version, info, skipSetup, jailbreak, showLog, prepareAgain, showFiles, dontSave, importIPSW, primary,
+            model, version, info, skipSetup, jailbreak, showLog, prepareAgain, showFiles, dontSave, importIPSW, primary
         ] {
             content.setContentHuggingPriority(.required, for: .horizontal)
         }
@@ -172,7 +172,7 @@ final class DevicePlaceholderViewController: NSViewController {
                 let fit = stateTier.heightAnchor.constraint(equalTo: state.heightAnchor)
                 fit.priority = .defaultLow
                 return fit
-            }(),
+            }()
         ])
     }
 
@@ -370,7 +370,7 @@ final class DevicePlaceholderViewController: NSViewController {
         let stack = NSStackView(
             views: [
                 label(row.supportNote, .headline), label(row.supportExplanation, .body, .secondaryLabelColor),
-                label(row.entry.statusNote, .body), label(row.releaseLine, .subheadline, .secondaryLabelColor),
+                label(row.entry.statusNote, .body), label(row.releaseLine, .subheadline, .secondaryLabelColor)
             ]
             .compactMap { $0 }
         )

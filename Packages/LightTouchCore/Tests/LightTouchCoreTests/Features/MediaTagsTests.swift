@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 struct MediaTagsTests {
     static let quadrants: [((Double, Double), MediaFixtures.RGBA)] = [
         ((0.25, 0.25), (200, 40, 40, 255)), ((0.75, 0.25), (40, 180, 60, 255)),
-        ((0.25, 0.75), (40, 60, 200, 255)), ((0.75, 0.75), (240, 220, 30, 255)),
+        ((0.25, 0.75), (40, 60, 200, 255)), ((0.75, 0.75), (240, 220, 30, 255))
     ]
 
     static func cover(_ url: URL, _ type: UTType) throws {
@@ -36,7 +36,7 @@ struct MediaTagsTests {
         var frames = [
             ("TIT2", title), ("TPE1", "Track Artist"), ("TALB", "The Album"), ("TPE2", "Album Artist"),
             ("TCOM", "Some Composer"),
-            ("TRCK", "3/12"), ("TPOS", "2/3"), ("TYER", "1987"), ("TCON", "(17)"), ("TCMP", "1"),
+            ("TRCK", "3/12"), ("TPOS", "2/3"), ("TYER", "1987"), ("TCON", "(17)"), ("TCMP", "1")
         ].reduce(Data()) { $0 + text($1.0, $1.1) }
         frames += frame("APIC", Data([0]) + Data("image/jpeg".utf8) + Data([0, 3, 0]) + cover)
         let n = frames.count
@@ -57,7 +57,7 @@ struct MediaTagsTests {
         let want: [String: AnyHashable] = [
             "title": "Tagged Tïtle", "artist": "Track Artist", "album": "The Album", "album_artist": "Album Artist",
             "composer": "Some Composer", "genre": genre, "track_number": 3, "track_count": 12,
-            "disc_number": 2, "disc_count": 3, "year": 1987, "compilation": true,
+            "disc_number": 2, "disc_count": 3, "year": 1987, "compilation": true
         ]
         for (key, value) in want {
             #expect(metadata[key] as? AnyHashable == value, "\(name): \(key) = \(String(describing: metadata[key]))")
@@ -143,7 +143,7 @@ struct MediaTagsTests {
                 item(.iTunesMetadataDiscNumber, Data([0, 0, 0, 2, 0, 3]) as NSData),
                 item(.iTunesMetadataReleaseDate, "1987" as NSString),
                 item(.iTunesMetadataDiscCompilation, 1 as NSNumber),
-                item(.iTunesMetadataCoverArt, try Data(contentsOf: png) as NSData),
+                item(.iTunesMetadataCoverArt, try Data(contentsOf: png) as NSData)
             ]
             try await export.export(to: song, as: .m4a)
             let (prepared, metadata) = try await Self.prepared(song)

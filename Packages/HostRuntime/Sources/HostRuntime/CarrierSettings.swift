@@ -32,7 +32,7 @@ public struct CarrierSettings: Codable, Equatable, Sendable {
         [
             ("carrier", carrier), ("mcc-mnc", mccMNC), ("registered", registered ? "on" : "off"),
             ("sim-present", simPresent ? "on" : "off"), ("signal-dbm", String(signalDBM)),
-            ("gps-fix", location.fix()),
+            ("gps-fix", location.fix())
         ]
     }
 

@@ -191,7 +191,7 @@ func driverConfig(_ tools: Tools, work: URL, ipa: URL? = nil) -> [String: Any] {
     var config: [String: Any] = [
         "helper": tools.helper.path, "firmwarekit": tools.firmwarekit.path, "usbmuxd": tools.usbmuxd.path,
         "ipa": ipa?.path ?? "", "bundleID": ipa.flatMap(ipaBundleID) ?? "com.qemuios.harness", "work": work.path,
-        "files": tools.files.path, "ipodBase": "", "ipadBase": "",
+        "files": tools.files.path, "ipodBase": "", "ipadBase": ""
     ]
     if let requirement = tools.requirement, !requirement.isEmpty { config["requirement"] = requirement }
     return config
@@ -210,7 +210,7 @@ func ipaBundleID(_ ipa: URL) -> String? {
 func driverEnvironment(_ tools: Tools) -> [String: String] {
     [
         "LTM_QEMU_DYLIB": tools.dylib.path, "LTM_HOST_SERVICE_WORKER": tools.services.path,
-        "LTM_STATE_DIR": FileManager.default.temporaryDirectory.appendingPathComponent("ltm-sessions-state").path,
+        "LTM_STATE_DIR": FileManager.default.temporaryDirectory.appendingPathComponent("ltm-sessions-state").path
     ]
 }
 

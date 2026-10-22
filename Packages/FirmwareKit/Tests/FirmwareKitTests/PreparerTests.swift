@@ -33,7 +33,7 @@ import Testing
             (
                 .error(code: "activation_failed", message: "m"),
                 ["event": "error", "code": "activation_failed", "message": "m"]
-            ),
+            )
         ]
         for (e, want) in cases {
             #expect(!e.json.contains("\n"))
@@ -215,7 +215,7 @@ import Testing
         p.arguments =
             [
                 "create", "--entry", entry.path, "--ipsw", ipsw.path, "--out", staging.path, "--helper", "/bin/sh",
-                "--guest-tools", dir.path,
+                "--guest-tools", dir.path
             ] + extra
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice

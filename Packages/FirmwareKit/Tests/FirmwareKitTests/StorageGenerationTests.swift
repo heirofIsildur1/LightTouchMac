@@ -14,8 +14,8 @@ struct StorageGenerationTests {
             "base": ["path": "original", "kind": "prepared"],
             "storage": [
                 "key": "original", "overlay": "overlay", "snapshot": "old-snapshot",
-                "writableNOR": "nor.bin", "usbmuxConf": "conf",
-            ],
+                "writableNOR": "nor.bin", "usbmuxConf": "conf"
+            ]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         return device

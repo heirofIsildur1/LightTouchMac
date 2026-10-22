@@ -30,7 +30,7 @@ struct StepPlan: Sendable {
             text: "Booting the restore ramdisk",
             milestones: [
                 .init(file: "keybag-", marker: "FTL_Open", at: 2, text: "Opening the flash"),
-                .init(file: "keybag-", marker: "it_keybag:", at: 4, text: "Creating the keybag"),
+                .init(file: "keybag-", marker: "it_keybag:", at: 4, text: "Creating the keybag")
             ]
         ),
         // The seal one-shot (Recipe.sealStep): boot the new flash until it_seal halts, then a check boot. Each line is
@@ -45,7 +45,7 @@ struct StepPlan: Sendable {
                 .init(file: "seal.log", marker: "SpringBoard[", at: 30, text: "Starting the Home screen"),
                 .init(file: "seal.log", marker: "it_prefs:", at: 41, text: "Starting the Home screen"),
                 .init(file: "seal.log", marker: "it_seal:", at: 65, text: "Shutting down"),
-                .init(file: "check.log", marker: "iBoot version", at: 68, text: "Checking the flash"),
+                .init(file: "check.log", marker: "iBoot version", at: 68, text: "Checking the flash")
             ]
         ),
         "Writing the lock": .init(seconds: 3, text: "Hashing the prepared flash"),
@@ -63,9 +63,9 @@ struct StepPlan: Sendable {
                     at: 10,
                     text: "Booting the restore ramdisk: opening the flash"
                 ),
-                .init(file: "keybag.log", marker: "it_keybag:", at: 30, text: "Creating the data-protection keybag"),
+                .init(file: "keybag.log", marker: "it_keybag:", at: 30, text: "Creating the data-protection keybag")
             ]
-        ),
+        )
     ]
 
     /// The step that boots the prepared flash once so its first boot is done (it_seal halts it).
@@ -84,7 +84,7 @@ struct StepPlan: Sendable {
             .init(file: "seal.log", marker: "SpringBoard[", at: 204, text: "Starting the Home screen"),
             .init(file: "seal.log", marker: "lockdown says", at: 239, text: "Starting the Home screen"),
             .init(file: "seal.log", marker: "it_seal:", at: 328, text: "Shutting down"),
-            .init(file: "check.log", marker: "iBoot version", at: 331, text: "Checking the flash"),
+            .init(file: "check.log", marker: "iBoot version", at: 331, text: "Checking the flash")
         ]
     )
 

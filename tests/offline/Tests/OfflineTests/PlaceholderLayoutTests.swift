@@ -30,7 +30,7 @@ extension SharedState {
             // The longest step names (FirmwareKit's StepPlan.plans), which the headline shows whole.
             let longSteps = [
                 "Writing the identity, NOR and boot files", "Building the system and data volumes",
-                "Creating the data-protection keybag",
+                "Creating the data-protection keybag"
             ]
             .map { name in
                 (
@@ -52,7 +52,7 @@ extension SharedState {
                 ("failed", DeviceRow(entry: both, instanceID: nil, session: nil, job: .failed("The restore failed."))),
                 ("one-option-after-failed", DeviceRow(entry: one, instanceID: nil, session: nil, job: nil)),
                 ("ready", DeviceRow(entry: one, instanceID: id, session: nil, job: nil)),
-                ("two-options-last", DeviceRow(entry: both, instanceID: nil, session: nil, job: nil)),
+                ("two-options-last", DeviceRow(entry: both, instanceID: nil, session: nil, job: nil))
             ]
             states += longSteps
             let renders = URL(

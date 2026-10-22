@@ -31,7 +31,7 @@ public nonisolated enum DeveloperConnectionProfile {
         else { return }
         let candidates = [
             tools?.appendingPathComponent("inetcat").path,
-            "/opt/homebrew/bin/inetcat", "/usr/local/bin/inetcat",
+            "/opt/homebrew/bin/inetcat", "/usr/local/bin/inetcat"
         ].compactMap { $0 }
         guard let inetcat = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
             throw CocoaError(

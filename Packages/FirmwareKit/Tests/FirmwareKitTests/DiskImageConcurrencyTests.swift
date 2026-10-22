@@ -14,7 +14,7 @@ struct DiskImageConcurrencyTests {
                     let expected = "bridge-\(index)"
                     // Await the actual shared disk-tool subprocess leaf.
                     let (status, output) = try await DiskImage.exec([
-                        "/usr/bin/printf", "%s", expected,
+                        "/usr/bin/printf", "%s", expected
                     ])
                     return status == 0 && output == expected
                 }
@@ -45,7 +45,7 @@ struct DiskImageConcurrencyTests {
         let pidFile = dir.appendingPathComponent("pid")
         let tool = Task {
             try await DiskImage.exec([
-                "/bin/sh", "-c", "printf '%s' $$ > \"$1\"; exec /bin/sleep 60", "fixture", pidFile.path,
+                "/bin/sh", "-c", "printf '%s' $$ > \"$1\"; exec /bin/sleep 60", "fixture", pidFile.path
             ])
         }
         let deadline = ContinuousClock.now.advanced(by: .seconds(5))

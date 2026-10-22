@@ -30,8 +30,8 @@ struct StoppedVolumeEditNativeTests {
                 "key": "initial", "overlay": device.appendingPathComponent("overlay").path,
                 "snapshot": device.appendingPathComponent("snapshot").path,
                 "writableNOR": device.appendingPathComponent("nor.bin").path,
-                "usbmuxConf": device.appendingPathComponent("conf").path,
-            ],
+                "usbmuxConf": device.appendingPathComponent("conf").path
+            ]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         let edit = try await StoppedVolumeEdit.begin(

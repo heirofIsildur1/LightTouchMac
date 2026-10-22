@@ -39,7 +39,7 @@ func keyboardCheck(_ args: KeyboardCheck) -> Never {
                 "keys \(word)", "wait 2", "button 0", "wait 6",
                 "agentget notes.sqlite /var/mobile/Library/Notes/notes.sqlite",
                 "agentget notes.sqlite-wal /var/mobile/Library/Notes/notes.sqlite-wal",
-                "quit", "expectExit 60",
+                "quit", "expectExit 60"
             ]
         )
     )

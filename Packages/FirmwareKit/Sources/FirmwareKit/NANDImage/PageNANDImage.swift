@@ -76,7 +76,7 @@ public struct PageNANDImage: Sendable, Equatable {
     func geometry() throws -> Data {
         var g: [String: Any] = [
             "storage_format": Self.format, "blank": blank, "board": board, "chip_selects": chips, "page_bytes": page,
-            "spare_bytes": spare, "pages_per_block": pagesPerBlock, "blocks_per_ce": blocksPerChip,
+            "spare_bytes": spare, "pages_per_block": pagesPerBlock, "blocks_per_ce": blocksPerChip
         ]
         if let layout { g["layout"] = layout }
         return try JSONSerialization.data(withJSONObject: g, options: [.sortedKeys, .prettyPrinted])

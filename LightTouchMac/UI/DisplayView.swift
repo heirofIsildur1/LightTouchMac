@@ -97,7 +97,7 @@ final class DisplayView: NSView {
             container.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 container.widthAnchor.constraint(equalToConstant: 160),
-                container.heightAnchor.constraint(equalToConstant: 128),
+                container.heightAnchor.constraint(equalToConstant: 128)
             ])
             symbol = container
         } else {
@@ -130,7 +130,7 @@ final class DisplayView: NSView {
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
+            stack.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor)
         ])
         powerBadge = stack
         stack.isHidden = isCapturingCanvas
@@ -284,7 +284,7 @@ final class DisplayView: NSView {
             attitudeIndicator.widthAnchor.constraint(equalToConstant: 40),
             attitudeIndicator.heightAnchor.constraint(equalToConstant: 40),
             attitudeIndicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            attitudeIndicator.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            attitudeIndicator.topAnchor.constraint(equalTo: topAnchor, constant: 12)
         ])
 
         registerForDraggedTypes([.fileURL, .ltmCatalogApp])
@@ -317,7 +317,7 @@ final class DisplayView: NSView {
         ("Rotate Right", NSSelectorFromString("deviceRotateRight:")),
         ("Shake", NSSelectorFromString("deviceShake:")),
         ("Copy Screenshot", NSSelectorFromString("copyScreen:")),
-        ("Save Screenshot", NSSelectorFromString("saveScreenshot:")),
+        ("Save Screenshot", NSSelectorFromString("saveScreenshot:"))
     ]
 
     override func menu(for event: NSEvent) -> NSMenu? {

@@ -145,7 +145,7 @@ public struct MediaVideo: Sendable {
                 "filename": output.lastPathComponent,
                 "kind": "feature-movie",
                 "title": title,
-                "duration_ms": exportedDuration * 1000,
+                "duration_ms": exportedDuration * 1000
             ]
             try PropertyListSerialization.data(fromPropertyList: properties, format: .xml, options: 0)
                 .write(to: metadata, options: .atomic)

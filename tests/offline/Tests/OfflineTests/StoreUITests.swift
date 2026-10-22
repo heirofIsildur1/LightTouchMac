@@ -17,7 +17,7 @@ extension SharedState {
         nonisolated static func server(_ request: URLComponents) -> LegacyStoreStub.Reply {
             var name = [
                 "/api/v1/apps/com.playfirst.hoteldash/versions": "versions-hoteldash.json",
-                "/api/v1/apps/com.secondarm.taptapdash/versions": "versions-taptapdash.json",
+                "/api/v1/apps/com.secondarm.taptapdash/versions": "versions-taptapdash.json"
             ][request.path]
             if request.path.hasPrefix("/api/v1/copies/") {
                 name = "copy-" + (request.path as NSString).lastPathComponent + ".json"
@@ -233,7 +233,7 @@ extension SharedState {
                 button.leadingAnchor.constraint(equalTo: mode.trailingAnchor, constant: 4),
                 button.centerYAnchor.constraint(equalTo: mode.centerYAnchor),
                 button.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -6),
-                pane.widthAnchor.constraint(equalToConstant: 300), pane.heightAnchor.constraint(equalToConstant: 40),
+                pane.widthAnchor.constraint(equalToConstant: 300), pane.heightAnchor.constraint(equalToConstant: 40)
             ])
             return pane
         }

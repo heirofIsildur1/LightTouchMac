@@ -94,7 +94,7 @@ nonisolated enum ProxyProbe {
             "agent",
             [
                 "device": d.name, "generation": generation, "alive": alive, "packaged": packaged,
-                "state": await d.lockdownValue("ActivationState") ?? "",
+                "state": await d.lockdownValue("ActivationState") ?? ""
             ]
         )
         if !ipad {  // wake: the display may have slept while it booted
@@ -137,7 +137,7 @@ nonisolated enum ProxyProbe {
             "httpget",
             [
                 "device": d.name, "label": label, "status": status, "output": text,
-                "ok": status == 0 && ProxyProbe.answered(text),
+                "ok": status == 0 && ProxyProbe.answered(text)
             ]
         )
     }
@@ -153,7 +153,7 @@ nonisolated enum ProxyProbe {
                 "trust",
                 [
                     "device": d.name, "generation": generation, "ok": true, "packaged": packaged,
-                    "seconds": Date().timeIntervalSince(start),
+                    "seconds": Date().timeIntervalSince(start)
                 ]
             )
         } catch {
@@ -188,7 +188,7 @@ nonisolated enum ProxyProbe {
             "a": 0, "b": 11, "c": 8, "d": 2, "e": 14, "f": 3, "g": 5, "h": 4, "i": 34, "j": 38, "k": 40,
             "l": 37, "m": 46, "n": 45, "o": 31, "p": 35, "q": 12, "r": 15, "s": 1, "t": 17, "u": 32,
             "v": 9, "w": 13, "x": 7, "y": 16, "z": 6, ".": 47, "/": 44, "-": 27, "=": 24, " ": 49,
-            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
+            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25, "0": 29
         ]
         for ch in url.lowercased() { if let code = codes[ch] { await key(code) } }
         if let shot { d.screenshot(shot) }

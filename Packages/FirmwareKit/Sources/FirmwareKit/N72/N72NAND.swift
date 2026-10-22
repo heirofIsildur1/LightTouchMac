@@ -136,7 +136,7 @@ public enum N72NAND {
         let zeroSpare = [UInt8](repeating: 0, count: spare)
         var pages: [Page: [UInt8]] = [
             Page(cs: 0, page: 0): [UInt8](repeating: 0, count: page) + metaSpare,
-            Page(cs: 3, page: 255): ftlContext() + metaSpare,
+            Page(cs: 3, page: 255): ftlContext() + metaSpare
         ]
         let maps = Set((0..<mapPages).map(stripe))
         for k in 0..<mapPages { pages[stripe(k)] = u16s((0..<2048).map { k * 2048 + $0 + 1 }) + zeroSpare }

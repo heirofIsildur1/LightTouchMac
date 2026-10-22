@@ -80,7 +80,7 @@ final class DeviceModelView: NSView {
         let named: [([String], Control?)] = [
             (["SleepWakeButton", "Sleep_wake___black_fitted_button"], .sleepWake),
             (["VolumeButton", "Volume___continuous_recessed_centre_rocker"], nil),
-            (["VolumeUpButton"], .volumeUp), (["VolumeDownButton"], .volumeDown),
+            (["VolumeUpButton"], .volumeUp), (["VolumeDownButton"], .volumeDown)
         ]
         for (names, control) in named {
             if let entity = names.lazy.compactMap({ loaded.findEntity(named: $0) }).first {
@@ -214,7 +214,7 @@ final class DeviceModelView: NSView {
             )
             for name in [
                 "Front_frame___broad_graphite_bevel", "Cover_glass___opaque_masked_surround",
-                "Display___inactive_optical_border", "Ambient_proximity_sensor___1",
+                "Display___inactive_optical_border", "Ambient_proximity_sensor___1"
             ] {
                 loaded.findEntity(named: name)?.components.set(
                     ImageBasedLightReceiverComponent(imageBasedLight: rimLighting)

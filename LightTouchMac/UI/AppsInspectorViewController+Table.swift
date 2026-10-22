@@ -229,7 +229,7 @@ extension AppsInspectorViewController: NSTableViewDataSource, NSTableViewDelegat
             text.bottomAnchor.constraint(equalTo: cell.centerYAnchor, constant: 0),
             subtitle.leadingAnchor.constraint(equalTo: text.leadingAnchor),
             subtitle.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-            subtitle.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1),
+            subtitle.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1)
         ])
         return cell
     }

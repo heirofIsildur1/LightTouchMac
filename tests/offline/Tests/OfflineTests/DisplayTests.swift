@@ -16,7 +16,7 @@ extension SharedState {
 
         static let n72Model = [
             "Models/N72.usdz": "Models/N72.usdz",
-            "shell.png": "LightTouchMac/Assets.xcassets/shell.imageset/shell_opaque.png",
+            "shell.png": "LightTouchMac/Assets.xcassets/shell.imageset/shell_opaque.png"
         ]
 
         /// The flat LCD layer is black-backed, stretched to the cutout, and upscales nearest-neighbor (minification filters).

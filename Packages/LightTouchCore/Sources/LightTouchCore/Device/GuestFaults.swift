@@ -13,7 +13,7 @@ public nonisolated enum GuestFaults {
         "panic(cpu ": "the iOS kernel panicked",
         "Exited abnormally": "a system process crashed",
         "fwexec(mount_tool": "launchd couldn't mount the device's volumes",
-        "Invalid content in Journal": "a volume's journal is unreadable",
+        "Invalid content in Journal": "a volume's journal is unreadable"
     ].merging((1...9).map { ("fsck exited with status: \($0)", "the file system check failed") }) { a, _ in a }
 
     /// The lines launchd prints as it mounts the fstab (mount -v): the system volume, then the data volume.

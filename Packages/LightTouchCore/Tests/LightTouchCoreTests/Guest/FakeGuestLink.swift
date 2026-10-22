@@ -36,7 +36,7 @@ nonisolated final class FakeGuestLink: GuestAgentLink, @unchecked Sendable {
 
     static let v2ops = [
         "exec", "spawn", "sync", "put", "get", "chown", "unlink", "launch", "frontmost", "lockstatus", "orientation",
-        "dlicon", "halt",
+        "dlicon", "halt"
     ]
 
     private func answer(_ op: String, _ args: String, _ body: Data) -> (Int, Data) {

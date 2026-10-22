@@ -70,7 +70,7 @@ extension SharedState {
             #expect(
                 t.calls == [
                     "start com.apple.mobile.house_arrest", "VendContainer com.example.Game", "free afc",
-                    "free house_arrest",
+                    "free house_arrest"
                 ],
                 "\(t.calls)"
             )
@@ -134,7 +134,7 @@ extension SharedState {
             }
             let tree = Tree()
             tree.folders = [
-                "Documents": ["Saves", "a.txt"], "Documents/Saves": ["1.sav", "Old"], "Documents/Saves/Old": ["0.sav"],
+                "Documents": ["Saves", "a.txt"], "Documents/Saves": ["1.sav", "Old"], "Documents/Saves/Old": ["0.sav"]
             ]
             tree.files = ["Documents/a.txt", "Documents/Saves/1.sav", "Documents/Saves/Old/0.sav"]
             func strings(_ list: [String]) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {

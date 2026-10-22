@@ -33,7 +33,7 @@ struct FilesRequestTests {
             .rename("Documents/a.sav", to: "b.sav", root: root),
             .makeFolder("Documents/Mods", root: .fileSystem),
             .crashReports(copyTo: nil),
-            .crashReports(copyTo: "/tmp/crash"),
+            .crashReports(copyTo: "/tmp/crash")
         ]
         for operation in operations {
             let request = HostServiceRequest(id: UUID(), session: UUID(), operation: operation)

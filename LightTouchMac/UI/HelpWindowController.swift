@@ -92,7 +92,7 @@ final class HelpWindowController: NSWindowController, NSTableViewDataSource, NST
             string: topic.title + "\n",
             attributes: [
                 .font: NSFont.preferredFont(forTextStyle: .title2),
-                .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph,
+                .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph
             ]
         )
         body.append(
@@ -100,7 +100,7 @@ final class HelpWindowController: NSWindowController, NSTableViewDataSource, NST
                 string: topic.shownBody,
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 14), .foregroundColor: NSColor.labelColor,
-                    .paragraphStyle: paragraph,
+                    .paragraphStyle: paragraph
                 ]
             )
         )
@@ -120,7 +120,7 @@ final class HelpWindowController: NSWindowController, NSTableViewDataSource, NST
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
             label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
         ])
         return cell
     }

@@ -40,13 +40,13 @@ import Testing
         }
         let lock: [String: Any] = [
             "board": "n72ap",
-            "entry": ["id": "n72ap-7E18", "content": ["recipe": ["name": "n72", "version": recipe]]],
+            "entry": ["id": "n72ap-7E18", "content": ["recipe": ["name": "n72", "version": recipe]]]
         ]
         try JSONSerialization.data(withJSONObject: lock).write(to: base.appendingPathComponent("device.lock.json"))
         try FileManager.default.createDirectory(at: overlay, withIntermediateDirectories: true)
         let record: [String: Any] = [
             "id": UUID().uuidString, "board": "n72ap", "firmware": "n72ap-7E18",
-            "base": ["kind": "prepared", "path": base.path], "storage": ["key": "base-7E18", "overlay": overlay.path],
+            "base": ["kind": "prepared", "path": base.path], "storage": ["key": "base-7E18", "overlay": overlay.path]
         ]
         try DeviceRecord.data(record).write(to: device.appendingPathComponent(DeviceRecord.name))
         return (root, device, base, overlay)
@@ -110,7 +110,7 @@ import Testing
         #expect(alt[0..<3072].allSatisfy { $0 == 0x5A } && alt[4096...] == N72NAND.blankSpare[...])
         #expect(
             try files(f.overlay).keys.sorted() == [
-                "/.base-identity", "/cs1/256.page", "/cs2/256.page", "/cs\(end.cs)/\(end.page).page",
+                "/.base-identity", "/cs1/256.page", "/cs2/256.page", "/cs\(end.cs)/\(end.page).page"
             ]
         )
         #expect(

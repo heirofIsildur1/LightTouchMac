@@ -251,7 +251,7 @@ extension SharedState {
                 drag([.option, .shift], [(20, 50), (20, 30), (25, 10)]),
                 [
                     "1:0@20,50", "2:0@60,50", "1:1@20,30", "2:1@60,30", "1:1@25,10", "2:1@65,10", "1:2@25,10",
-                    "2:2@65,10",
+                    "2:2@65,10"
                 ],
                 "Option-Shift drags both fingers in parallel"
             )
@@ -562,7 +562,7 @@ extension SharedState {
                         let to = display.convert(CGPoint(x: c.x + dx, y: c.y + dy), to: nil)
                         sent = []
                         let steps: [(NSEvent.EventType, NSPoint)] = [
-                            (.leftMouseDown, at), (.leftMouseDragged, to), (.leftMouseUp, to),
+                            (.leftMouseDown, at), (.leftMouseDragged, to), (.leftMouseUp, to)
                         ]
                         for (type, p) in steps {
                             window.at = p

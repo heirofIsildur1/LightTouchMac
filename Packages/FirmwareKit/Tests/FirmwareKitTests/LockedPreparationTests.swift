@@ -26,7 +26,7 @@ struct LockedPreparationTests {
         lock["inputs"] = [
             "ipsw": ["path": "/ipsw/iPad1,1_4.2.1_8C148_Restore.ipsw", "sha1": "8717b3be"],
             "language": "fr-FR", "keyboards": ["com.apple.keylayout.French", "com.apple.keylayout.US"],
-            "sibling": ["entry": "k48ap-8F190", "ipsw": "/ipsw/sibling.ipsw"],
+            "sibling": ["entry": "k48ap-8F190", "ipsw": "/ipsw/sibling.ipsw"]
         ]
         return lock
     }
@@ -87,7 +87,7 @@ struct LockedPreparationTests {
                 "recipe option gl_test on (the catalog row doesn't set it)",
                 "recipe option jailbreak on (the catalog row doesn't set it)",
                 "recipe option skip_setup on (the catalog row doesn't set it)",
-                "recipe option writable_nor off (the catalog row doesn't set it)",
+                "recipe option writable_nor off (the catalog row doesn't set it)"
             ],
             "\(plan.variants)"
         )
@@ -98,7 +98,7 @@ struct LockedPreparationTests {
         let labels = Set(Mirror(reflecting: FirmwareCommand.Create()).children.compactMap(\.label))
         let recorded: Set = [
             "_entry", "_ipsw", "_seed", "_language", "_keyboards", "_siblingEntry", "_siblingIpsw", "_glTest",
-            "_skipSetup", "_jailbreak",
+            "_skipSetup", "_jailbreak"
         ]
         let runsOwn: Set = ["_catalog", "_id", "_out", "_helper", "_cache", "_guestTools", "_stopAfter"]
         #expect(labels == recorded.union(runsOwn), "\(labels.subtracting(recorded.union(runsOwn)).sorted())")

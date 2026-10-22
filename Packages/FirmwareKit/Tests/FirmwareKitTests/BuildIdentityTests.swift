@@ -24,7 +24,7 @@ struct BuildIdentityTests {
             "ProductType": "iPhone3,1", "ProductVersion": "6.1.3", "ProductBuildVersion": "10B329",
             "DeviceMap": [["BoardConfig": "n90ap", "Platform": "s5l8930x"]],
             "MinimumSystemPartition": ["048-2748-005.dmg": 1212],
-            "SystemPartitionPadding": ["n90": ["8": 80, "16": 160, "32": 320]],
+            "SystemPartitionPadding": ["n90": ["8": 80, "16": 160, "32": 320]]
         ]
         let r = try RestoreInfo(
             plistData: PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
@@ -56,7 +56,7 @@ struct BuildIdentityTests {
                 "RestoreKernelCache": "kernelcache.release.k48", "RestoreLogo": af + "applelogo.s5l8930x.img3",
                 "RestoreRamDisk": "018-8375-001.dmg", "iBEC": "Firmware/dfu/iBEC.k48ap.RELEASE.dfu",
                 "iBSS": "Firmware/dfu/iBSS.k48ap.RELEASE.dfu", "iBoot": af + "iBoot.k48ap.RELEASE.img3",
-                "UpdateRamDisk": "018-8374-001.dmg",
+                "UpdateRamDisk": "018-8374-001.dmg"
             ]
         )
         let r = try RestoreInfo(ipsw)
@@ -99,7 +99,7 @@ struct BuildIdentityTests {
                 "iBoot": af + "iBoot.n72ap.RELEASE.img3", "LLB": af + "LLB.n72ap.RELEASE.img3",
                 "DeviceTree": af + "DeviceTree.n72ap.img3", "AppleLogo": af + "applelogo.s5l8720x.img3",
                 "KernelCache": "kernelcache.release.s5l8720x", "OS": "018-4160-1.dmg",
-                "RestoreRamDisk": "018-4166-1.dmg", "UpdateRamDisk": "018-4177-1.dmg",
+                "RestoreRamDisk": "018-4166-1.dmg", "UpdateRamDisk": "018-4177-1.dmg"
             ]
         )
         try RestoreInfo(ipsw).verify(against: Oracle.entry("n72ap-5F138"))

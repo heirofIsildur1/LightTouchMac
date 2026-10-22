@@ -208,7 +208,7 @@ struct AppsMenuTests {
         let targets = [
             AppsMenuTarget(title: "iPad iOS 3.2.2", canQueueInstall: true, isThisDevice: false, device: remote),
             AppsMenuTarget(title: "iPod touch iOS 3.1.3", canQueueInstall: true, isThisDevice: true, device: mine),
-            AppsMenuTarget(title: "iPad iOS 3.2.2", canQueueInstall: true, isThisDevice: false, device: other),
+            AppsMenuTarget(title: "iPad iOS 3.2.2", canQueueInstall: true, isThisDevice: false, device: other)
         ]
         #expect(item(menu(kept: [], targets), "Install on") == nil, "no retained copy, nothing to install elsewhere")
         let installOn = item(menu(kept: ["one"], targets), "Install on")

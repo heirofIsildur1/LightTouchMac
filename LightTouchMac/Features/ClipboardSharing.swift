@@ -26,7 +26,7 @@ import LightTouchCore
         // Coming to the front and leaving it are checked at once, so a quick trip away still hands the Mac's text.
         for name in [
             NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
-            NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+            NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification
         ] {
             _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
                 MainActor.assumeIsolated { ClipboardSharing.shared.tick() }

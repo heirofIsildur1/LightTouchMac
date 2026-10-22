@@ -21,7 +21,7 @@ extension SharedState {
             defer { try? FileManager.default.removeItem(at: work) }
             for (name, version) in [
                 ("v2_0", "(2u << 16)"), ("v2_7", "(2u << 16) | 7u"), ("v1_2", "(1u << 16) | 2u"),
-                ("v3_0", "(3u << 16)"), ("none", nil),
+                ("v3_0", "(3u << 16)"), ("none", nil)
             ] {
                 let source = work.appendingPathComponent("\(name).c")
                 try
@@ -102,7 +102,7 @@ extension SharedState {
                 mtlTexture: texture,
                 options: [
                     kCARendererColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
-                    kCARendererMetalCommandQueue: queue,
+                    kCARendererMetalCommandQueue: queue
                 ]
             )
             renderer.layer = layer

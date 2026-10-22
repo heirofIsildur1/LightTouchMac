@@ -149,7 +149,7 @@ enum MediaFixtures {
                 // AAC LC (profile 1 = object type 2 - 1), 44.1 kHz (index 4), two channels, no CRC.
                 data.append(contentsOf: [
                     0xFF, 0xF1, UInt8(1 << 6 | 4 << 2 | 2 >> 2), UInt8((2 & 3) << 6 | (total >> 11)),
-                    UInt8((total >> 3) & 0xFF), UInt8((total & 7) << 5 | 0x1F), 0xFC,
+                    UInt8((total >> 3) & 0xFF), UInt8((total & 7) << 5 | 0x1F), 0xFC
                 ])
                 data.append(packet)
             }
@@ -165,7 +165,7 @@ enum MediaFixtures {
             mediaType: .video,
             outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.h264,
-                AVVideoWidthKey: width, AVVideoHeightKey: height,
+                AVVideoWidthKey: width, AVVideoHeightKey: height
             ]
         )
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
@@ -173,14 +173,14 @@ enum MediaFixtures {
             sourcePixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey as String: width,
-                kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferHeightKey as String: height
             ]
         )
         let audio = AVAssetWriterInput(
             mediaType: .audio,
             outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44100,
-                AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 128_000,
+                AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 128_000
             ]
         )
         video.expectsMediaDataInRealTime = true

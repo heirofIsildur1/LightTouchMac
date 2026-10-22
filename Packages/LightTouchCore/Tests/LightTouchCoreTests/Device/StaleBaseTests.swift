@@ -41,7 +41,7 @@ struct StaleBaseTests {
                 return try! JSONSerialization.data(withJSONObject: [
                     "format": 1, "board": content["board"]!, "build": content["build"]!,
                     "tool": ["name": "firmwarekit", "version": tool],
-                    "entry": ["id": id, "sha256": String(repeating: "0", count: 64), "content": content],
+                    "entry": ["id": id, "sha256": String(repeating: "0", count: 64), "content": content]
                 ])
             }
         }
@@ -125,7 +125,7 @@ struct StaleBaseTests {
             lock: .raw(#"{"format": 1, "board": "n45ap", "activation_hook": null}"#),
             flagged: false
         ),
-        .init(name: "unreadable", entry: "n45ap-4B1", lock: .raw("not json"), flagged: false),
+        .init(name: "unreadable", entry: "n45ap-4B1", lock: .raw("not json"), flagged: false)
     ]
 
     @Test func shippedRecipesAreTheFixedOnes() {

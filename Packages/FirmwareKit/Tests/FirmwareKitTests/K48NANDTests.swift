@@ -200,7 +200,7 @@ struct K48NANDTests {
         let inputs = [
             hw2.appendingPathComponent("rdisk0-head4M.bin"), u.appendingPathComponent("system.img"),
             hw2.appendingPathComponent("rdisk0s3.bin"), u.appendingPathComponent("data.img"),
-            Fixtures.files.appendingPathComponent("ipad1/7B500/dec/kernelcache.mach"),
+            Fixtures.files.appendingPathComponent("ipad1/7B500/dec/kernelcache.mach")
         ]
         guard ProcessInfo.processInfo.environment["FK_NAND_FULL"] == "1", inputs.allSatisfy(Fixtures.exists) else {
             try FixtureRequirements.missing(

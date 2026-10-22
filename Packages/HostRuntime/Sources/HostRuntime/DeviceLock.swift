@@ -209,7 +209,7 @@ public struct DeviceLock: Codable, Sendable, Equatable {
                 .fileReadCorruptFile,
                 userInfo: [
                     NSFilePathErrorKey: url.path, NSUnderlyingErrorKey: error,
-                    NSLocalizedDescriptionKey: "Invalid boot lock at \(url.path): \(error)",
+                    NSLocalizedDescriptionKey: "Invalid boot lock at \(url.path): \(error)"
                 ]
             )
         }

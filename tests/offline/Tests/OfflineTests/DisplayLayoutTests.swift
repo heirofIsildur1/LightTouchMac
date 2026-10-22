@@ -235,7 +235,7 @@ extension SharedState {
             let edge = box()
             for (at, lands) in [
                 (CGPoint(x: edge.midX, y: edge.minY - 6), CGPoint(x: 0.5, y: 0)),
-                (CGPoint(x: edge.maxX + 6, y: edge.midY), CGPoint(x: 1, y: 0.5)),
+                (CGPoint(x: edge.maxX + 6, y: edge.midY), CGPoint(x: 1, y: 0.5))
             ] {
                 press(at)
                 check(
@@ -778,7 +778,7 @@ extension SharedState {
             }
             for (profile, scans) in [
                 (pod, [size(400, 400), size(320, 504), size(504, 320)]),
-                (pad, [size(1024, 1024), size(1104, 1024), size(1024, 1104)]),
+                (pad, [size(1024, 1024), size(1104, 1024), size(1024, 1104)])
             ] {
                 for scan in scans {
                     let turned = profile.freeFormTurn(scan: scan) != 0

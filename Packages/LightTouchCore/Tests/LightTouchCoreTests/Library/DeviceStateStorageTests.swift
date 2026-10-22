@@ -293,7 +293,7 @@ struct DeviceStateStorageTests {
             try DeviceStateStorage.checkBootPaths(
                 base: p.base,
                 mutable: [
-                    p.overlay, p.snapshot, p.snapshotMeta, p.snapshotTmp, p.snapshotBad, p.usbmuxConf, p.work, p.lease,
+                    p.overlay, p.snapshot, p.snapshotMeta, p.snapshotTmp, p.snapshotBad, p.usbmuxConf, p.work, p.lease
                 ]
                     + [p.writableNOR].compactMap { $0 },
                 state: selected,

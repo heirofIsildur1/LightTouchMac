@@ -64,7 +64,7 @@ public final class AppMetadataCache {
                 "Payload/Super Monkey Ball [SEGA].app/Icon.png",
                 "Payload/Super Monkey Ball [SEGA].app/Icon@2x.png",
                 "Payload/Super Monkey Ball [SEGA].app/Settings.bundle/Nested.app/Info.plist",
-                "Payload/Super Monkey Ball [SEGA].app/Frameworks/Foo.framework/Icon.png",
+                "Payload/Super Monkey Ball [SEGA].app/Frameworks/Foo.framework/Icon.png"
             ]
             let found = IPAMembers.appRoot(members)
             assert(found == "Payload/Super Monkey Ball [SEGA].app/", "nested .app won: \(found ?? "nil")")

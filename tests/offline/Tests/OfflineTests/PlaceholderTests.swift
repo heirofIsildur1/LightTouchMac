@@ -113,7 +113,7 @@ extension SharedState {
                     "stopped",
                     DeviceRow(entry: ipad, instanceID: id, session: .dead("The iPad stopped unexpectedly."), job: nil)
                 ),
-                ("requires-ipsw", DeviceRow(entry: ipod, instanceID: nil, session: nil, job: nil)),
+                ("requires-ipsw", DeviceRow(entry: ipod, instanceID: nil, session: nil, job: nil))
             ]
             var failures: [String] = []
             var skips: Set<String> = []
@@ -421,7 +421,7 @@ extension SharedState {
                 let outside = pixel(NSPoint(x: square.minX - 8, y: square.midY))
                 for corner in [
                     NSPoint(x: square.minX + 6, y: square.minY + 6), NSPoint(x: square.maxX - 6, y: square.minY + 6),
-                    NSPoint(x: square.minX + 6, y: square.maxY - 6), NSPoint(x: square.maxX - 6, y: square.maxY - 6),
+                    NSPoint(x: square.minX + 6, y: square.maxY - 6), NSPoint(x: square.maxX - 6, y: square.maxY - 6)
                 ] where zip(pixel(corner), outside).contains(where: { abs($0 - $1) > 1 }) {
                     failures.append("\(board): the art's square \(pixel(corner)) on the background \(outside)")
                     break

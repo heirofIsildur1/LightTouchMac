@@ -17,7 +17,7 @@ struct NetworkPolicyTests {
         "127.0.0.1", "127.1", "127.255.255.254", "2130706433", "0x7f000001", "0x7f.1", "0.0.0.0", "0",
         "0.1.2.3", "::1", "[::1]", "::", "::ffff:127.0.0.1", "[::ffff:127.0.0.1]", "::ffff:7f00:1", "::127.0.0.1",
         "::ffff:0:127.0.0.1", "64:ff9b::7f00:1", "::ffff:0.0.0.0", "::ffff:127.0.0.1%", "localhost", "LOCALHOST.",
-        "x.localhost",
+        "x.localhost"
     ])
     func thisMacIsNeverReachable(host: String) {
         for lan in [false, true] {
@@ -32,7 +32,7 @@ struct NetworkPolicyTests {
         "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "100.64.0.1", "100.127.255.255",
         "198.18.0.1", "198.19.255.255", "224.0.0.251", "239.255.255.250", "240.0.0.1", "255.255.255.255",
         "[::ffff:192.168.1.1]", "::ffff:10.0.0.1", "::10.0.0.1", "64:ff9b::a00:1", "::ffff:0:a9fe:a9fe", "fe80::1",
-        "fe80::1%lo0", "fc00::1", "fd12:3456::1", "fec0::1", "ff02::1", "printer.local", "Printer.Local.",
+        "fe80::1%lo0", "fc00::1", "fd12:3456::1", "fec0::1", "ff02::1", "printer.local", "Printer.Local."
     ])
     func localNetworksNeedAttachToLocalNetwork(host: String) throws {
         #expect(throws: NetworkPolicy.Refusal.localNetwork) {
@@ -44,7 +44,7 @@ struct NetworkPolicyTests {
     @Test(arguments: [
         "93.184.215.14", "1.1.1.1", "11.0.0.1", "100.63.255.255", "100.128.0.1", "172.15.0.1", "172.32.0.1",
         "192.169.0.1", "198.17.0.1", "198.20.0.1", "223.255.255.255", "2606:4700::1111", "[2001:4860:4860::8888]",
-        "::ffff:8.8.8.8", "64:ff9b::808:808",
+        "::ffff:8.8.8.8", "64:ff9b::808:808"
     ])
     func publicAddressesPass(host: String) throws {
         let endpoints = try NetworkPolicy.resolve(host, port: 443, localNetwork: false)
@@ -67,7 +67,7 @@ struct NetworkPolicyTests {
         let answers: [String: [Endpoint]] = [
             "mixed.example": [Self.v4(93, 184, 215, 14), Self.v4(127, 0, 0, 1)],
             "mapped.example": [Endpoint(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 127, 0, 0, 1], port: 80)],
-            "unspecified.example": [Self.v4(0, 0, 0, 0)],
+            "unspecified.example": [Self.v4(0, 0, 0, 0)]
         ]
         for name in answers.keys {
             #expect(throws: NetworkPolicy.Refusal.host) {

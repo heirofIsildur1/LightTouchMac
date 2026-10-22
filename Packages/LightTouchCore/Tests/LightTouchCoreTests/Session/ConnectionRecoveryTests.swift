@@ -44,7 +44,7 @@ struct ConnectionRecoveryTests {
             )
             for error: DeviceError in [
                 .endpointBusy, .notAttached, .unavailable, .timedOut(operation: "USB connection"),
-                .instproxy(.opFailed, phase: "browse"), .lockdown(-17), .lockdown(-4), .lockdown(-27), .lockdown(-32),
+                .instproxy(.opFailed, phase: "browse"), .lockdown(-17), .lockdown(-4), .lockdown(-27), .lockdown(-32)
             ] {
                 c.recovery.reportFailure(error, operation: "Checking connection")
                 c.deviceReachable = false

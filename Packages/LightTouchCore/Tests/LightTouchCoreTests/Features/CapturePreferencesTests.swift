@@ -30,7 +30,7 @@ struct CapturePreferencesTests {
                         || [
                             "copyOnCapture", "recordDeviceBezel",
                             "openFinderAfterCapture", "soundEffectsEnabled",
-                            "openInApplicationPath",
+                            "openInApplicationPath"
                         ].contains($0)
                 }.isEmpty,
                 "reading writes nothing"
@@ -80,7 +80,7 @@ struct CapturePreferencesTests {
                 )
                 let info: [String: Any] = [
                     "CFBundlePackageType": "APPL", "CFBundleIdentifier": "test.capture.editor.\(UUID().uuidString)",
-                    "CFBundleName": "Image Editor",
+                    "CFBundleName": "Image Editor"
                 ]
                 try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(
                     to: app.appendingPathComponent("Contents/Info.plist")

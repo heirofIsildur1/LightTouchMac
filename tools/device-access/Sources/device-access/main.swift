@@ -123,7 +123,7 @@ func access(_ arguments: DeviceAccess) throws -> Int32 {
         "HostName=localhost", "Port=22", "User=root", "HostKeyAlias=" + alias,
         "UserKnownHostsFile=" + shellQuote(sshLiteral(knownHosts)),
         "StrictHostKeyChecking=" + (FileManager.default.fileExists(atPath: knownHosts) ? "yes" : "ask"),
-        "ProxyCommand=" + proxy, "ConnectTimeout=10", "ServerAliveInterval=15", "ServerAliveCountMax=2",
+        "ProxyCommand=" + proxy, "ConnectTimeout=10", "ServerAliveInterval=15", "ServerAliveCountMax=2"
     ]
     let provisionedIdentity = state.appendingPathComponent("id_ecdsa").path
     if let identity = arguments.identity
@@ -136,7 +136,7 @@ func access(_ arguments: DeviceAccess) throws -> Int32 {
         }
         sshOptions += [
             "IdentityFile=" + shellQuote(sshLiteral(identity)), "IdentitiesOnly=yes",
-            "PreferredAuthentications=publickey",
+            "PreferredAuthentications=publickey"
         ]
     }
     if mode == "config" {

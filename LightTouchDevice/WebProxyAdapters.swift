@@ -249,7 +249,7 @@ enum WebProxyAdapters {
                     "current": "temperature_2m,weather_code,is_day",
                     "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset",
                     "temperature_unit": unit == "c" ? "celsius" : "fahrenheit", "timezone": "auto",
-                    "forecast_days": "6",
+                    "forecast_days": "6"
                 ]
             )
             guard let forecasts = result.flatMap({ $0 is [String: Any] ? [$0] : $0 as? [Any] }),
@@ -347,7 +347,7 @@ enum WebProxyAdapters {
         cycle -= cycle.rounded(.down)
         return [
             "moonphase": String(Int((cycle * 8 + 0.5).rounded(.down)) % 8),
-            "moonfacevisible": String(format: "%.3f", 50 * (1 - cos(2 * Double.pi * cycle))),
+            "moonfacevisible": String(format: "%.3f", 50 * (1 - cos(2 * Double.pi * cycle)))
         ]
     }
     static func forecast(_ data: Any, id: String, place: Place, celsius: Bool) -> XMLElement? {
@@ -386,7 +386,7 @@ enum WebProxyAdapters {
                 child(item, "forecast"),
                 [
                     "high": String(format: "%.0f", high), "low": String(format: "%.0f", low), "code": condition,
-                    "dayofweek": String(calendar.component(.weekday, from: when)),
+                    "dayofweek": String(calendar.component(.weekday, from: when))
                 ]
             )
         }

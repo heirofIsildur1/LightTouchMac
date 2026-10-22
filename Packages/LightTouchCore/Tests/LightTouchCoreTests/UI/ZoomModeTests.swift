@@ -35,7 +35,7 @@ struct ZoomModeTests {
     nonisolated static let cases: [Case] = {
         _ = ShippedResources.machines
         let panes = [
-            CGSize(width: 480, height: 400), CGSize(width: 720, height: 640), CGSize(width: 1512, height: 900),
+            CGSize(width: 480, height: 400), CGSize(width: 720, height: 640), CGSize(width: 1512, height: 900)
         ]
         return Board.allCases.flatMap { board in
             [1, 2].flatMap { backing in

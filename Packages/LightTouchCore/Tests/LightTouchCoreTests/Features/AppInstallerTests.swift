@@ -30,7 +30,7 @@ extension SharedState {
                 center.addObserver(forName: .ltmInstallProgress, object: nil, queue: nil) { note in
                     let job = note.object as! InstallJob
                     MainActor.assumeIsolated { changes.updates.append(job.status) }
-                },
+                }
             ]
             defer { tokens.forEach(center.removeObserver) }
             return try await body(changes)
@@ -387,7 +387,7 @@ extension SharedState {
                 device.mediaFirmware = .init(version: "1.1", name: "iOS 1.1")
                 for (file, words) in [
                     ("Refused song.mp3", "Adding music isn’t supported on iOS 1.1 yet."),
-                    ("Refused photo.png", "Adding photos isn’t supported on iOS 1.1 yet."),
+                    ("Refused photo.png", "Adding photos isn’t supported on iOS 1.1 yet.")
                 ] {
                     let job = media(file, to: device)
                     #expect(job.isFinished && job.failed && job.retry == nil && job.status == words)

@@ -61,7 +61,7 @@ struct GuestAgentTests {
         #expect(
             old.shells == [
                 "'/bin/launchctl' 'stop' 'it'\\''s'", "rm -f '/tmp/x y'",
-                "chown 501:501 '/var/mobile/Media/LightTouch'", "sync",
+                "chown 501:501 '/var/mobile/Media/LightTouch'", "sync"
             ]
         )
         #expect(old.spawns.isEmpty && !old.ops.contains("spawn"), "a v1 agent is never sent a v2 op")

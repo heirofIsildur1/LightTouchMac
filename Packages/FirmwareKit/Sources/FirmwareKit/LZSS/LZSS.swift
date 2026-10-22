@@ -134,7 +134,7 @@ public enum BootLogo {
         }
         return [
             KBoot.Segment(pa: fb, length: UInt32(stride * fbH), data: nil),
-            KBoot.Segment(pa: fb + UInt32(y0 * stride), length: UInt32(rows.count), data: Data(rows)),
+            KBoot.Segment(pa: fb + UInt32(y0 * stride), length: UInt32(rows.count), data: Data(rows))
         ]
     }
 }

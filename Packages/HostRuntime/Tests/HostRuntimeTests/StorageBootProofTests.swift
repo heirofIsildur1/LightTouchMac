@@ -11,7 +11,7 @@ struct StorageBootProofTests {
         var data: [String: Any] = [
             "base": ["kind": "prepared", "path": "base/old"],
             "storage": ["key": "old", "overlay": "overlay/old"],
-            "identity": ["die_id": "original"], "guest": ["active": 1],
+            "identity": ["die_id": "original"], "guest": ["active": 1]
         ]
         func write() throws { try DeviceRecord.data(data).write(to: record) }
         try write()

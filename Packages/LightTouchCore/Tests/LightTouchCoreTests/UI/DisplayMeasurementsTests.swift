@@ -21,7 +21,7 @@ struct DisplayMeasurementsTests {
     @Test(arguments: [
         CGSize(width: 1512 * 25.4 / 72, height: 982 * 25.4 / 72),  // the synthetic 72 dpi estimate
         .zero,  // absent
-        CGSize(width: 100, height: 500),  // inconsistent aspect
+        CGSize(width: 100, height: 500)  // inconsistent aspect
     ])
     func unusableMetadataIsRefused(_ hardware: CGSize) {
         #expect(

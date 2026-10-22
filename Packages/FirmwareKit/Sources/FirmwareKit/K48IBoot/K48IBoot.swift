@@ -175,7 +175,7 @@ public enum K48IBoot {
         // SysCfg ('gfCS'): 20-byte records, a 4-byte tag then a 16-byte inline value.
         let entries: [(String, String)] = [
             ("Mod#", try need("model-number")), ("Regn", try need("region-info")),
-            ("SrNm", try need("serial-number")), ("MLB#", try need("mlb-serial-number")),
+            ("SrNm", try need("serial-number")), ("MLB#", try need("mlb-serial-number"))
         ]
         nor.replaceSubrange(0x4000..<0x4004, with: Array("gfCS".utf8))
         for (i, v) in [UInt32(24 + 20 * entries.count), 8192, 0x10001, 0, UInt32(entries.count)].enumerated() {
@@ -190,7 +190,7 @@ public enum K48IBoot {
         }
         let values: [(String, String)] = [
             ("debug-uarts", "1"), ("auto-boot", "true"), ("boot-command", "fsboot"),
-            ("boot-args", bootArgs), ("wifiaddr", try need("wifi-mac")), ("btaddr", try need("bt-mac")),
+            ("boot-args", bootArgs), ("wifiaddr", try need("wifi-mac")), ("btaddr", try need("bt-mac"))
         ]
         let bank = try nvramBank(values)
         nor.replaceSubrange(0xFC000..<0xFE000, with: bank)

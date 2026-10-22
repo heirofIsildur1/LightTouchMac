@@ -23,7 +23,7 @@ public nonisolated struct DeviceBatch<Item> {
     /// The commands several rows take, with their titles' verbs; the ones that ask first end in an ellipsis.
     static var verbs: [DeviceAction: String] {
         [
-            .start: "Start", .forceStop: "Force Stop", .jailbreak: "Jailbreak", .erase: "Erase",
+            .start: "Start", .forceStop: "Force Stop", .jailbreak: "Jailbreak", .erase: "Erase"
         ]
     }
     public let action: DeviceAction
@@ -318,7 +318,7 @@ public nonisolated struct DeviceRow: Equatable, Sendable {
         let parts = [
             progressSummary, remaining.map(Self.remainingText),
             showSpeed
-                ? speed.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) + "/s" } : nil,
+                ? speed.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) + "/s" } : nil
         ]
         let line = parts.compactMap { $0 }.joined(separator: " — ")
         return line.isEmpty ? nil : line

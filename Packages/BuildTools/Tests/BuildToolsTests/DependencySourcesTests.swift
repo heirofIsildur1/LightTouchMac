@@ -23,9 +23,9 @@ struct DependencySourcesTests {
                     [
                         "name": "example", "groups": ["native"], "archive": "example-1.tar.gz",
                         "cache_aliases": ["example.tar.gz"], "url": "https://example.invalid/source.tar.gz",
-                        "sha256": sha256Hex(content),
+                        "sha256": sha256Hex(content)
                     ]
-                ],
+                ]
             ],
             to: manifest
         )

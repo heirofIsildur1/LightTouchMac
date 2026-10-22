@@ -30,7 +30,7 @@ struct AccessibilityTests {
         #expect(AccessibilityFeature.invertColors.title(version: "7.1.2") == "Invert Colors")
         #expect(
             AccessibilityFeature.allCases.map { $0.title(version: "6.1.6") } == [
-                "VoiceOver", "Zoom", "Invert Colors", "Mono Audio", "Speak Auto-text",
+                "VoiceOver", "Zoom", "Invert Colors", "Mono Audio", "Speak Auto-text"
             ]
         )
     }
@@ -67,7 +67,7 @@ struct AccessibilityTests {
             try PropertyListSerialization.data(
                 fromPropertyList: [
                     "VoiceOverTouchEnabled": true, "InvertColorsEnabled": true, "ZoomTouchEnabled": false,
-                    "VoiceOverTouchSpeakingRate": 0.5,
+                    "VoiceOverTouchSpeakingRate": 0.5
                 ],
                 format: .binary,
                 options: 0

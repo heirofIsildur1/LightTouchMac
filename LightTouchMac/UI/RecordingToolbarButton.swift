@@ -22,7 +22,7 @@ final class RecordingToolbarButton: NSButton {
         addSubview(progress)
         NSLayoutConstraint.activate([
             progress.centerXAnchor.constraint(equalTo: centerXAnchor),
-            progress.centerYAnchor.constraint(equalTo: centerYAnchor),
+            progress.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
         update(.idle, elapsed: "0:00", enabled: false)
     }

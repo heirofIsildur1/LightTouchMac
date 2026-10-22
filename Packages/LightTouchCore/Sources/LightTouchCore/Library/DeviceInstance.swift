@@ -199,7 +199,7 @@ public nonisolated struct DeviceInstance: Codable, Equatable, Identifiable, Send
             base: paths.base,
             mutable: [
                 paths.overlay, paths.snapshot, paths.snapshotMeta, paths.snapshotTmp, paths.snapshotBad,
-                paths.usbmuxConf, paths.work, paths.lease,
+                paths.usbmuxConf, paths.work, paths.lease
             ] + [paths.writableNOR].compactMap { $0 },
             state: Bundled.stateDirectory,
             owner: id

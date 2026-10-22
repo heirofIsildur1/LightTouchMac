@@ -106,7 +106,7 @@ public nonisolated enum FirmwareBootAdmission {
             JSONSerialization.data(
                 withJSONObject: [
                     "recipe": step, "step": "iphone-imei",
-                    "imei": upgraded.imei, "udid": upgraded.udid,
+                    "imei": upgraded.imei, "udid": upgraded.udid
                 ],
                 options: [.sortedKeys]
             ),

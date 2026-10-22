@@ -22,7 +22,7 @@ import Testing
         var entry = FirmwareJobsTests.entry("k48ap-7B367")
         entry["estimates"] = FirmwareJobsTests.smallEstimates
         entry["source"] = [
-            "kind": "ipsw", "url": url ?? "http://127.0.0.1:9/none.ipsw", "sha1": sha1, "bytes": data.count,
+            "kind": "ipsw", "url": url ?? "http://127.0.0.1:9/none.ipsw", "sha1": sha1, "bytes": data.count
         ]
         let catalog = try FirmwareJobsTests.catalog([entry], in: tmp)
         let h = try Harness(tmp, catalog: catalog, preparer: preparer)
@@ -212,7 +212,7 @@ import Testing
             var entry = FirmwareJobsTests.entry("k48ap-7B367")
             entry["estimates"] = FirmwareJobsTests.smallEstimates
             entry["source"] = [
-                "kind": "ipsw", "url": "http://127.0.0.1:9/none.ipsw", "sha1": Self.zerosSHA1, "bytes": Self.zerosBytes,
+                "kind": "ipsw", "url": "http://127.0.0.1:9/none.ipsw", "sha1": Self.zerosSHA1, "bytes": Self.zerosBytes
             ]
             let catalog = try FirmwareJobsTests.catalog([entry], in: tmp)
             let e = catalog.entries[0]

@@ -164,7 +164,7 @@ final class AppsInspectorViewController: NSViewController {
 
         for (button, action) in [
             (browseButton, #selector(browseStore)), (installButton, #selector(installLocal)),
-            (retryButton, #selector(refreshClicked(_:))), (resumeButton, #selector(resumeInstallsClicked(_:))),
+            (retryButton, #selector(refreshClicked(_:))), (resumeButton, #selector(resumeInstallsClicked(_:)))
         ] {
             button.target = self
             button.action = action
@@ -211,7 +211,7 @@ final class AppsInspectorViewController: NSViewController {
             placeholder.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
             placeholder.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
             placeholder.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
-            placeholder.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            placeholder.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16)
         ]
         let footer = NSView()
         footer.translatesAutoresizingMaskIntoConstraints = false
@@ -225,7 +225,7 @@ final class AppsInspectorViewController: NSViewController {
             footer.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             footer.bottomAnchor.constraint(equalTo: container.bottomAnchor), footerHeight,
             addRemove.leadingAnchor.constraint(equalTo: footer.leadingAnchor, constant: 10),
-            addRemove.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
+            addRemove.centerYAnchor.constraint(equalTo: footer.centerYAnchor)
         ]
         NSLayoutConstraint.activate(constraints)
 

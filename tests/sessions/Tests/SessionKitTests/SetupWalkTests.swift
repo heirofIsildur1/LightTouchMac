@@ -67,7 +67,7 @@ struct SetupWalkTests {
         ("apple id", [0.92, 0.92, 0.0, 0.07, 0.0, 0.09, 0.0]), ("apple id", [0.92, 0.92, 0.0, 0.04, 0.0, 0.1, 0.0]),
         ("diagnostics", [0.0, 0.0, 0.0, 1.0, 0.27, 0.01, 0.0]), ("diagnostics", [0.0, 0.0, 0.0, 1.0, 0.29, 0.0, 0.0]),
         ("diagnostics", [0.0, 0.0, 0.0, 0.12, 0.0, 0.0, 0.95]), ("thank you", [0.0, 0.83, 0.17, 0.05, 0.0, 0.18, 0.0]),
-        (nil, [0.0, 0.0, 0.0, 0.0, 0.0, 0.04, 0.0]), (nil, [0.78, 0.69, 0.86, 1.0, 1.0, 0.74, 0.92]),
+        (nil, [0.0, 0.0, 0.0, 0.0, 0.0, 0.04, 0.0]), (nil, [0.78, 0.69, 0.86, 1.0, 1.0, 0.74, 0.92])
     ]
 
     @Test func measuredPagesAreRecognized() {
@@ -86,7 +86,7 @@ struct SetupWalkTests {
     /// n88ap-10A523 (3GS 6.0.1): the language page with the Home sheet up.
     static let sheetOnLanguage: [String: (x: Double, y: Double)] = [
         "Test Network": (0.2, 0.02), "9:43 PM": (0.5, 0.02), "English": (0.15, 0.2), "Français": (0.15, 0.29),
-        "Deutsch": (0.15, 0.39), "Emergency Call": (0.5, 0.66), "Start Over": (0.5, 0.77), "Cancel": (0.5, 0.91),
+        "Deutsch": (0.15, 0.39), "Emergency Call": (0.5, 0.66), "Start Over": (0.5, 0.77), "Cancel": (0.5, 0.91)
     ]
 
     @Test func theHomeSheetIsCancelledFirst() {
@@ -112,7 +112,7 @@ struct SetupWalkTests {
     static let country7: [String: (x: Double, y: Double)] = [
         "••••• Light Touch A 7:17 PM": (0.29, 0.02), "< Back": (0.12, 0.09), "Select Your Country": (0.5, 0.19),
         "or Region": (0.47, 0.27), "MORE COUNTRIES AND REGIONS": (0.4, 0.5), "Afghanistan": (0.2, 0.6),
-        ">": (0.94, 0.6), "Åland Islands": (0.22, 0.72), "Albania": (0.15, 0.84), "Algeria": (0.14, 0.97),
+        ">": (0.94, 0.6), "Åland Islands": (0.22, 0.72), "Albania": (0.15, 0.84), "Algeria": (0.14, 0.97)
     ]
 
     @Test func theCountryListIsScrolledToUnitedStates() {
@@ -132,7 +132,7 @@ struct SetupWalkTests {
     /// n90ap-11D257 (7.1.2): the passcode page as Vision read it on 15 pages in a row (a stray mark, a curly apostrophe).
     @Test func thePasscodePageIsReadPastAStrayMark() {
         let passcode: [String: (x: Double, y: Double)] = [
-            "Create a Passcode": (0.5, 0.17), "• Don\u{2019}t Add Passcode": (0.48, 0.49), "1": (0.17, 0.59),
+            "Create a Passcode": (0.5, 0.17), "• Don\u{2019}t Add Passcode": (0.48, 0.49), "1": (0.17, 0.59)
         ]
         #expect(taps(SetupPlan.plan(passcode, pages: [])) == ["Don't Add Passcode"])
     }
@@ -147,11 +147,11 @@ struct SetupWalkTests {
     @Test func aCountrysLanguagePageIsNotEveryLanguage() {
         let country: [String: (x: Double, y: Double)] = [
             "Vítejte": (0.4, 0.22), "Bienven": (0.8, 0.38), "Bem-vindo": (0.4, 0.45), "Välkommen": (0.6, 0.53),
-            "English": (0.14, 0.73), "Español": (0.14, 0.82),
+            "English": (0.14, 0.73), "Español": (0.14, 0.82)
         ]
         let every: [String: (x: Double, y: Double)] = [
             "English": (0.14, 0.2), "Français": (0.16, 0.29), "Deutsch": (0.16, 0.38), "日本語": (0.13, 0.48),
-            "Nederlands": (0.2, 0.57), "Italiano": (0.16, 0.66), "Español": (0.16, 0.75),
+            "Nederlands": (0.2, 0.57), "Italiano": (0.16, 0.66), "Español": (0.16, 0.75)
         ]
         #expect(!SetupPlan.listsEveryLanguage(country))
         #expect(SetupPlan.listsEveryLanguage(every))
@@ -164,19 +164,19 @@ struct SetupWalkTests {
     @Test func thePagesWalksStoppedOnEachHaveAStep() {
         let language: [String: (x: Double, y: Double)] = [
             "•••• Light Touch = 9:11 PM": (0.29, 0.02), "English": (0.14, 0.27), ">": (0.94, 0.27),
-            "Français": (0.16, 0.4), "Deutsch": (0.16, 0.52),
+            "Français": (0.16, 0.4), "Deutsch": (0.16, 0.52)
         ]
         #expect(taps(SetupPlan.plan(language, pages: [])) == ["English", "Light Touch = 9:11 PM"])
         let k: [String: (x: Double, y: Double)] = [
             "•••• Light Touch F 9:12 PM": (0.29, 0.02), "stan": (0.29, 0.07), "< Back": (0.12, 0.09),
             "Kenya": (0.13, 0.19), ">": (0.94, 0.19), "Kiribati": (0.14, 0.32), "Kuwait": (0.14, 0.44),
-            "Kyrgyzstan": (0.2, 0.57), "Laos": (0.11, 0.69), "Latvia": (0.13, 0.82), "Lebanon": (0.16, 0.94),
+            "Kyrgyzstan": (0.2, 0.57), "Laos": (0.11, 0.69), "Latvia": (0.13, 0.82), "Lebanon": (0.16, 0.94)
         ]
         #expect(SetupPlan.plan(k, pages: ["(scroll)"]) == [.scroll(0.85, 0.25, fast: true)])
         let appleID: [String: (x: Double, y: Double)] = [
             "•ll Light Touch & 7:56 PM": (0.3, 0.02), "Back": (0.1, 0.09), "Apple ID": (0.5, 0.09),
             "Sign In with an Apple ID": (0.5, 0.71), "Create a Free Apple ID": (0.5, 0.85),
-            "Skip This Step": (0.82, 0.96),
+            "Skip This Step": (0.82, 0.96)
         ]
         #expect(taps(SetupPlan.plan(appleID, pages: ["(Skip)"])) == ["Skip This Step"])
     }

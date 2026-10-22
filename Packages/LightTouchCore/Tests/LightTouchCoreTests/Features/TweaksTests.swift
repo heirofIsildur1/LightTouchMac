@@ -71,14 +71,14 @@ import Testing
                 "com.apple.springboard SBShowRSSI", "com.apple.springboard SBShowGSMRSSI",
                 "com.apple.springboard SBFakeBars", "com.apple.springboard SBFakeTime",
                 "com.apple.springboard SBFakeTimeString", "com.apple.springboard SBFakeCarrier",
-                "com.apple.mobilesafari ConsoleEnabled",
+                "com.apple.mobilesafari ConsoleEnabled"
             ]
         )
         #expect(
             s.defaults(version: "1.0").map(\.id) == [
                 "com.apple.springboard SBShowRSSI", "com.apple.springboard SBShowGSMRSSI",
                 "com.apple.springboard SBFakeBars", "com.apple.springboard SBFakeTime",
-                "com.apple.springboard SBFakeTimeString",
+                "com.apple.springboard SBFakeTimeString"
             ]
         )
         #expect(s.live(version: "1.0") == (nil, nil) as (Data?, UInt32?), "no live ops: there is no agent")
@@ -110,7 +110,7 @@ import Testing
             #expect(
                 sent.last?.map(\.id).sorted() == [
                     "com.apple.springboard SBFakeTime", "com.apple.springboard SBShowGSMRSSI",
-                    "com.apple.springboard SBShowRSSI",
+                    "com.apple.springboard SBShowRSSI"
                 ]
             )
             #expect(tweaks.settings.written.count == 3)
@@ -225,13 +225,13 @@ import Testing
             ids("4.0") == [
                 "com.apple.springboard SBShowRSSI", "com.apple.springboard SBShowGSMRSSI",
                 "com.apple.springboard SBFakeTime", "com.apple.UIKit UIAnimationDragCoefficient",
-                "com.apple.Preferences KeyboardEmojiEverywhere", "com.apple.mobilesafari ConsoleEnabled",
+                "com.apple.Preferences KeyboardEmojiEverywhere", "com.apple.mobilesafari ConsoleEnabled"
             ]
         )
         #expect(
             ids("6.1.6") == [
                 "com.apple.springboard SBShowRSSI", "com.apple.springboard SBShowGSMRSSI",
-                "com.apple.UIKit UIAnimationDragCoefficient", "com.apple.webinspectord RemoteInspectorEnabled",
+                "com.apple.UIKit UIAnimationDragCoefficient", "com.apple.webinspectord RemoteInspectorEnabled"
             ],
             "no keynote clock or emoji switch there; Safari's switch is the Web Inspector"
         )
@@ -251,7 +251,7 @@ import Testing
         // What an earlier Time Machine wrote goes, and timed restarts to read it.
         s.written = [
             "com.apple.timed TMAutomaticTimeEnabled", "com.apple.timed TMAutomaticTimeOnlyEnabled",
-            "com.apple.timed DisableAutomaticTime",
+            "com.apple.timed DisableAutomaticTime"
         ]
         let changes = s.changes(version: "7.1.2")
         #expect(changes.map(\.id) == s.written && changes.allSatisfy { $0.value == nil })
@@ -260,7 +260,7 @@ import Testing
         link.files[timed] = try PropertyListSerialization.data(
             fromPropertyList: [
                 "TMAutomaticTimeEnabled": false, "TMAutomaticTimeOnlyEnabled": false, "DisableAutomaticTime": true,
-                "TMAutomaticTimeZoneEnabled": true,
+                "TMAutomaticTimeZoneEnabled": true
             ],
             format: .binary,
             options: 0
@@ -278,7 +278,7 @@ import Testing
         s.on = [.signalNumbers]
         s.written = [
             "com.apple.springboard SBShowRSSI", "com.apple.springboard SBShowGSMRSSI",
-            "com.apple.springboard SBFakeTime",
+            "com.apple.springboard SBFakeTime"
         ]
         let changes = s.changes(version: "3.1.3")
         #expect(changes.filter { $0.value == nil }.map(\.key) == ["SBFakeTime"])
@@ -355,7 +355,7 @@ import Testing
                 GuestDefault("com.apple.springboard", "SBFakeBars", .int(1)),
                 GuestDefault("com.apple.springboard", "SBFakeTime", .bool(true)),
                 GuestDefault("com.apple.springboard", "SBFakeTimeString", .string("9:41 AM")),
-                GuestDefault("com.apple.springboard", "SBFakeCarrier", .string("Light Touch")),
+                GuestDefault("com.apple.springboard", "SBFakeCarrier", .string("Light Touch"))
             ],
             "the keynote clock's SBFakeTime once, under the string"
         )

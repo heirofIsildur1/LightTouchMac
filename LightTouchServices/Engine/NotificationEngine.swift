@@ -13,7 +13,7 @@ nonisolated enum NotificationEngine {
     /// so none of this may be main-actor bound.
     nonisolated static let observed = [
         "com.apple.mobile.application_installed",
-        "com.apple.mobile.application_uninstalled",
+        "com.apple.mobile.application_uninstalled"
     ]
 
     /// Handed to the C callback; retained for the session's whole life and

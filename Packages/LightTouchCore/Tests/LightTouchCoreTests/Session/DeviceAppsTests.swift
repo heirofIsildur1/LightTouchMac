@@ -41,7 +41,7 @@ struct DeviceAppsTests {
         host.deviceReachable = true
         for (name, change) in [
             ("not running", { host.isRunning = false }),
-            ("storage failed", { host.storageFailed = true }), ("no usbmuxd", { host.usbmuxSession = nil }),
+            ("storage failed", { host.storageFailed = true }), ("no usbmuxd", { host.usbmuxSession = nil })
         ] {
             change()
             #expect(!apps.canReachDevice && !apps.canQueueInstall, "\(name)")

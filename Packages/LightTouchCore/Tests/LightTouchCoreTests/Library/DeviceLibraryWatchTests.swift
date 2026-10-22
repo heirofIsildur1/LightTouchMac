@@ -126,7 +126,7 @@ struct DeviceLibraryWatchTests {
             #expect(watch.matters(path, none), "\(path)")
         }
         for path in [
-            "/nonexistent/State/Devices/X/overlay", "/nonexistent/State/Preparing/Y", "/nonexistent/Statements",
+            "/nonexistent/State/Devices/X/overlay", "/nonexistent/State/Preparing/Y", "/nonexistent/Statements"
         ] {
             #expect(!watch.matters(path, none), "\(path)")
         }

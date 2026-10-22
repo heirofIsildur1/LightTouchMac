@@ -34,7 +34,7 @@ import Testing
                 == .error(code: "activation_failed", message: "exit 2")
         )
         for junk in [
-            "", "not json", #"{"event":"step"}"#, #"{"event":"begin","steps":"x"}"#, #"{"event":"new"}"#, "[1]",
+            "", "not json", #"{"event":"step"}"#, #"{"event":"begin","steps":"x"}"#, #"{"event":"new"}"#, "[1]"
         ] {
             #expect(L(junk) == nil, "\(junk)")
         }
@@ -76,7 +76,7 @@ import Testing
             ("boot-arg rd", "the way it starts up isn’t supported"),
             ("libappsync.dylib (in installd)", "installing apps on it isn’t supported"),
             ("iPhone OS 1.x boot chain", "only iPhone OS 1 runs on this device"),
-            ("it_boot (guest-package loader)", "the guest tools don’t run on it"),
+            ("it_boot (guest-package loader)", "the guest tools don’t run on it")
         ] {
             #expect(
                 PreparationJob.message(code: "unsupported", detail: "", piece: piece)
@@ -368,7 +368,7 @@ import Testing
             (state, "the state root"), (state.appendingPathComponent("Devices"), "Devices/"),
             (otherDevice, "another record"), (otherDevice.appendingPathComponent("overlay"), "inside another record"),
             (outside, "outside the state root"), (state.appendingPathComponent("Devices/../../outside"), "a .. escape"),
-            (mine.appendingPathComponent("escape"), "a symlink out"),
+            (mine.appendingPathComponent("escape"), "a symlink out")
         ] {
             #expect(throws: (any Error).self, "\(why) was removable") {
                 try DeviceStateStorage.checkRemovable(path, state: state, owner: device.id)

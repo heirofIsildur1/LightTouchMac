@@ -63,7 +63,7 @@ struct BootStageTests {
         #expect(
             said == [
                 "Powering on", "Loading iOS", "Starting the system", "Connecting over USB",
-                "Waiting for the Home screen",
+                "Waiting for the Home screen"
             ]
         )
         #expect(stage == .usb)

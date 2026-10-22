@@ -77,7 +77,7 @@ final class ProxySettingsView: NSView {
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             stack.widthAnchor.constraint(equalToConstant: 300),
             archiveNote.widthAnchor.constraint(equalToConstant: 282),
-            statusLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 276),
+            statusLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 276)
         ])
         selectionChanged(nil)
         updateStatus(status)

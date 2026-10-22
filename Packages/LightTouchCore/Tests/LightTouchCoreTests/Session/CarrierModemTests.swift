@@ -27,7 +27,7 @@ struct CarrierModemTests {
             #expect(
                 link.requests == [
                     .modemSet(property: "carrier", value: "Lab"),
-                    .modemSet(property: "signal-dbm", value: String(CarrierSettings.signalDBM(bars: 2))),
+                    .modemSet(property: "signal-dbm", value: String(CarrierSettings.signalDBM(bars: 2)))
                 ]
             )
             #expect(DeviceSettings.load(directory).carrier == next && modem.carrierSettings == next)

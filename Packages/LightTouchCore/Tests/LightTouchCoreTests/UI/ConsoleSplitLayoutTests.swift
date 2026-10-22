@@ -13,7 +13,7 @@ struct ConsoleSplitLayoutTests {
         arguments: [
             (265, 270), (279.5, 270), (261, 270), (280, 280), (260, 260), (195, 200), (209, 200), (210, 210),
             (191, 200),
-            (190, 190), (99, 100), (50, 100), (49.9, nil), (0, nil), (1000, 440), (433.7, 433),
+            (190, 190), (99, 100), (50, 100), (49.9, nil), (0, nil), (1000, 440), (433.7, 433)
         ] as [(CGFloat, CGFloat?)]
     )
     func detentsAndCollapse(_ proposed: CGFloat, _ want: CGFloat?) {

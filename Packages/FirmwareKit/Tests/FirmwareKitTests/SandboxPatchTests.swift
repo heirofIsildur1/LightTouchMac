@@ -25,7 +25,9 @@ struct SandboxPatchTests {
     @Test func locatesAcrossTheCachedKernels() throws {
         guard let root = ProcessInfo.processInfo.environment["LTM_SANDBOX_KERNELS"] else { return }
         let fm = FileManager.default
-        var ok = 0, noKext = 0, unresolved = 0
+        var ok = 0
+        var noKext = 0
+        var unresolved = 0
         let base = URL(fileURLWithPath: root)
         let e = fm.enumerator(at: base, includingPropertiesForKeys: nil)
         while let u = e?.nextObject() as? URL {

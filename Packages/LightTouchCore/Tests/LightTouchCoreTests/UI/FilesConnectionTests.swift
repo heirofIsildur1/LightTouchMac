@@ -23,7 +23,7 @@ struct FilesConnectionTests {
         files.setTransferring(true)
         let copying = FilesConnection.State.transferring(.init(device: a, endpoint: endpointA))
         for (device, endpoint, reachable) in [
-            (a, endpointA, nil), (a, nil, false), (b, endpointB, true), (nil, nil, nil),
+            (a, endpointA, nil), (a, nil, false), (b, endpointB, true), (nil, nil, nil)
         ] as [(UUID?, HostServiceEndpoint?, Bool?)] {
             #expect(!files.follow(device: device, endpoint: endpoint, reachable: reachable))
             #expect(files.state == copying, "the copy's binding holds: \(String(describing: device))")

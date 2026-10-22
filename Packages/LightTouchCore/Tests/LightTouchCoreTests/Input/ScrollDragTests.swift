@@ -51,7 +51,7 @@ struct ScrollDragTests {
         #expect(
             d.sent == [
                 "begin@50", "update@52", "end@52", "begin@50", "update@48", "update@45", "end@45", "begin@50",
-                "update@51",
+                "update@51"
             ],
             "\(d.sent)"
         )

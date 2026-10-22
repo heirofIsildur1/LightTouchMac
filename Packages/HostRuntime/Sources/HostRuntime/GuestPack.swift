@@ -42,7 +42,7 @@ public enum GuestPack {
         /// only where the preparer installed the front end.
         public static let glTargets: Set<String> = [
             "/System/Library/Frameworks/OpenGLES.framework/MBXGLEngine.bundle/MBXGLEngine",
-            "/System/Library/Frameworks/OpenGLES.framework/OpenGLES",
+            "/System/Library/Frameworks/OpenGLES.framework/OpenGLES"
         ]
 
         /// Drop hooks (and their payload files) by file name.
@@ -59,7 +59,7 @@ public enum GuestPack {
                 .fileReadCorruptFile,
                 userInfo: [
                     NSFilePathErrorKey: url.path,
-                    NSLocalizedDescriptionKey: "\(url.lastPathComponent): \(why)",
+                    NSLocalizedDescriptionKey: "\(url.lastPathComponent): \(why)"
                 ]
             )
         }

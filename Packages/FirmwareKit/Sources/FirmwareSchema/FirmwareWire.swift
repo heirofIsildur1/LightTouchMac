@@ -16,7 +16,7 @@ nonisolated public enum FirmwareWire {
     /// The one list of such steps; a migration that isn't listed here leaves its devices flagged.
     public static let admissionRecipeSteps: [String: [Int: Int]] = [
         "n72ap": [1: 2], "n45ap": [2: 3], "m68ap": [1: 2],
-        "n90ap": [1: 2], "n88ap": [1: 2],
+        "n90ap": [1: 2], "n88ap": [1: 2]
     ]
 
     /// `version` after every admission step for `board` (FirmwareWire.admissionRecipeSteps).

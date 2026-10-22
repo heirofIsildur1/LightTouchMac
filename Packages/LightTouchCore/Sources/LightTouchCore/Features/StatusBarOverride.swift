@@ -62,7 +62,7 @@ public nonisolated struct StatusBarStyle: Codable, Equatable, Sendable {
         if !time.isEmpty {
             keys += [
                 GuestDefault("com.apple.springboard", "SBFakeTime", .bool(true)),
-                GuestDefault("com.apple.springboard", "SBFakeTimeString", .string(time)),
+                GuestDefault("com.apple.springboard", "SBFakeTimeString", .string(time))
             ]
         }
         if !carrier.isEmpty, Self.takesCarrier(version: version) {

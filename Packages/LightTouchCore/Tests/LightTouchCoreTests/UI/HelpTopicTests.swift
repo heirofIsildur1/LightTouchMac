@@ -35,7 +35,7 @@ struct HelpTopicTests {
             parsed == [
                 HelpTopic(title: "One", body: "First line\n\nThen a # mid-line"),
                 HelpTopic(title: "Two", body: "Second"),
-                HelpTopic(title: "Empty", body: ""),
+                HelpTopic(title: "Empty", body: "")
             ]
         )
     }
@@ -74,7 +74,7 @@ struct HelpTopicTests {
         "old saved city", "moon", "Successful retries", "inspect the boot", "Updates pause while", "displayed tail",
         "Controller release", "Device → Orientation", "Help → Device Logs", "Help → Show Unfinished",
         "Capture → Capture Options", "⌘O", "Edit → Search Apps", "Local Network", "Device Logs button",
-        "next app launch",
+        "next app launch"
     ])
     func cutTextStaysOut(_ gone: String) {
         #expect(!whole.contains(gone), "Help still says: \(gone)")
@@ -82,7 +82,7 @@ struct HelpTopicTests {
 
     @Test(arguments: [
         "File → Add Device (⌘N)", "Window → Device Logs",
-        "Light Touch → Settings → Capture", "Device → Motion",
+        "Light Touch → Settings → Capture", "Device → Motion"
     ])
     func currentMenuPaths(_ path: String) {
         #expect(whole.contains(path), "Help lacks \(path)")

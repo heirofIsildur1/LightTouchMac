@@ -60,7 +60,7 @@ struct CarrierSettingsTests {
                 "-global", "ios-baseband.carrier=A, B", "-global", "ios-baseband.mcc-mnc=00101",
                 "-global", "ios-baseband.registered=off", "-global", "ios-baseband.sim-present=on",
                 "-global", "ios-baseband.signal-dbm=-97",
-                "-global", "ios-baseband.gps-fix=37.334900,-122.009000,0,0.00,-1.0,5",
+                "-global", "ios-baseband.gps-fix=37.334900,-122.009000,0,0.00,-1.0,5"
             ]
         )
     }

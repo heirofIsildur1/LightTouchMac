@@ -99,7 +99,7 @@ nonisolated public enum PreparationChanges {
             "preparation \(serial.map(String.init) ?? "- (before serials)")",
             "recipe \((recipe?["version"] as? Int).map(String.init) ?? "-")",
             "firmwarekit \((lock["tool"] as? [String: Any])?["version"] as? String ?? "-")",
-            "guest package \(package?["version"] as? String ?? "-") seed \((package?["seed"] as? Int).map(String.init) ?? "-")",
+            "guest package \(package?["version"] as? String ?? "-") seed \((package?["seed"] as? Int).map(String.init) ?? "-")"
         ].joined(separator: ", ")
         guard let id, let content, let recipe else {
             return Verdict(
@@ -288,6 +288,6 @@ nonisolated public enum PreparationChanges {
                 its seal boot set Auto-Lock Never only in ManagedConfiguration, which 4.0 beta 1's SpringBoard \
                 doesn't time the lock by, so the device locks a minute after the last touch
                 """
-        ),
+        )
     ]
 }

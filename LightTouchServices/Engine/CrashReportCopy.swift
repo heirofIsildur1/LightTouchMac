@@ -63,7 +63,7 @@ nonisolated enum CrashReportCopy {
         else { throw DeviceError.failed("crashreportcopy: no SysInfoReply: \(info.first ?? "")") }
         try send([
             "DLMessageProcessMessage",
-            ["CrashReportRequest": "SendNewCrashLogs", "FileDestPath": "CrashReporter"],
+            ["CrashReportRequest": "SendNewCrashLogs", "FileDestPath": "CrashReporter"]
         ])
         var reports: [String: Report] = [:]
         reading: while true {
@@ -91,8 +91,8 @@ nonisolated enum CrashReportCopy {
                         "DLMessageProcessMessage",
                         [
                             "CrashReportRequest": "MarkCrashLogAsSent", "CrashReportLogPath": path,
-                            "kPTCrashReportErrorKey": "CouldntSaveFile",
-                        ],
+                            "kPTCrashReportErrorKey": "CouldntSaveFile"
+                        ]
                     ])
                 }
             case "DLMessageProcessMessage":

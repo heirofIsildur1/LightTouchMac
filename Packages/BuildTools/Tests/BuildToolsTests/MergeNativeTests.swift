@@ -17,7 +17,7 @@ struct MergeNativeTests {
         for dir in [
             prefix.appendingPathComponent("lib/pkgconfig"), prefix.appendingPathComponent("include"),
             prefix.appendingPathComponent("share"),
-            staticLib.appendingPathComponent("lib"), qemu, root.appendingPathComponent("build/usbmuxd/src"),
+            staticLib.appendingPathComponent("lib"), qemu, root.appendingPathComponent("build/usbmuxd/src")
         ] {
             try files.createDirectory(at: dir, withIntermediateDirectories: true)
         }
@@ -45,7 +45,7 @@ struct MergeNativeTests {
         _ = try output(
             cc + [
                 "-dynamiclib", lib.path, "-install_name", "@rpath/libqemu-arm.dylib", "-o",
-                qemu.appendingPathComponent("libqemu-arm.dylib").path,
+                qemu.appendingPathComponent("libqemu-arm.dylib").path
             ]
         )
         let usbmuxd = root.appendingPathComponent("build/usbmuxd/src/usbmuxd")
@@ -79,7 +79,7 @@ struct MergeNativeTests {
         try "# gdb helper\n".write(to: gdb, atomically: true, encoding: .utf8)
         var record: [String: Any] = [
             "schema_version": 1, "architecture": arch, "deps_prefix": root.appendingPathComponent("prefix").path,
-            "static_deps": staticLib.path, "qemu_build": qemu.path, "usbmuxd_binary": usbmuxd.path,
+            "static_deps": staticLib.path, "qemu_build": qemu.path, "usbmuxd_binary": usbmuxd.path
         ]
         if staged { record["reused_native_deps"] = deps.path }
         try writeJSON(record, to: root.appendingPathComponent("native-build.json"))
@@ -105,11 +105,11 @@ struct MergeNativeTests {
         try MergeNative.merge(output: out, roots: [arm, intel])
         for name in [
             "prefix/lib/libvalue.dylib", "static/prefix/lib/libvalue.a", "qemu-build/libqemu-arm.dylib",
-            "build/usbmuxd/src/usbmuxd",
+            "build/usbmuxd/src/usbmuxd"
         ] {
             #expect(
                 Set(try sh("lipo", "-archs", out.appendingPathComponent(name).path).split(separator: " ")) == [
-                    "arm64", "x86_64",
+                    "arm64", "x86_64"
                 ],
                 "\(name)"
             )

@@ -15,7 +15,7 @@ struct StoppedRecordOwnerTests {
     private func bytes(_ id: UUID, base: String, overlay: String) throws -> Data {
         try DeviceRecord.data([
             "id": id.uuidString, "unknown": ["retained": true],
-            "base": ["path": base], "storage": ["overlay": overlay],
+            "base": ["path": base], "storage": ["overlay": overlay]
         ])
     }
     @Test func exclusionPrecedesRecordReadAndFailureReleasesDescriptor() throws {

@@ -11,7 +11,7 @@ public enum MergeNative {
     static let parts: [(part: String, key: String, member: String)] = [
         ("prefix", "deps_prefix", ""), ("static/prefix", "static_deps", ""),
         ("qemu-build/libqemu-arm.dylib", "qemu_build", "libqemu-arm.dylib"),
-        ("build/usbmuxd/src/usbmuxd", "usbmuxd_binary", ""),
+        ("build/usbmuxd/src/usbmuxd", "usbmuxd_binary", "")
     ]
 
     /// Build-time metadata for compiling against one slice: never packaged, and cross-compiled slices legitimately
@@ -185,7 +185,7 @@ public enum MergeNative {
             [
                 "schema_version": 1, "architectures": slices.keys.sorted(),
                 "static_deps": out.appendingPathComponent("static/prefix").path,
-                "slices": slices.mapValues(\.record),
+                "slices": slices.mapValues(\.record)
             ],
             to: out.appendingPathComponent("native-build.json")
         )

@@ -200,7 +200,7 @@ extension DisplayView {
                 let gradient = CAGradientLayer()
                 gradient.colors = [
                     NSColor.white.withAlphaComponent(0.95).cgColor,
-                    NSColor(white: 0.94, alpha: 0.9).cgColor,
+                    NSColor(white: 0.94, alpha: 0.9).cgColor
                 ]
                 gradient.startPoint = CGPoint(x: 0.5, y: 0)
                 gradient.endPoint = CGPoint(x: 0.5, y: 1)
@@ -257,7 +257,7 @@ extension DisplayView {
         let colors =
             [
                 NSColor.white.withAlphaComponent(0.95).cgColor,
-                NSColor(white: 0.94, alpha: 0.9).cgColor,
+                NSColor(white: 0.94, alpha: 0.9).cgColor
             ] as CFArray
         guard let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1]) else {
             return image

@@ -19,7 +19,7 @@ extension SharedState {
 
         static let art = DisplayTests.n72Model.merging([
             "ipad-frame.png": "LightTouchMac/Assets.xcassets/ipad-frame.imageset/ipad-frame.png",
-            "shell-iphone4.png": "LightTouchMac/Assets.xcassets/shell-iphone4.imageset/shell-iphone4.png",
+            "shell-iphone4.png": "LightTouchMac/Assets.xcassets/shell-iphone4.imageset/shell-iphone4.png"
         ]) { a, _ in a }
 
         @Test func sizesInEveryBezel() async throws {

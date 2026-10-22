@@ -101,7 +101,7 @@ public nonisolated struct LegacyState: Sendable {
                 userInfo: [
                     NSFilePathErrorKey: first.path,
                     NSLocalizedDescriptionKey:
-                        "\(missed.count == 1 ? "An app" : "\(missed.count) apps") you saved couldn’t be kept, so nothing was erased.",
+                        "\(missed.count == 1 ? "An app" : "\(missed.count) apps") you saved couldn’t be kept, so nothing was erased."
                 ]
             )
         }

@@ -48,7 +48,7 @@ struct FrameCheckTests {
         // 4x2 pixels -> 2x1 blocks: the left block's mean of (0, 100), the right's of (200, 255).
         let px: [UInt8] = [
             0, 0, 0, 0, 100, 100, 100, 0, 200, 200, 200, 0, 255, 255, 255, 0,
-            0, 0, 0, 0, 100, 100, 100, 0, 200, 200, 200, 0, 255, 255, 255, 0,
+            0, 0, 0, 0, 100, 100, 100, 0, 200, 200, 200, 0, 255, 255, 255, 0
         ]
         let s = FrameCheck.signature(width: 4, height: 2, rgbx: px, gridWidth: 2)
         #expect(s == S(width: 2, height: 1, pixels: [[50, 50, 50], [228, 228, 228]]))
