@@ -181,7 +181,8 @@ public enum Preparer {
         try JSONSerialization.data(withJSONObject: config).write(to: cfg)
         let out = Pipe()
         // A sandboxed helper's files, issued to its pid once it runs (an unreaped child) and passed on its standard
-        // input (SandboxExtension): the work folder (this config) and the serial log's read-write, and `grants`.
+        // input (SandboxExtension): the work folder (this config) and the serial log's read-write, `grants`, and a
+        // Debug helper's emulator outside its bundle.
         let sandboxed = HelperSandbox.isSandboxed(helper)
         let grantPipe = sandboxed ? Pipe() : nil
         let pid = try spawn(
@@ -195,7 +196,8 @@ public enum Preparer {
         try? grantPipe?.fileHandleForReading.close()
         if let grantPipe {
             let (tokens, refused) = SandboxExtension.issue(
-                grants + [.init(work, .readWrite), .init(serial.deletingLastPathComponent(), .readWrite)],
+                grants + [.init(work, .readWrite), .init(serial.deletingLastPathComponent(), .readWrite)]
+                    + HelperSandbox.emulatorGrants(helper: helper),
                 to: .pid(pid)
             )
             if !refused.isEmpty { log("one-shot: no sandbox grant for \(refused.joined(separator: ", "))") }

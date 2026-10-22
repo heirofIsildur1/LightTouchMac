@@ -449,17 +449,10 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
     /// Debug: the emulator the helper loads before the rendezvous, outside the bundle (the rpath's QEMU_BUILD_DIR and
     /// vendor directory, LTM_QEMU_DYLIB's folder), read-only.
     private func emulatorGrants() -> [SandboxExtension.Grant] {
-        #if DEBUG
-            var grants = Self.runPaths(configuration.helper).map {
-                SandboxExtension.Grant(URL(fileURLWithPath: $0), .read)
-            }
-            if let dylib = configuration.dylib ?? ProcessInfo.processInfo.environment["LTM_QEMU_DYLIB"] {
-                grants.append(.init(URL(fileURLWithPath: dylib).deletingLastPathComponent(), .read))
-            }
-            return grants
-        #else
-            return []
-        #endif
+        HelperSandbox.emulatorGrants(
+            helper: configuration.helper,
+            dylib: configuration.dylib ?? ProcessInfo.processInfo.environment["LTM_QEMU_DYLIB"]
+        )
     }
 
     /// Before a boot: what it opens, by role (BootConfig.files, from the boot recipe; a config without them gets
@@ -516,49 +509,6 @@ nonisolated public final class DeviceLink: @unchecked Sendable {
         let line = "device link: no sandbox grant for \(refused.joined(separator: ", "))\n"
         _ = line.withCString { write(configuration.outputDescriptor, $0, strlen($0)) }
     }
-
-    #if DEBUG
-        /// The helper's LC_RPATH folders that exist, @executable_path and @loader_path resolved.
-        static func runPaths(_ binary: URL) -> [String] {
-            guard let data = try? Data(contentsOf: binary, options: .alwaysMapped), data.count > 32 else { return [] }
-            func u32(_ at: Int, big: Bool = false) -> Int {
-                guard at + 4 <= data.count else { return 0 }
-                let v = data.subdata(in: at..<at + 4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-                return Int(big ? v.bigEndian : v)
-            }
-            var start = 0
-            if u32(0, big: true) == 0xcafe_babe {  // fat: this machine's slice
-                #if arch(arm64)
-                    let want = 0x0100_000c
-                #else
-                    let want = 0x0100_0007
-                #endif
-                guard
-                    let slice = (0..<u32(4, big: true)).map({ 8 + $0 * 20 }).first(where: { u32($0, big: true) == want }
-                    )
-                else { return [] }
-                start = u32(slice + 8, big: true)
-            }
-            guard u32(start) == 0xfeed_facf else { return [] }
-            let folder = binary.deletingLastPathComponent().path
-            var paths: [String] = []
-            var at = start + 32
-            for _ in 0..<u32(start + 16) {
-                let command = u32(at)
-                let size = u32(at + 4)
-                guard size > 0, at + size <= data.count else { break }
-                if command == 0x8000_001c {  // LC_RPATH
-                    let bytes = data.subdata(in: at + u32(at + 8)..<at + size).prefix { $0 != 0 }
-                    let path = String(decoding: bytes, as: UTF8.self)
-                        .replacingOccurrences(of: "@executable_path", with: folder)
-                        .replacingOccurrences(of: "@loader_path", with: folder)
-                    if FileManager.default.fileExists(atPath: path) { paths.append(path) }
-                }
-                at += size
-            }
-            return paths
-        }
-    #endif
 
     // MARK: - Teardown
 

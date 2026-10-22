@@ -21,10 +21,10 @@ let launch: HelperLaunch = {
     }
 }()
 
-// A sandboxed helper's grants from DeviceLink or firmwarekit, on standard input (a pipe they close), before anything
+// A sandboxed helper's grants from DeviceLink, firmwarekit or DeviceInfo.list, on standard input (a pipe they close), before anything
 // opens a file (HostRuntime SandboxExtension); given back at exit. Unsandboxed, standard input is /dev/null.
 switch launch.mode {
-case .connect, .oneshot:
+case .connect, .oneshot, .machines:
     let (tokens, refused) = SandboxExtension.consumeStandardInput()
     if tokens > 0 {
         helperLog(
@@ -32,7 +32,7 @@ case .connect, .oneshot:
         )
     }
     atexit { SandboxExtension.releaseAll() }
-case .headless, .machines: break
+case .headless: break
 }
 
 /// Never dispatchMain(): it pthread_exit()s the main thread, and the dylib's

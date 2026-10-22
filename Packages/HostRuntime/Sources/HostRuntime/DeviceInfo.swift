@@ -69,7 +69,18 @@ public struct DeviceInfo: Codable, Sendable, Equatable {
         let out = Pipe()
         process.standardOutput = out
         process.standardError = FileHandle.nullDevice
+        // A sandboxed helper's emulator, granted on its standard input once it runs (as firmwarekit's one-shots)
+        let grants = HelperSandbox.isSandboxed(helper) ? Pipe() : nil
+        process.standardInput = grants ?? FileHandle.nullDevice
         try process.run()
+        if let grants {
+            let (tokens, _) = SandboxExtension.issue(
+                HelperSandbox.emulatorGrants(helper: helper),
+                to: .pid(process.processIdentifier)
+            )
+            try? grants.fileHandleForWriting.write(contentsOf: JSONEncoder().encode(tokens))
+            try? grants.fileHandleForWriting.close()
+        }
         let data = out.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
