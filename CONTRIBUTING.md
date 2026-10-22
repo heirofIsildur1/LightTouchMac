@@ -57,7 +57,8 @@ QEMU_BUILD_DIR = $(QEMU_IOS_DIR)/build-w1-native          # libqemu-arm.dylib, o
 ```
 
 These repeat **the pin**, `build-support/sources.json`: the qemu-ios commit, its expected checkout path and
-development build directory, and the usbmuxd commit; iBoot32Patcher is pinned in `build-support/dependencies.json`.
+development build directory, and the usbmuxd commit; iBoot32Patcher and ANGLE (with its depot_tools) are pinned in
+`build-support/dependencies.json`.
 `scripts/sources` resolves the pin for every script (`sources qemu-ios | usbmuxd | qemu-build | commit NAME`,
 `sources check` for pinned vs actual; `QEMU_IOS_DIR`, `USBMUXD_SOURCE_DIR` and `QEMU_BUILD_DIR` override).
 To produce the dylib, build `qemu-system-arm` in that checkout and run `contrib/macos-app/make-dylib-macos.sh BUILD_DIR`.
@@ -292,7 +293,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `Packages/ReleaseChecks/` | The checks of a built app (`Release.xctestplan`): signatures, entitlements, slices and load closure, bundle hygiene, the bundled tools, boots through the bundle |
 | `Packages/DeviceServices/` | One device's stock lockdown services: `HostServiceWire` (the request/event protocol, errors, timeouts, device paths, the Home screen layout) and `HostServiceClient` (the app's `DeviceServices` calls, `HostServiceWorkers`, `NotificationProxy`) |
 | `Packages/FirmwareKit/` | `FirmwareKit` (IPSW → device), `FirmwareSchema` (the wire types, `StorageCapacity`, `DeveloperTools`, `GuestArchive`: what the app links), the `firmwarekit` CLI (`Sources/FirmwareKitCLI`), `CActivation` |
-| `scripts/` | `bootstrap`, `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
+| `scripts/` | `bootstrap`, `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-angle.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
 | `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |

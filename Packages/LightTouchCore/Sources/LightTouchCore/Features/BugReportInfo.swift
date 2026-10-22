@@ -147,6 +147,7 @@ public nonisolated enum BugReportInfo {
         freeSpace: Int64? = nil,
         bezel: String? = nil,
         refresh120: Bool = false,
+        angle: Bool = false,
         shareClipboard: Bool = true,
         skippedAfterCrash: [String] = [],
         devices: [Device],
@@ -160,6 +161,7 @@ public nonisolated enum BugReportInfo {
         }
         if let bezel { lines.append("Device bezels: \(bezel)") }
         if refresh120 { lines.append("120 Hz refresh: on") }
+        if angle { lines.append("ANGLE renderer: on") }
         if !shareClipboard { lines.append("Clipboard sharing: off") }
         if !skippedAfterCrash.isEmpty {
             lines.append("Skipped after a crash: " + skippedAfterCrash.joined(separator: ", "))

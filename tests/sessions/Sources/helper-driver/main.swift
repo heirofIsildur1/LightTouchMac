@@ -49,6 +49,8 @@ struct Scenario: Decodable {
         var itpack: String?
         /// The panel's refresh, as Settings ▸ General's experimental 120 Hz boots it; default 60.
         var refreshHz: Int?
+        /// Settings ▸ General's experimental ANGLE renderer; default off.
+        var angle: Bool?
         /// The Debug Port's gdbstub on this Unix socket, as the app adds it (DebugPort.arguments); "gdb" attaches.
         var debugPort: String?
     }
@@ -97,7 +99,8 @@ func preparedBoot(_ p: Scenario.Prepared, hardware: DeviceInfo?) throws -> BootC
         audio: ["-audio", "driver=none"],
         netdev: "user,id=wifi0",
         carrier: p.carrier,
-        refreshHz: p.refreshHz ?? 60
+        refreshHz: p.refreshHz ?? 60,
+        angle: p.angle ?? false
     )
     if let socket = p.debugPort { config.argv += DebugPort.arguments(socket: socket) }
     return config
@@ -688,7 +691,7 @@ Thread.detachNewThread {
             usleep(UInt32(v[0] * 1e6))
             link.send(.audioStop(generation: g))
             usleep(1_500_000)
-        case "snapshot":
+        case "snapshot", "snapshot-refused":  // snapshot-refused: the save must end in an error (status 3)
             let start = Date()
             link.send(.snapshotSave(path: p[1]))
             var code = 1
@@ -709,7 +712,7 @@ Thread.detachNewThread {
                     "glesContexts": link.status?.glesContexts ?? -1
                 ]
             )
-            if code != 2 { fail("snapshot failed") }
+            if code != (p[0] == "snapshot" ? 2 : 3) { fail("snapshot ended with status \(code)") }
         case "gdb":  // gdb SOCKET: a debugger attaches to the Debug Port (lldb's unix-connect) and asks why it stopped
             guard let s = BridgeSocket.connect(p[1]) else { fail("no gdbstub at \(p[1])") }
             var tv = timeval(tv_sec: 10, tv_usec: 0)

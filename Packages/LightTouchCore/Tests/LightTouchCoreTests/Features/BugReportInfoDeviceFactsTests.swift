@@ -32,12 +32,12 @@ struct BugReportInfoDeviceFactsTests {
             "board": "n90ap",
             "entry": [
                 "content": ["recipe": ["version": recipe, "options": ["jailbreak": jailbreak, "skip_setup": skipSetup]]]
-            ],
+            ]
         ]
         if let sandbox {
             json["fit"] = [
                 ["piece": "boot-arg amfi_allow_any_signature", "fits": true, "proof": "read"],
-                ["piece": "sandbox patch (sb_evaluate)", "fits": sandbox.0, "proof": sandbox.1],
+                ["piece": "sandbox patch (sb_evaluate)", "fits": sandbox.0, "proof": sandbox.1]
             ]
         }
         return try DeviceLock(json: json)
@@ -142,7 +142,9 @@ struct BugReportInfoDeviceFactsTests {
         d.iosVersion = "5.1.1"
         d.readSettings(DeviceSettings(), proxy: WebProxyConfiguration(), accessibilityOn: nil)
         let plain = BugReportInfo.text(system: system, devices: [d], recentErrors: [], identity: identity)
-        for absent in ["Notice", "Web proxy", "Tweaks", "Accessibility", "120 Hz", "Clipboard", "Free space", "Storage"] {
+        for absent in [
+            "Notice", "Web proxy", "Tweaks", "Accessibility", "120 Hz", "ANGLE", "Clipboard", "Free space", "Storage"
+        ] {
             #expect(!plain.contains(absent), "\(absent)")
         }
         #expect(!plain.contains("Skipped"))
@@ -155,6 +157,7 @@ struct BugReportInfoDeviceFactsTests {
             system: system,
             freeSpace: 5_000_000_000,
             refresh120: true,
+            angle: true,
             shareClipboard: false,
             skippedAfterCrash: ["3D device", "starting a device at launch"],
             devices: [d],
@@ -167,6 +170,7 @@ struct BugReportInfoDeviceFactsTests {
                 arm64 on Mac16,10, Apple M4
                 Free space: \(Int64(5_000_000_000).formatted(.byteCount(style: .file))) on the library's volume
                 120 Hz refresh: on
+                ANGLE renderer: on
                 Clipboard sharing: off
                 Skipped after a crash: 3D device, starting a device at launch
                 """
@@ -255,11 +259,11 @@ struct BugReportInfoDeviceFactsTests {
         try withTemporaryDirectory { root throws in
             let device = try folder(root, [])
             let log = device.appendingPathComponent("firmwarekit.log")
-            try (
-                "NAND image migration: couldn't read /Users/jappleseed/Library/Application Support/Light Touch/Devices/"
-                    + "8874EC96-6945-4F6F-AD3D-96DDEBB6F52B/overlay (UDID 6f1ed002ab5595859014ebf0951522d9a1b2c3d4, "
-                    + "serial C02XK1ZQJGH5, user jappleseed); the device stays in format 1\n"
-            ).write(to: log, atomically: true, encoding: .utf8)
+            try
+                ("NAND image migration: couldn't read /Users/jappleseed/Library/Application Support/Light Touch/Devices/"
+                + "8874EC96-6945-4F6F-AD3D-96DDEBB6F52B/overlay (UDID 6f1ed002ab5595859014ebf0951522d9a1b2c3d4, "
+                + "serial C02XK1ZQJGH5, user jappleseed); the device stays in format 1\n").write(
+                    to: log, atomically: true, encoding: .utf8)
             var d = BugReportInfo.Device(
                 marketingName: "iPhone",
                 board: "m68ap",

@@ -30,15 +30,16 @@ func flickCheck(_ args: FlickCheck) -> Never {
         work: work,
         name: "flick",
         steps: [
-                // As `sessions rotation`: the second slide is a page swipe on the Home screen, so Home after it.
-                "boot", "lit 0.03 300", "wait 5", "button 0", "wait 2", slide, "wait 4", "button 0", "wait 2", slide,
-                "wait 4", "button 0", "wait 3",
-                // The first page, then Home on it shows the page left of it.
-                "dump page", "button 0", "wait 3", "dump left", "button 0", "wait 3",
-            ] + args.kinds.split(separator: ",").map { "flicks \($0) \(args.runs) \(at)" } + ["quit", "expectExit 60"]
+            // As `sessions rotation`: the second slide is a page swipe on the Home screen, so Home after it.
+            "boot", "lit 0.03 300", "wait 5", "button 0", "wait 2", slide, "wait 4", "button 0", "wait 2", slide,
+            "wait 4", "button 0", "wait 3",
+            // The first page, then Home on it shows the page left of it.
+            "dump page", "button 0", "wait 3", "dump left", "button 0", "wait 3"
+        ] + args.kinds.split(separator: ",").map { "flicks \($0) \(args.runs) \(at)" } + ["quit", "expectExit 60"]
     )
-    if args.refreshHz != 60, var prepared = scenario["prepared"] as? [String: Any] {
-        prepared["refreshHz"] = args.refreshHz
+    if args.refreshHz != 60 || args.angle, var prepared = scenario["prepared"] as? [String: Any] {
+        if args.refreshHz != 60 { prepared["refreshHz"] = args.refreshHz }
+        if args.angle { prepared["angle"] = true }
         scenario["prepared"] = prepared
     }
     let d = HelperDriver("flick", tools: tools, work: work, scenario: scenario)

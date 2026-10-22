@@ -283,6 +283,24 @@ struct ReleaseAppStaticTests {
         }
     }
 
+    /// Every dylib the vendor directory ships reaches the app's Frameworks (Xcode's Embed Vendor Frameworks names them
+    /// one by one; ANGLE's were left out once, and the experimental ANGLE renderer fell back to CGL).
+    @Test func everyVendorDylibIsEmbedded() throws {
+        let print = try run(["/bin/bash", repository.appendingPathComponent("scripts/vendor-check").path, "--print"])
+        let vendor = URL(fileURLWithPath: print.output.trimmingCharacters(in: .whitespacesAndNewlines))
+            .appendingPathComponent("Frameworks")
+        try #require(print.succeeded, "\(print.output)")
+        let shipped = try FileManager.default.contentsOfDirectory(atPath: vendor.path).filter { $0.hasSuffix(".dylib") }
+        #expect(shipped.contains("libGLESv2.dylib") && shipped.contains("libEGL.dylib"))
+        let embedded = Set(
+            try FileManager.default.contentsOfDirectory(atPath: contents.appendingPathComponent("Frameworks").path)
+        )
+        #expect(
+            Set(shipped).subtracting(embedded).isEmpty,
+            "not embedded: \(Set(shipped).subtracting(embedded).sorted())"
+        )
+    }
+
     @Test func hygieneLicensesAndNoLocalPaths() throws {
         // The workspace's: scripts/ship archives the workspace, so these are the versions the app was built with.
         let resolved = [

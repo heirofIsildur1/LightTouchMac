@@ -18,7 +18,8 @@ public enum BundleHygiene {
         "proxy-libintl": ("proxy-libintl", "proxy-libintl", true), "ffmpeg": ("ffmpeg", "FFmpeg", true),
         "iBoot32Patcher": ("iBoot32Patcher", "iBoot32Patcher", true), "libslirp": ("libslirp", "libslirp", true),
         "openssl": ("openssl", "OpenSSL", false), "nettle": ("nettle", "Nettle", true),
-        "pcre2": ("pcre2", "PCRE2", false), "pixman": ("pixman", "pixman", false)
+        "pcre2": ("pcre2", "PCRE2", false), "pixman": ("pixman", "pixman", false),
+        "angle": ("angle", "ANGLE", false)
     ]
     /// Where each shipped Mach-O comes from (bundle-relative glob: the components linked into it). Light Touch's own
     /// binaries list only what they link in; their Swift packages are checked against the Package.resolved files.
@@ -39,6 +40,8 @@ public enum BundleHygiene {
             ["libimobiledevice", "openssl", "libimobiledevice-glue", "libusbmuxd", "libtatsu"]
         ),
         ("Contents/Frameworks/libplist-2.0*.dylib", ["libplist"]),
+        // ANGLE (with Abseil and zlib linked in, their texts in licenses/angle): the experimental ANGLE renderer's
+        ("Contents/Frameworks/libEGL.dylib", ["angle"]), ("Contents/Frameworks/libGLESv2.dylib", ["angle"]),
         // a Swift package (licensed through Package.resolved), with its helpers and XPC services
         ("Contents/Frameworks/Sparkle.framework/*", []),
         // the toolchain's Span back-deployment, which Xcode embeds for BinaryParsing below macOS 26 (the Swift

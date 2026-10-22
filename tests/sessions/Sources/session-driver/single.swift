@@ -95,6 +95,8 @@ struct SingleConfig: Decodable {
     /// panel=WxH on the same overlay (EmulatorController.setPanel); then the frame's size, the dock row in the new
     /// bottom band, and a tap on a dock icon launching its app.
     var panel: String?
+    /// Settings ▸ General's experimental ANGLE renderer, on for every boot (PreparedDeviceBoot's angle).
+    var angle: Bool?
     /// The base's Home reference (matrix-refs): a boot without a guest agent whose lock-screen shot already matches it
     /// is at Home, and gets no slide.
     var homeReference: String?
@@ -138,6 +140,7 @@ nonisolated enum WiFiProbe {
     let a4 = profile.isKBoot
     let b = URL(fileURLWithPath: s.base)
     let d = Device(name: s.board, profile: profile, base: b)
+    d.angle = s.angle ?? false
     if let managed = s.managed {
         do { d.instance = try DeviceInstance.read(URL(fileURLWithPath: managed)) } catch { fail("managed: \(error)") }
     }

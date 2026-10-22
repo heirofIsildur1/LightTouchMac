@@ -34,6 +34,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dumpdtb",
         "firmware",
         "gid-blobs",
+        "gl-renderer",
         "gles-debug",
         "gles-rejects",
         "graphics",
@@ -75,7 +76,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "wifi",
         "wifi-country",
         "wifi-mac",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "m68ap": [
         "accel-pitch",
@@ -93,6 +94,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dump-guest-core",
         "dumpdtb",
         "firmware",
+        "gl-renderer",
         "gles-contexts",
         "gles-debug",
         "gles-rejects",
@@ -124,7 +126,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "usb-wrangler-quirk",
         "wifi",
         "wifi-mac",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "n18ap": [
         "agent-cancel",
@@ -147,6 +149,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dump-guest-core",
         "dumpdtb",
         "firmware",
+        "gl-renderer",
         "gles-debug",
         "gles-rejects",
         "graphics",
@@ -183,7 +186,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "usb-tcp-addr",
         "wifi",
         "wifi-country",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "n45ap": [
         "accel-pitch",
@@ -200,6 +203,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dump-guest-core",
         "dumpdtb",
         "firmware",
+        "gl-renderer",
         "gles-contexts",
         "gles-debug",
         "gles-rejects",
@@ -229,7 +233,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "usb-wrangler-quirk",
         "wifi",
         "wifi-mac",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "n72ap": [
         "accel-orientation",
@@ -272,6 +276,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "firmware",
         "forge-sigcheck",
         "gid-blobs",
+        "gl-renderer",
         "gles-contexts",
         "gles-debug",
         "gles-rejects",
@@ -314,7 +319,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "wdt-noreset",
         "wifi",
         "wifi-mac",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "n81ap": [
         "accel-pitch",
@@ -343,6 +348,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dumpdtb",
         "firmware",
         "gid-blobs",
+        "gl-renderer",
         "gles-debug",
         "gles-rejects",
         "graphics",
@@ -384,7 +390,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "wifi",
         "wifi-country",
         "wifi-mac",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "n88ap": [
         "agent-cancel",
@@ -407,6 +413,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dump-guest-core",
         "dumpdtb",
         "firmware",
+        "gl-renderer",
         "gles-debug",
         "gles-rejects",
         "graphics",
@@ -443,7 +450,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "usb-tcp-addr",
         "wifi",
         "wifi-country",
-        "x-change-vmfd-on-reset",
+        "x-change-vmfd-on-reset"
     ],
     "n90ap": [
         "accel-pitch",
@@ -472,6 +479,7 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "dumpdtb",
         "firmware",
         "gid-blobs",
+        "gl-renderer",
         "gles-debug",
         "gles-rejects",
         "graphics",
@@ -513,6 +521,6 @@ private let declaredMachineOptions: [String: Set<String>] = [
         "wifi",
         "wifi-country",
         "wifi-mac",
-        "x-change-vmfd-on-reset",
-    ],
+        "x-change-vmfd-on-reset"
+    ]
 ]

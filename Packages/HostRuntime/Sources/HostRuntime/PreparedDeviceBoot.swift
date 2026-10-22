@@ -338,7 +338,8 @@ public struct PreparedDeviceBoot {
         webProxy: WebProxyEndpoint? = nil,
         cellular: BootRecipe.Cellular = .on,
         carrier: CarrierSettings? = nil,
-        refreshHz: Int = 60
+        refreshHz: Int = 60,
+        angle: Bool = false
     ) throws -> BootConfig {
         guard let hardware = hardware ?? board.hardware else {
             throw CocoaError(
@@ -346,7 +347,10 @@ public struct PreparedDeviceBoot {
                 userInfo: [NSLocalizedDescriptionKey: "The emulator library has no machine for \(board.rawValue)."]
             )
         }
-        let machine = machineOptions()
+        var machine = machineOptions()
+        // Settings ▸ General's experimental ANGLE renderer: the GL bridge draws through ANGLE on Metal. A snapshot
+        // resumes on CGL, whose GL state it holds (ANGLE keeps none).
+        if angle, restore.isEmpty, board.machineOptions.contains("gl-renderer") { machine["gl-renderer"] = "angle" }
         var config: BootConfig
         switch board.soc {
         case .s5l8900:

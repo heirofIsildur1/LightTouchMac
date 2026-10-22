@@ -245,6 +245,35 @@ func helperBoot(_ args: HelperBootCheck) -> Never {
         // The agent through the link is `sessions single`'s (frontmost, launch, file read-back): it needs the USB host
         // and the package offer this bare boot leaves out.
     }
+    if only.contains("angle") {
+        // Settings ▸ General's experimental ANGLE renderer keeps no snapshot: a save with the compositor's GL live is
+        // refused by name, writes nothing, and the device keeps running.
+        print("angle")
+        let snapshot = work.appendingPathComponent("angle/snapshot.bin")
+        var scenario = preparedScenario(
+            base,
+            tools: tools,
+            work: work,
+            name: "angle",
+            steps: [
+                "boot", "lit 0.03 240", "wait 6", "snapshot-refused \(snapshot.path)", "wait 2", "status", "quit",
+                "expectExit 60"
+            ]
+        )
+        if var prepared = scenario["prepared"] as? [String: Any] {
+            prepared["angle"] = true
+            scenario["prepared"] = prepared
+        }
+        let d = HelperDriver("angle", tools: tools, work: work, scenario: scenario)
+        let finished = d.finish(400) == 0
+        let saved = d.events.one("snapshot")
+        r.check(
+            finished && saved.int("status") == 3 && (saved.string("error") ?? "").contains("OpenGL ES")
+                && (saved.int("glesContexts") ?? 0) > 0 && !FileManager.default.fileExists(atPath: snapshot.path),
+            "angle: a snapshot with \(saved.int("glesContexts") ?? -1) GL contexts live is refused ("
+                + "\(saved.string("error") ?? "no error")), nothing written, and the helper runs on to quit"
+        )
+    }
     if only.contains("meddle") {
         print("meddle")
         let overlay = work.appendingPathComponent("meddle/overlay")

@@ -223,7 +223,9 @@ cp "$SRC/scripts/build-package-native.sh" "$QEMU/contrib/ffmpeg/h264-chunk-er.pa
 export PKG_CONFIG_LIBDIR="$P/lib/pkgconfig:$STATIC/lib/pkgconfig"
 mkdir "$ROOT/qemu-build"
 cd "$ROOT/qemu-build"
+# LTM_ANGLE (scripts/build-angle.sh's output): the experimental ANGLE renderer is built against its headers, beside CGL.
 "$QEMU/configure" ${QEMU_CROSS[@]+"${QEMU_CROSS[@]}"} --target-list=arm-softmmu --without-default-features --enable-cocoa --enable-coreaudio --enable-pixman --enable-slirp --enable-nettle --disable-pie \
+    ${LTM_ANGLE:+"-Dltm_angle_prefix=$LTM_ANGLE"} \
     --python="${QEMU_PYTHON:-python3.12}" \
     --extra-cflags="-I$STATIC/include -mmacosx-version-min=14.0 -fmacro-prefix-map=$QEMU/= -fmacro-prefix-map=$ROOT/qemu-build/=" \
     --extra-ldflags="-L$STATIC/lib -lcrypto -mmacosx-version-min=14.0"

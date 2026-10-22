@@ -16,7 +16,7 @@ final class SettingsWindowController: NSWindowController {
         panes = [
             NSHostingView(rootView: general.settingsPane(resize)),
             NSHostingView(rootView: capture.settingsPane(resize)),
-            NSHostingView(rootView: StorageSettingsView(model: storage).settingsPane(resize, maxHeight: 560)),
+            NSHostingView(rootView: StorageSettingsView(model: storage).settingsPane(resize, maxHeight: 560))
         ]
         tabs.tabStyle = .toolbar
         tabs.canPropagateSelectedChildViewControllerTitle = true
@@ -123,6 +123,7 @@ struct GeneralSettingsView: View {
     @AppStorage(NetworkAccessPreference.key) private var internet: Bool?
     @AppStorage(VibrationSound.key) private var vibrationSound = true
     @AppStorage(DisplayRefresh.key) private var refresh120 = false
+    @AppStorage(ANGLERenderer.key) private var angle = false
     @AppStorage(ClipboardSync.key) private var shareClipboard = true
 
     var body: some View {
@@ -137,6 +138,10 @@ struct GeneralSettingsView: View {
             Toggle(isOn: $refresh120) {
                 Text("120 Hz refresh (experimental)")
                 Text("Takes effect when a device next starts. Games that count frames run too fast.")
+            }
+            Toggle(isOn: $angle) {
+                Text("ANGLE renderer (experimental)")
+                Text("Takes effect when a device next starts. Draws with Metal through ANGLE instead of OpenGL.")
             }
         }
     }
