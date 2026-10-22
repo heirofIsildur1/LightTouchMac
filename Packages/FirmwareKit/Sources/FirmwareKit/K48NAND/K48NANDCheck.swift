@@ -1,5 +1,6 @@
 // ipad1_nand.py check: reads a store back the way the kernel would (special pages, VFL contexts, a
 // YaFTL R/O-restore walk over every vblock, the index pages, then the MBR and HFS headers).
+import BinaryParsing
 import Foundation
 
 extension K48NAND {
@@ -90,10 +91,14 @@ extension K48NAND {
             guard let (d, _) = read(0, geo.ppage(geo.cand[0][4], 0)), d.starts(with: "NANDDRIVERSIGN".utf8) else {
                 return nil
             }
-            return (
-                UInt8(truncatingIfNeeded: le32(d, 0x38)) &- 0x30, le32(d, 0x3c),
-                Array(d[0x40..<0x140].prefix { $0 != 0 })
-            )
+            // nSig (its low byte the epoch's digit) and the flags at 0x38, the kernel version (NUL-padded) at 0x40
+            return try? parsing(d, "NANDDRIVERSIGN") { s in
+                try s.seek(toAbsoluteOffset: 0x38)
+                let sig = try UInt32(parsingLittleEndian: &s)
+                let flags = try UInt32(parsingLittleEndian: &s)
+                let version = try [UInt8](parsing: &s, byteCount: 0x100)
+                return (UInt8(truncatingIfNeeded: sig) &- 0x30, flags, Array(version.prefix { $0 != 0 }))
+            }
         }
 
         /// The file serving (cs, ppage).
@@ -200,6 +205,17 @@ extension K48NAND {
         return geo
     }
 
+    /// A DEVICEINFOBBT page's eight candidate blocks (u32s at 0x14) and its bad-block table (the length at 0x34, the
+    /// table at 0x38); nil when the table runs past the page.
+    static func deviceInfoBBT(_ d: [UInt8]) -> (cands: [Int], bbt: [UInt8])? {
+        try? parsing(d, "DEVICEINFOBBT") { s in
+            try s.seek(toAbsoluteOffset: 0x14)
+            let cands = try [UInt32](parsing: &s, count: 8) { try UInt32(parsingLittleEndian: &$0) }
+            let n = try UInt32(parsingLittleEndian: &s)
+            return (cands.map { Int($0) }, try [UInt8](parsing: &s, byteCount: Int(n)))
+        }
+    }
+
     /// Checks a store; `log` gets every "ok"/"FAIL" line. Returns true when nothing failed.
     public static func check(store dir: URL, mbr: URL? = nil, system: URL? = nil, log: (String) -> Void = { _ in })
         throws -> Bool
@@ -221,13 +237,12 @@ extension K48NAND {
             var found: (blk: Int, cands: [Int], bbt: [UInt8])?
             for blk in stride(from: geo.blocksPerCE - 1, to: geo.blocksPerCE - geo.blocksPerCE / 10 - 1, by: -1) {
                 if let (d, _) = st.read(cs, geo.ppage(blk, 0)), magic(d, "DEVICEINFOBBT") {
-                    let n = Int(le32(d, 0x34))
-                    found = (blk, (0..<8).map { Int(le32(d, 0x14 + 4 * $0)) }, Array(d[0x38..<0x38 + n]))
+                    found = deviceInfoBBT(d).map { (blk, $0.cands, $0.bbt) }
                     break
                 }
             }
             ok(found?.bbt.count == geo.bbtLen, "cs\(cs) DEVICEINFOBBT at block \(hex(found?.blk ?? 0))")
-            guard let (_, c, bbt) = found else { continue }
+            guard let (_, c, bbt) = found, bbt.count == geo.bbtLen else { continue }
             ok(
                 !bit(bbt, 0) && geo.cand[cs].allSatisfy { !bit(bbt, $0) },
                 "cs\(cs) BBT marks block 0 and candidates bad"
@@ -338,7 +353,7 @@ extension K48NAND {
         let m0 = lpnData(0)
         ok(m0.map { $0[510] == 0x55 && $0[511] == 0xAA } ?? false, "LBA 0 carries an MBR")
         if let m0 {
-            let parts = partitions(mbr: m0)
+            let parts = try partitions(mbr: m0)
             for (i, p) in parts.enumerated() where p.type != 0 {
                 ok(
                     p.lba + p.count <= geo.exportedPages,
@@ -354,8 +369,9 @@ extension K48NAND {
             }
             if let mbr {
                 let src = [UInt8](try Data(contentsOf: mbr).prefix(512))
+                let srcParts = try partitions(mbr: src)  // refuses a file shorter than an MBR
                 ok(
-                    Array(m0[..<0x1be]) == Array(src[..<0x1be]) && parts[0] == partitions(mbr: src)[0],
+                    Array(m0[..<0x1be]) == Array(src[..<0x1be]) && parts[0] == srcParts[0],
                     "LBA 0 matches \(mbr.lastPathComponent) (boot code + partition 1)"
                 )
             }

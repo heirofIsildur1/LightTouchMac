@@ -108,6 +108,19 @@ public final class HFSPlusVolume {
 
     deinit { close(fd) }
 
+    /// The size a volume header at `at` in `bytes` gives its volume, blockSize × totalBlocks (big-endian u32s at 40
+    /// and 44); nil when no HFS+ or HFSX signature is there. A product past what an Int holds is refused.
+    static func headerBytes(_ bytes: [UInt8], at: Int) throws -> Int? {
+        try parsing(bytes, "HFS+ volume header") { s in
+            try s.seek(toRelativeOffset: at)
+            var header = try s.sliceSpan(byteCount: 48)
+            guard [0x482B, 0x4858].contains(try UInt16(parsingBigEndian: &header)) else { return nil }
+            try header.seek(toRelativeOffset: 38)
+            let blockSize = try Int(parsing: &header, storedAsBigEndian: UInt32.self)
+            return try blockSize.multipliedThrowingOnOverflow(by: Int(parsing: &header, storedAsBigEndian: UInt32.self))
+        }
+    }
+
     // MARK: - Raw fork I/O
 
     /// The fork's extents in file order: the eight inline ones, then any in the extents overflow file.

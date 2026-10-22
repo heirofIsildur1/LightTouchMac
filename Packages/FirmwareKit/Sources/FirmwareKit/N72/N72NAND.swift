@@ -230,17 +230,14 @@ public enum N72NAND {
         let gpt = (0..<3).map { Page(cs: $0, page: 2 * pagesPerBlock) }
         guard let mbr = current(gpt[0]), let header = current(gpt[1]), let entry = current(gpt[2]), mbr.count == page
         else { return false }
-        let blocks = (0..<4).reduce(0) { $0 | Int(mbr[0x1BE + 12 + $1]) << (8 * $1) } - 10
+        let blocks = try K48NAND.partitions(mbr: mbr)[0].count - 10
         guard blocks > 0 else { return false }
         var changed = false
         if gptPages(blocks, slack: legacyGPTSlack) == [mbr, header, entry] {
             // The volume the GPT was made for: HFS+/HFSX at block 0, `blocks` 4 KiB long.
-            guard let first = current(predict(0)), first.count == page, first[1024] == 0x48,
-                first[1025] == 0x2B || first[1025] == 0x58
+            guard let first = current(predict(0)), first.count == page,
+                let bytes = try? HFSPlusVolume.headerBytes(first, at: 1024), bytes == blocks * page
             else { return false }
-            let be32 = { (o: Int) in (0..<4).reduce(0) { $0 << 8 | Int(first[1024 + o + $1]) } }
-            let bytes = be32(40) * be32(44)
-            guard bytes == blocks * page else { return false }
             if let storageKey, try !PreparedDeviceBoot.pinOverlay(overlay, toBase: storageKey) { return false }
             let primary = first[1024..<1536]
             let end = predict(blocks - 1)

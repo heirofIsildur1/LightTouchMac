@@ -124,10 +124,16 @@ public enum VolumeRebuild {
         let ftl = try N45FTL(base: base, overlay: overlay)
         let first = N45NAND.firstLBA
         let ps = N45NAND.page
-        guard let vh = ftl.read(lpn: first)?.data, vh[1024] == 0x48, vh[1025] == 0x2B || vh[1025] == 0x58 else {
+        guard let vh = ftl.read(lpn: first)?.data, let bytes = try HFSPlusVolume.headerBytes(vh, at: 1024) else {
             throw FirmwareError(.unsupported, "\(base.path): no HFS+ volume header at logical page \(first)")
         }
-        let bytes = Int(be32(vh, 1024 + 44)) * Int(be32(vh, 1024 + 40))
+        // the guest's header says the size: it must be what the FTL maps from the volume's first page
+        guard bytes <= (ftl.logicalPages - first) * ps else {
+            throw FirmwareError(
+                .unsupported,
+                "\(base.path): the volume header claims \(bytes) bytes, past the \((ftl.logicalPages - first) * ps) the FTL maps"
+            )
+        }
         let out = dir.appendingPathComponent("system.img")
         let fd = try create(out, bytes: bytes)
         defer { close(fd) }
@@ -154,10 +160,17 @@ public enum VolumeRebuild {
         guard let mbr = data(0), mbr[510] == 0x55, mbr[511] == 0xAA else {
             throw FirmwareError(.unsupported, "\(base.path): LBA 0 carries no MBR")
         }
-        let parts = K48NAND.partitions(mbr: mbr)
+        let parts = try K48NAND.partitions(mbr: mbr)
         var vols: [Volume] = []
         for (name, p) in [("system", parts[0]), ("data", parts[1])]
         where p.type != 0 && only.map({ $0.contains(name) }) ?? true {
+            // the guest's MBR places the partition: it must lie in the pages the FTL exports
+            guard p.lba + p.count <= geo.exportedPages else {
+                throw FirmwareError(
+                    .unsupported,
+                    "\(base.path): the \(name) partition (LBA \(p.lba), \(p.count) pages) runs past the \(geo.exportedPages) exported"
+                )
+            }
             let out = dir.appendingPathComponent("\(name).img")
             let fd = try create(out, bytes: p.count * geo.pageSize)
             defer { close(fd) }

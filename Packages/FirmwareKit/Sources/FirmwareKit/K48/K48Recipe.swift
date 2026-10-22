@@ -269,7 +269,7 @@ final class K48Board: Board {
         let systemMiB = max(recipe.systemMiB, stockMiB)
         c.log("system partition \(systemMiB) MiB (catalog \(recipe.systemMiB), restore \(stockMiB))")
         try K48NAND.makeMBR(geometry: geometry, systemMiB: systemMiB).write(to: mbr)
-        let parts = K48NAND.partitions(mbr: [UInt8](try Data(contentsOf: mbr)))
+        let parts = try K48NAND.partitions(mbr: [UInt8](try Data(contentsOf: mbr)))
         var kernelcacheImg3: Data?
         if iboot {
             guard let kc = try BuildComponents.load(c.ipsw, board: c.e.board)["KernelCache"] else {

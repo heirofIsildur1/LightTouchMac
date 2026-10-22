@@ -7,6 +7,7 @@
 // page_bytes+spare_bytes, stored XOR 0xFF (StoreFormat.image, nand-xor-ff-v2): unwritten pages are holes, which read
 // as erased. Stores made before it (legacy-zero-blank-v1) hold records as programmed; the image migration
 // (K48NANDImage) converts them.
+import BinaryParsing
 import Foundation
 
 public enum K48NAND {
@@ -440,10 +441,21 @@ public enum K48NAND {
         public let count: Int
     }
 
-    public static func partitions(mbr: [UInt8]) -> [Partition] {
-        (0..<4).map { i in
-            let o = 0x1be + 16 * i
-            return Partition(type: mbr[o + 4], lba: Int(le32(mbr, o + 8)), count: Int(le32(mbr, o + 12)))
+    /// The MBR's four entries at 0x1BE: status, CHS start, type, CHS end, then the first LBA and the count
+    /// (little-endian u32s).
+    public static func partitions(mbr: [UInt8]) throws -> [Partition] {
+        try parsing(mbr, "MBR") { s in
+            try s.seek(toAbsoluteOffset: 0x1BE)
+            return try [Partition](parsing: &s, count: 4) { e in
+                try e.seek(toRelativeOffset: 4)
+                let type = try UInt8(parsing: &e)
+                try e.seek(toRelativeOffset: 3)
+                return Partition(
+                    type: type,
+                    lba: try Int(parsing: &e, storedAsLittleEndian: UInt32.self),
+                    count: try Int(parsing: &e, storedAsLittleEndian: UInt32.self)
+                )
+            }
         }
     }
 
@@ -618,7 +630,7 @@ public enum K48NAND {
         guard head.count >= 512, head[510] == 0x55, head[511] == 0xAA else {
             throw FirmwareError(.unsupported, "\(mbr.path): no MBR signature")
         }
-        let parts = partitions(mbr: head)
+        let parts = try partitions(mbr: head)
         let p1 = parts[0]
         let p3 = parts[2]
         var p2 = parts[1]
@@ -708,7 +720,11 @@ public enum K48NAND {
             }
             return d
         }
-        let parts = partitions(mbr: page(0))
+        let parts = try partitions(mbr: page(0))
+        // the guest's MBR says where its partitions are: the pages read back for them must be exported ones
+        guard parts[0].lba <= geo.exportedPages, parts[2].lba + parts[2].count <= geo.exportedPages else {
+            throw FirmwareError(.unsupported, "\(store.path): the MBR's partitions run past the exported pages")
+        }
         let mbr = work.appendingPathComponent("mbr.bin")
         try Data((0..<parts[0].lba).flatMap(page)).write(to: mbr)
         var s3: URL?

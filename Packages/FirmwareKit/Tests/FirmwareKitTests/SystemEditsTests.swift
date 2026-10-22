@@ -592,7 +592,7 @@ enum K48Oracle {
         try await Oracle.withTemp { dir in
             let entry = try Oracle.entry(fw.entryID)
             let recipe = try #require(entry.recipe)
-            let parts = K48NAND.partitions(mbr: [UInt8](K48NAND.makeMBR(systemMiB: recipe.systemMiB)))
+            let parts = try K48NAND.partitions(mbr: [UInt8](K48NAND.makeMBR(systemMiB: recipe.systemMiB)))
             let swift = dir.appendingPathComponent("swift")
             try FileManager.default.createDirectory(at: swift, withIntermediateDirectories: true)
             let helpers = try K48Oracle.helpers(in: dir)
@@ -672,7 +672,7 @@ enum K48Oracle {
             let recipe = try #require(entry.recipe)
             let mbr = dir.appendingPathComponent("mbr.bin")
             try K48NAND.makeMBR(systemMiB: recipe.systemMiB).write(to: mbr)
-            let parts = K48NAND.partitions(mbr: [UInt8](try Data(contentsOf: mbr)))
+            let parts = try K48NAND.partitions(mbr: [UInt8](try Data(contentsOf: mbr)))
             let helpers = try K48Oracle.guestTools ?? K48Oracle.helpers(in: dir)
             var volumes: [[URL]] = []
             for run in ["a", "b"] {

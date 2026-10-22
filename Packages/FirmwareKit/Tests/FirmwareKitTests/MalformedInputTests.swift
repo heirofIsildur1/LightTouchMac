@@ -1,4 +1,5 @@
 import Foundation
+import HostRuntime
 import Testing
 
 @testable import FirmwareKit
@@ -144,5 +145,107 @@ struct MalformedInputTests {
                 gidBlobs: Data(repeating: 7, count: 96)
             )
         }
+    }
+
+    // MARK: NAND (what the guest left)
+
+    /// A prepared 1.x store whose volume header, rewritten in its live NAND as a guest would, claims `blocks` blocks of
+    /// `blockSize` bytes.
+    static func legacyDevice(claiming blockSize: UInt32, _ blocks: UInt32, in dir: URL) throws -> (URL, URL) {
+        let (base, _) = try N45FTLTests.prepared(dir)
+        let overlay = dir.appendingPathComponent("overlay")
+        try FileManager.default.createDirectory(at: overlay, withIntermediateDirectories: true)
+        let live = try PageNANDImage.Store(PreparedDeviceBoot.liveNAND(base: base, overlay: overlay), writable: true)
+        let at = N45NAND.location(lpn: N45NAND.firstLBA, banks: N45FTLTests.banks)
+        var record = try live.read(at.bank, at.page)
+        for (o, v) in [(1024 + 40, blockSize), (1024 + 44, blocks)] {
+            for k in 0..<4 { record[o + k] = UInt8(v >> (24 - 8 * k) & 0xFF) }
+        }
+        try live.write(at.bank, at.page, record)
+        return (base, overlay)
+    }
+
+    /// The guest's HFS+ header sizes the 1.x volume export: 4 GiB, past what the FTL's map covers, read logical
+    /// blocks past the map (Index out of range); 0xFFFFFFFF blocks of 0xFFFFFFFF bytes overflowed the product.
+    @Test(arguments: [(UInt32(4096), UInt32(0x10_0000)), (0xFFFF_FFFF, 0xFFFF_FFFF)])
+    func aLegacyVolumeHeaderClaimingMoreThanTheFTLMapsIsRefused(_ size: UInt32, _ blocks: UInt32) throws {
+        let dir = try Fixtures.tempDir("malformed-n45-header")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let (base, overlay) = try Self.legacyDevice(claiming: size, blocks, in: dir)
+        #expect(throws: FirmwareError.self) {
+            try VolumeRebuild.rebuild(base: base, overlay: overlay, into: dir.appendingPathComponent("out"))
+        }
+    }
+
+    /// A log block in use whose page offset (the guest's) points past the block: the page was read from the next
+    /// block instead.
+    @Test func aLegacyLogOffsetPastItsBlockIsRefused() throws {
+        let dir = try Fixtures.tempDir("malformed-n45-log")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let (base, _) = try N45FTLTests.prepared(dir)
+        let overlay = dir.appendingPathComponent("overlay")
+        try N45FTLTests.booted(overlay, base)
+        let sb = N45FTLTests.sb
+        var offsets = [UInt8](repeating: 0xFF, count: N45NAND.page)
+        N45FTLTests.le(&offsets, 2 * 5, sb + 2, 2)  // slot 0's page 5 at page sb + 2 of a block of sb
+        let live = try PageNANDImage.Store(PreparedDeviceBoot.liveNAND(base: base, overlay: overlay), writable: true)
+        let at = N45NAND.location(vpn: 3 * sb + 5, banks: N45FTLTests.banks)  // booted()'s first log-offset page
+        try live.write(at.bank, at.page, offsets + N45NAND.cxtSpare(type: 0x44, index: 0, age: 0xFFFF_FFF0))
+        #expect(throws: FirmwareError.self) { try N45FTL(base: base, overlay: overlay) }
+    }
+
+    /// An iPad store whose guest-written MBR places the system partition past the pages the FTL exports: the export
+    /// wrote a volume of that size.
+    @Test func aGuestMBRPlacingAPartitionPastTheExportIsRefused() async throws {
+        let dir = try Fixtures.tempDir("malformed-k48-mbr")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let geo = K48NAND.Geometry.selfcheck
+        let ps = geo.pageSize
+        func mbr(_ count: Int) -> [UInt8] {
+            var m = [UInt8](repeating: 0, count: ps)
+            m[510] = 0x55
+            m[511] = 0xAA
+            m[0x1be + 4] = 0xAF
+            put32(&m, 0x1be + 8, 63)
+            put32(&m, 0x1be + 12, UInt32(count))
+            return m
+        }
+        let paths = ["mbr", "system.img"].map { dir.appendingPathComponent($0) }
+        try Data(mbr(64) + [UInt8](repeating: 0, count: ps * 62)).write(to: paths[0])
+        try Data([UInt8](repeating: 0x5A, count: ps * 64)).write(to: paths[1])
+        let base = dir.appendingPathComponent("base")
+        try await K48NAND.build(
+            geometry: geo,
+            mbr: paths[0],
+            kernelVersion: Array("Darwin Kernel Version selfcheck".utf8),
+            system: paths[1],
+            data: .none,
+            out: base
+        )
+        let overlay = dir.appendingPathComponent("overlay")
+        let st = try K48NAND.Store(create: overlay, geo: geo)
+        let (cs, pp) = geo.vpnToPhys((geo.numBlocks - 2) * geo.ppsublk)
+        try st.write(cs, pp, mbr(geo.exportedPages), K48NAND.spare(0, 1000, K48NAND.tUser))
+        st.close()
+        for c in 0..<geo.numCS {
+            var dirty = [UInt8](repeating: 0, count: geo.pagesPerCE / 8)
+            if c == cs { dirty[pp / 8] |= 1 << (pp % 8) }
+            let (b, e) = geo.busCE(c)
+            try Data(dirty).write(to: overlay.appendingPathComponent("bus\(b)-ce\(e).dirty"))
+        }
+        #expect(throws: FirmwareError.self) {
+            try VolumeRebuild.rebuild(base: base, overlay: overlay, into: dir.appendingPathComponent("out"))
+        }
+    }
+
+    /// An MBR shorter than its table and a DEVICEINFOBBT page whose table length runs past the page.
+    @Test func aShortMBRAndALongBadBlockTableAreRefused() {
+        #expect(throws: FirmwareError.self) { try K48NAND.partitions(mbr: [UInt8](repeating: 0, count: 0x1C0)) }
+        var bbt = [UInt8](repeating: 0, count: 4096)
+        bbt.replaceSubrange(0..<13, with: Array("DEVICEINFOBBT".utf8))
+        put32(&bbt, 0x34, 0x2000)
+        #expect(K48NAND.deviceInfoBBT(bbt) == nil)
+        put32(&bbt, 0x34, 16)
+        #expect(K48NAND.deviceInfoBBT(bbt)?.bbt.count == 16)
     }
 }

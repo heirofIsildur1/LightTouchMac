@@ -350,13 +350,20 @@ public enum StoppedVolumeEdit {
         let f = try FileHandle(forReadingFrom: image)
         defer { try? f.close() }
         let ps = N45NAND.page
+        let room = (ftl.logicalPages - N45NAND.firstLBA) * ps
+        guard try f.seekToEnd() <= room else {
+            throw FirmwareError(.unsupported, "\(image.path) is larger than the \(room) bytes the FTL maps")
+        }
+        try f.seek(toOffset: 0)
         var changed = 0
         var lpn = N45NAND.firstLBA
         while let chunk = try f.read(upToCount: ps), !chunk.isEmpty {
             let data = [UInt8](chunk) + [UInt8](repeating: 0, count: ps - chunk.count)
             let old = ftl.read(lpn: lpn)
             if data != old?.data ?? [UInt8](repeating: 0, count: ps) {
-                let p = ftl.location(lpn: lpn)
+                guard let p = ftl.location(lpn: lpn) else {
+                    throw FirmwareError(.unsupported, "\(image.path): logical page \(lpn) is past the FTL's map")
+                }
                 let record = data + (old?.spare ?? N45NAND.dataSpare(lpn))
                 if let live {
                     try live.write(p, record)
