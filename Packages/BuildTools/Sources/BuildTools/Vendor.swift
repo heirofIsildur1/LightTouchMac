@@ -1,5 +1,5 @@
+import BuildSupport
 import Foundation
-import ReleaseChecks
 
 /// scripts/vendor: checks what a build needs, then builds what Xcode can't, from the pins, into a cached vendor
 /// directory that Archive copies into the app (see `usage`).
@@ -18,7 +18,7 @@ public struct Vendor {
 
         The pin hash covers build-support/sources.json (qemu-ios and usbmuxd commits), dependencies.json,
         developer-disk-images.json, the patches, the recipes (build-support/recipes) and these tools
-        (Packages/BuildTools, ReleaseChecks' Mach-O check). A run with the vendor directory complete only writes the
+        (Packages/BuildTools). A run with the vendor directory complete only writes the
         machine options; with --release the built-in iPod is prepared again when FirmwareKit, the helper or the guest
         tools changed. Nothing here deletes a vendor directory. One run at a time: a second run waits for the first (a
         flock on <vendor root>/.lock).
@@ -68,7 +68,18 @@ public struct Vendor {
     static let archs = ["arm64", "x86_64"], minos = "14.4"
     static let bootROMs = ["bootrom_240_4", "ipod1g/bootrom_s5l8900"]  // the iPod touch 2G's and 1G's SecureROMs
     static let developerImages = "build-support/developer-disk-images.json"
-    static let builtIn = "n72ap-7E18", seed = "lighttouch-built-in"  // the unpack gives every copy its own identity
+    static let seed = "lighttouch-built-in"  // the unpack gives every copy its own identity
+    /// The built-in iPod's catalog id: Packages/ReleaseChecks/boots.json's builtIn, which scripts/ship and
+    /// ReleaseBootTests read too.
+    var builtIn: String {
+        get throws {
+            let boots = root.appendingPathComponent("Packages/ReleaseChecks/boots.json")
+            guard let id = try readJSON(boots)["builtIn"] as? String, !id.isEmpty else {
+                throw ToolError("vendor: \(boots.path) names no builtIn")
+            }
+            return id
+        }
+    }
     // What the app and firmwarekit look for in the guest export (qemu-ios contrib/export-guest-artifacts.sh).
     static let ipodTools = ["itmedia", "itphoto"]
     static let guestTools = [
@@ -78,7 +89,7 @@ public struct Vendor {
     ]
     static let guestPackageMinSerial = 16
     static let tools = [
-        "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources", "Packages/ReleaseChecks/Sources"
+        "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources"
     ]
     static let staticKeyed = [
         "build-support/recipes/build-static-deps.sh", "build-support/dependencies.json",
@@ -372,6 +383,7 @@ public struct Vendor {
 
     /// The built-in iPod: `firmwarekit create` of builtIn with the export's guest tools, packed by pack-base.
     func builtInDevice(_ vendor: URL, _ work: URL, guestRoot: URL, tool: URL, helper: URL) throws -> URL {
+        let builtIn = try builtIn
         let log = work.appendingPathComponent("logs/device.log")
         let stage = work.appendingPathComponent("stage/Contents")
         remove(stage.deletingLastPathComponent())
@@ -390,7 +402,7 @@ public struct Vendor {
         let (entry, ipsw) = try builtInIPSW()
         guard files.fileExists(atPath: ipsw.path) else {
             throw ToolError(
-                "vendor: no \(Self.builtIn) IPSW at \(ipsw.path) (download it in the app, or set LTM_BUILT_IN_IPSW)"
+                "vendor: no \(builtIn) IPSW at \(ipsw.path) (download it in the app, or set LTM_BUILT_IN_IPSW)"
             )
         }
         let device = work.appendingPathComponent("device")
@@ -398,7 +410,7 @@ public struct Vendor {
         remove(device)
         try files.createDirectory(at: device.appendingPathComponent("out"), withIntermediateDirectories: true)
         try JSONSerialization.data(withJSONObject: entry).write(to: device.appendingPathComponent("entry.json"))
-        say("preparing the built-in \(Self.builtIn)")
+        say("preparing the built-in \(builtIn)")
         let clean = environment.filter { !$0.key.hasPrefix("LTM_") }
         let guestTools = guestRoot.appendingPathComponent("ipad-guest-tools")
         try run(
@@ -417,8 +429,8 @@ public struct Vendor {
         guard Self.preparedWith(guestTools, lock: device.appendingPathComponent("out/device.lock.json")) else {
             throw ToolError("vendor: the built-in iPod was not prepared with the vendored guest tools")
         }
-        let blob = device.appendingPathComponent("\(Self.builtIn).itbase")
-        let reuse = Self.previousBuiltIn(vendor, root: vendorRoot).map { ["--reuse", $0.path] } ?? []
+        let blob = device.appendingPathComponent("\(builtIn).itbase")
+        let reuse = Self.previousBuiltIn(vendor, root: vendorRoot, builtIn: builtIn).map { ["--reuse", $0.path] } ?? []
         try run(
             [
                 stage.appendingPathComponent("MacOS/firmwarekit").path, "pack-base", "--base",
@@ -438,9 +450,9 @@ public struct Vendor {
     /// The packed built-in iPod a previous build made, for pack-base to take its unchanged chunks from (so the chunks,
     /// and the app's Sparkle deltas, change only where the device did): this vendor directory's own, else the newest
     /// under the vendor root.
-    static func previousBuiltIn(_ vendor: URL, root: URL) -> URL? {
+    static func previousBuiltIn(_ vendor: URL, root: URL, builtIn: String) -> URL? {
         func packed(_ dir: URL) -> URL? {
-            let itbase = dir.appendingPathComponent("Resources/Device/\(Self.builtIn).itbase")
+            let itbase = dir.appendingPathComponent("Resources/Device/\(builtIn).itbase")
             return files.fileExists(atPath: itbase.appendingPathComponent("index.json").path) ? itbase : nil
         }
         if let own = packed(vendor) { return own }
@@ -748,13 +760,14 @@ public struct Vendor {
 
     /// The built-in iPod's catalog entry and where its IPSW is (LTM_BUILT_IN_IPSW, else the app's IPSW cache).
     func builtInIPSW() throws -> ([String: Any], URL) {
+        let builtIn = try builtIn
         let catalog = try readJSON(root.appendingPathComponent("LightTouchMac/Resources/firmware-catalog.json"))
         guard
             let entry = (catalog["entries"] as? [[String: Any]] ?? []).first(where: {
-                $0["id"] as? String == Self.builtIn
+                $0["id"] as? String == builtIn
             }),
             let sha1 = (entry["source"] as? [String: Any])?["sha1"] as? String
-        else { throw ToolError("vendor: no \(Self.builtIn) in the catalog") }
+        else { throw ToolError("vendor: no \(builtIn) in the catalog") }
         return (entry, url(environment["LTM_BUILT_IN_IPSW"] ?? ipswCache.appendingPathComponent("\(sha1).ipsw").path))
     }
 
@@ -823,7 +836,7 @@ public struct Vendor {
             if !files.fileExists(atPath: ipsw.path) {
                 missing.append(
                     (
-                        "the iPod touch 2G 3.1.3 (\(Self.builtIn)) IPSW at \(ipsw.path) (LTM_BUILT_IN_IPSW)",
+                        "the iPod touch 2G 3.1.3 (\(try builtIn)) IPSW at \(ipsw.path) (LTM_BUILT_IN_IPSW)",
                         "download it in Light Touch, or: curl -L --create-dirs -o \"\(ipsw.path)\" \(source["url"] ?? "")  (sha1 \(source["sha1"] ?? ""))"
                     )
                 )
@@ -858,12 +871,12 @@ public struct Vendor {
         let device = try treeHash(Self.deviceSources)
         let done = vendor.appendingPathComponent("vendor.json")
         var record = ((try? readJSON(done)) ?? [:]).compactMapValues { $0 as? String }
-        let blob = vendor.appendingPathComponent("Resources/Device/\(Self.builtIn).itbase")
+        let blob = vendor.appendingPathComponent("Resources/Device/\(try builtIn).itbase")
         let rebuild =
             record["recipe"] != recipe
             || !files.fileExists(atPath: vendor.appendingPathComponent("Frameworks/libqemu-arm.dylib").path)
-        let builtIn = release && (rebuild || record["device"] != device || !files.fileExists(atPath: blob.path))
-        if rebuild || builtIn {
+        let prepareBuiltIn = release && (rebuild || record["device"] != device || !files.fileExists(atPath: blob.path))
+        if rebuild || prepareBuiltIn {
             try files.createDirectory(at: work, withIntermediateDirectories: true)
             let qemu = try qemuTree(work)
             let (guestRoot, manifest) = try guest(work, qemu: qemu)
@@ -886,7 +899,7 @@ public struct Vendor {
                 // A built-in iPod from before is no longer this build's until --release prepares it again.
                 record = ["recipe": recipe]
             }
-            if builtIn {
+            if prepareBuiltIn {
                 let (tool, helper) = try firmwarekit(work)
                 try copy(try builtInDevice(vendor, work, guestRoot: guestRoot, tool: tool, helper: helper), blob)
                 record["device"] = device

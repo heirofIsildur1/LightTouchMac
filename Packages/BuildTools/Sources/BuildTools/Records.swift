@@ -1,5 +1,5 @@
+import BuildSupport
 import Foundation
-import ReleaseChecks
 
 /// The provenance records build-static-deps.sh and build-package-native.sh leave in their roots.
 public enum Records {
@@ -74,7 +74,7 @@ public enum Records {
         "build-support/patches/libplist-bin-limits.patch", "build-support/patches/libimobiledevice-reply-limits.patch",
         "build-support/checks/reply-limit.c",
         "Packages/BuildTools/Sources/BuildTools/DependencySources.swift",
-        "Packages/ReleaseChecks/Sources/ReleaseChecks/MachOClosure.swift"
+        "Packages/BuildTools/Sources/BuildSupport/MachOClosure.swift"
     ]
 
     static func isFile(_ file: URL) -> Bool {

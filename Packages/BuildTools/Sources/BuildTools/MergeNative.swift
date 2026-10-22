@@ -1,5 +1,5 @@
+import BuildSupport
 import Foundation
-import ReleaseChecks
 
 /// Per-architecture native build roots (build-package-native.sh outputs, or a root whose prefix and static deps come
 /// from another, QEMU built elsewhere) merged into one universal root for scripts/vendor. Each part is read from where
@@ -22,7 +22,7 @@ public enum MergeNative {
 
     /// A Mach-O, or a static archive (merged with lipo too).
     static func isMachO(_ file: URL) -> Bool {
-        BundleHygiene.isMachO(file)
+        MachOClosure.isMachO(file)
             || (try? FileHandle(forReadingFrom: file).read(upToCount: 8)) == Data("!<arch>\n".utf8)
     }
 

@@ -1,3 +1,4 @@
+import BuildSupport
 import Foundation
 import HostRuntime
 import Testing
@@ -302,9 +303,11 @@ struct ReleaseAppStaticTests {
     }
 
     @Test func hygieneLicensesAndNoLocalPaths() throws {
-        // The workspace's: scripts/ship archives the workspace, so these are the versions the app was built with.
+        // The project's: scripts/ship archives the project, so these are the versions the app was built with.
         let resolved = [
-            repository.appendingPathComponent("LightTouchMac.xcworkspace/xcshareddata/swiftpm/Package.resolved"),
+            repository.appendingPathComponent(
+                "LightTouchMac.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+            ),
             repository.appendingPathComponent("Packages/FirmwareKit/Package.resolved")
         ]
         let inputs =

@@ -1,3 +1,4 @@
+import BuildSupport
 import Foundation
 import zlib
 
@@ -57,16 +58,6 @@ public enum BundleHygiene {
     static let licenseTexts = ["LICENSE*", "LICENCE*", "COPYING*", "COPYRIGHT*", "GPL-*.txt"]
 
     static func matches(_ name: String, _ pattern: String) -> Bool { fnmatch(pattern, name, 0) == 0 }
-
-    public static func isMachO(_ url: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: url), let head = try? handle.read(upToCount: 4) else {
-            return false
-        }
-        try? handle.close()
-        return [
-            [0xcf, 0xfa, 0xed, 0xfe], [0xce, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca]
-        ].contains(Array(head))
-    }
 
     static func hasLicense(_ directory: URL) -> Bool {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
@@ -153,7 +144,7 @@ public enum BundleHygiene {
             if name.contains(".itbase/"), url.pathExtension == "z" { continue }
             let data = try Data(contentsOf: url)
             if local.contains(where: { data.range(of: $0) != nil }) { found.append("names a local path: \(name)") }
-            guard isMachO(url) else { continue }
+            guard MachOClosure.isMachO(url) else { continue }
             if name.hasPrefix("Contents/Resources/"), !name.hasPrefix(guest + "/") {
                 found.append("nested code under Resources (pack it into \(guest)): \(name)")
             }

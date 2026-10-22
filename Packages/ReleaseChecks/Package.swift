@@ -9,13 +9,17 @@ let package = Package(
     name: "ReleaseChecks",
     platforms: [.macOS("14.4")],
     products: [.library(name: "ReleaseChecks", targets: ["ReleaseChecks"])],
-    // HostRuntime (local): the tests start the bundled helper with its HelperLaunch.
-    dependencies: [.package(path: "../HostRuntime")],
+    // HostRuntime (local): the tests start the bundled helper with its HelperLaunch. BuildTools (local): BuildSupport's
+    // command runner, SHA-256 and MachOClosure, which scripts/vendor's native builds are checked with too.
+    dependencies: [.package(path: "../HostRuntime"), .package(path: "../BuildTools")],
     targets: [
-        .target(name: "ReleaseChecks"),
+        .target(name: "ReleaseChecks", dependencies: [.product(name: "BuildSupport", package: "BuildTools")]),
         .testTarget(
             name: "ReleaseChecksTests",
-            dependencies: ["ReleaseChecks", .product(name: "HostRuntime", package: "HostRuntime")]
+            dependencies: [
+                "ReleaseChecks", .product(name: "BuildSupport", package: "BuildTools"),
+                .product(name: "HostRuntime", package: "HostRuntime")
+            ]
         )
     ]
 )

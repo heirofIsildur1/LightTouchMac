@@ -30,7 +30,7 @@ what to do and not do on a shared Mac.
 - The device helper is sandboxed in every build (`LTM_HELPER_SANDBOX`, CONTRIBUTING.md, Building); `sessions` and
   `firmwarekit` from a Terminal without Full Disk Access make macOS ask once for the app group's container.
   `LTM_HELPER_SANDBOX=NO` builds it unsandboxed for debugging.
-- Unit tests: `xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit -skipMacroValidation`, or
+- Unit tests: `xcodebuild test -project LightTouchMac.xcodeproj -scheme LightTouchMac -testPlan Unit -skipMacroValidation`, or
   `swift test --package-path Packages/<Package>` for one package. Tests live in `Packages/*/Tests`, `tests/offline`
   and `tests/sessions` (CONTRIBUTING.md, Gates); the scripts' shell tests in `tests/scripts`.
 - `sessions` and `scripts/ship` end with one line, `PASS <summary> <log>` or

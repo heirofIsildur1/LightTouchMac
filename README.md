@@ -53,11 +53,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The tests come in three tiers:
 
 ```sh
 # no emulator: the packages' Swift Testing suites
-xcodebuild test -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit
+xcodebuild test -project LightTouchMac.xcodeproj -scheme LightTouchMac -testPlan Unit
 # emulator sessions, headless and silent, on a prepared device (sessions --help lists the checks)
 swift run --package-path tests/sessions sessions single PREPARED_BASE
 # a built app: signatures, bundle, closure and the built-in iPod's boot
-TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -workspace LightTouchMac.xcworkspace \
+TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -project LightTouchMac.xcodeproj \
     -scheme LightTouchMac -testPlan Release
 ```
 

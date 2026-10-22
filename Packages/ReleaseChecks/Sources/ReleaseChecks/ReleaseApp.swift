@@ -1,3 +1,4 @@
+import BuildSupport
 import Foundation
 
 /// The app a Release test run checks: LTM_RELEASE_APP (a Light Touch.app) or LTM_RELEASE_ARCHIVE (an .xcarchive, whose
@@ -48,7 +49,7 @@ public enum ReleaseApp {
         )
         return (enumerator?.compactMap { $0 as? URL } ?? []).filter { url in
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-            return values?.isRegularFile == true && values?.isSymbolicLink != true && BundleHygiene.isMachO(url)
+            return values?.isRegularFile == true && values?.isSymbolicLink != true && MachOClosure.isMachO(url)
         }.sorted { $0.path < $1.path }
     }
 
@@ -77,7 +78,8 @@ public enum ReleaseApp {
         var clean = environment.filter {
             !$0.key.hasPrefix("LTM_") && !$0.key.hasPrefix("TEST_RUNNER_") && !$0.key.hasPrefix("XCTest")
         }
-        clean["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        // the system's tools and the toolchain's shims only, never Homebrew's
+        clean["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
         return clean
     }
 }

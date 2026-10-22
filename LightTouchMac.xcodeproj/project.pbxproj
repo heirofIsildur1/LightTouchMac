@@ -102,6 +102,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A1D0C0DE3F000000000000001 /* LightTouchCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/LightTouchCore; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000002 /* HostRuntime */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/HostRuntime; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000003 /* FirmwareKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/FirmwareKit; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000004 /* DeviceRuntime */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/DeviceRuntime; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000005 /* DeviceServices */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/DeviceServices; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000006 /* ReleaseChecks */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/ReleaseChecks; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000007 /* BuildTools */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Packages/BuildTools; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000008 /* sessions */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = tests/sessions; sourceTree = "<group>"; };
+		A1D0C0DE3F000000000000009 /* offline */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = tests/offline; sourceTree = "<group>"; };
 		A1D0C0DE3A000000000000031 /* Tool.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tool.entitlements; sourceTree = "<group>"; };
 		A1D0C0DE3800000000000000010 /* libqemu-arm.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "Frameworks/libqemu-arm.dylib"; sourceTree = VENDOR_DIR; };
 		A1D0C0DE3800000000000000011 /* libavcodec.63.1.101.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "Frameworks/libavcodec.63.1.101.dylib"; sourceTree = VENDOR_DIR; };
@@ -185,6 +194,15 @@
 				A1D0C0DE3100000000000012 /* LightTouchDevice */,
 				A1D0C0DE3200000000000000B /* LightTouchServices */,
 				EB72984030B2091100000002 /* Configuration */,
+				A1D0C0DE3F000000000000001 /* LightTouchCore */,
+				A1D0C0DE3F000000000000002 /* HostRuntime */,
+				A1D0C0DE3F000000000000003 /* FirmwareKit */,
+				A1D0C0DE3F000000000000004 /* DeviceRuntime */,
+				A1D0C0DE3F000000000000005 /* DeviceServices */,
+				A1D0C0DE3F000000000000006 /* ReleaseChecks */,
+				A1D0C0DE3F000000000000007 /* BuildTools */,
+				A1D0C0DE3F000000000000008 /* sessions */,
+				A1D0C0DE3F000000000000009 /* offline */,
 				EA17D83330239D9B00BDF83E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -329,6 +347,10 @@
 				A1D0C0DE3B000000000000001,
 				A1D0C0DE3C000000000000001,
 				A1D0C0DE3A000000000000010,
+				A1D0C0DE3E000000000000001,
+				A1D0C0DE3E000000000000002,
+				A1D0C0DE3E000000000000003,
+				A1D0C0DE3E000000000000004,
 				EA17D84B3023A55900BDF83E /* XCRemoteSwiftPackageReference "swift-subprocess" */,
 				A1D0C0DE37000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				A1D0C0DE3D000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
@@ -538,6 +560,10 @@
 		A1D0C0DE36000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = Packages/DeviceRuntime; };
 		A1D0C0DE3B000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = Packages/DeviceServices; };
 		A1D0C0DE3C000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = Packages/LightTouchCore; };
+		A1D0C0DE3E000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = Packages/ReleaseChecks; };
+		A1D0C0DE3E000000000000002 = {isa = XCLocalSwiftPackageReference; relativePath = Packages/BuildTools; };
+		A1D0C0DE3E000000000000003 = {isa = XCLocalSwiftPackageReference; relativePath = tests/sessions; };
+		A1D0C0DE3E000000000000004 = {isa = XCLocalSwiftPackageReference; relativePath = tests/offline; };
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */

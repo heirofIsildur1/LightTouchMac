@@ -1,6 +1,6 @@
+import BuildSupport
 import CryptoKit
 import Foundation
-import ReleaseChecks
 
 /// A failure the tools report as one line on stderr and exit 1.
 public struct ToolError: Error, CustomStringConvertible {

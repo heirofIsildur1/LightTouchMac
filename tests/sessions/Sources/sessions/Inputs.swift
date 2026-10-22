@@ -1,6 +1,6 @@
+import BuildSupport
 import FirmwareSchema
 import Foundation
-import ReleaseChecks
 import SessionKit
 
 /// The repository this was built from.

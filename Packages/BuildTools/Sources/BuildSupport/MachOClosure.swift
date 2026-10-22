@@ -4,6 +4,17 @@ import Foundation
 /// each dependency resolves (through the binary's rpaths and its loaders'), none needs a newer macOS than the app
 /// supports, and inside an app none escapes the bundle; optionally, native code has no weak imports.
 public enum MachOClosure {
+    /// Whether `url` starts with a Mach-O or universal magic number.
+    public static func isMachO(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url), let head = try? handle.read(upToCount: 4) else {
+            return false
+        }
+        try? handle.close()
+        return [
+            [0xcf, 0xfa, 0xed, 0xfe], [0xce, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe], [0xbe, 0xba, 0xfe, 0xca]
+        ].contains(Array(head))
+    }
+
     public struct Failure: Error, CustomStringConvertible, Equatable {
         public let description: String
         init(_ description: String) { self.description = description }

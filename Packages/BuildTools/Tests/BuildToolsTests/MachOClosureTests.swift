@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import ReleaseChecks
+@testable import BuildSupport
 
 /// The closure check against real Mach-O files built here (was tests/release/test-package.py's fixture half).
 struct MachOClosureTests {
@@ -225,12 +225,4 @@ struct MachOClosureTests {
             )
         }
     }
-}
-
-func withScratch<T>(_ body: (URL) throws -> T) throws -> T {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("release-checks-\(UUID().uuidString)")
-        .resolvingSymlinksInPath()
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-    return try body(root)
 }

@@ -1,5 +1,5 @@
+import BuildSupport
 import Foundation
-import ReleaseChecks
 
 /// The pinned dependency archives (build-support/dependencies.json): fetched only through their SHA-256, tracked source
 /// staged without build outputs, and the SOURCE.txt a shipped build carries.

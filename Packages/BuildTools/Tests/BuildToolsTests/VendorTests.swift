@@ -86,7 +86,7 @@ struct VendorTests {
         let root = try scratch()
         defer { remove(root) }
         func packed(_ key: String, age: TimeInterval) throws -> URL {
-            let itbase = root.appendingPathComponent("\(key)/Resources/Device/\(Vendor.builtIn).itbase")
+            let itbase = root.appendingPathComponent("\(key)/Resources/Device/builtIn.itbase")
             try touch(itbase.appendingPathComponent("index.json"))
             try files.setAttributes(
                 [.modificationDate: Date(timeIntervalSinceNow: -age)],
@@ -95,16 +95,28 @@ struct VendorTests {
             return itbase
         }
         let current = root.appendingPathComponent("current")
-        #expect(Vendor.previousBuiltIn(current, root: root) == nil)
-        try touch(root.appendingPathComponent("blob/Resources/Device/\(Vendor.builtIn).itbase"))  // format 1: a file
-        #expect(Vendor.previousBuiltIn(current, root: root) == nil)
+        #expect(Vendor.previousBuiltIn(current, root: root, builtIn: "builtIn") == nil)
+        try touch(root.appendingPathComponent("blob/Resources/Device/builtIn.itbase"))  // format 1: a file
+        #expect(Vendor.previousBuiltIn(current, root: root, builtIn: "builtIn") == nil)
         _ = try packed("older", age: 100)
         let newer = try packed("newer", age: 10)
         #expect(
-            Vendor.previousBuiltIn(current, root: root)?.resolvingSymlinksInPath() == newer.resolvingSymlinksInPath()
+            Vendor.previousBuiltIn(current, root: root, builtIn: "builtIn")?.resolvingSymlinksInPath()
+                == newer.resolvingSymlinksInPath()
         )
         let own = try packed("current", age: 1000)
-        #expect(Vendor.previousBuiltIn(current, root: root)?.resolvingSymlinksInPath() == own.resolvingSymlinksInPath())
+        #expect(
+            Vendor.previousBuiltIn(current, root: root, builtIn: "builtIn")?.resolvingSymlinksInPath()
+                == own.resolvingSymlinksInPath())
+    }
+
+    /// The built-in iPod scripts/vendor prepares is boots.json's (scripts/ship and ReleaseBootTests read it there), the
+    /// one the app's catalog bundles.
+    @Test func theBuiltInIsBootsJSONsAndTheCatalogs() throws {
+        let repository = URL(fileURLWithPath: #filePath).appendingPathComponent("../../../../..").standardized
+        let id = try Vendor(root: repository).builtIn
+        let catalog = try readJSON(repository.appendingPathComponent("LightTouchMac/Resources/firmware-catalog.json"))
+        #expect((catalog["bundled"] as? [String: Any])?.keys.sorted() == [id])
     }
 
     /// scripts/vendor keys its directory with scripts/vendor-check, as Xcode's first phase does: the key of the
@@ -115,8 +127,7 @@ struct VendorTests {
         defer { remove(dir) }
         let vendor = Vendor(root: dir)
         for name in [
-            "build-support", "scripts", "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources",
-            "Packages/ReleaseChecks/Sources"
+            "build-support", "scripts", "Packages/BuildTools/Package.swift", "Packages/BuildTools/Sources"
         ] {
             try vendor.copy(repository.appendingPathComponent(name), dir.appendingPathComponent(name))
         }
@@ -129,7 +140,7 @@ struct VendorTests {
         #expect(try vendor.pinKey() == first)
         var previous = first
         for name in [
-            "build-support/patches/new.patch", "Packages/ReleaseChecks/Sources/New.swift",
+            "build-support/patches/new.patch", "Packages/BuildTools/Sources/BuildSupport/New.swift",
             "build-support/recipes/build-static-deps.sh"
         ] {
             try Data("changed".utf8).write(to: dir.appendingPathComponent(name))

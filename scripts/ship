@@ -237,7 +237,7 @@ main() {
         step "archive"
         archive="$RELDIR/release-$SHORT.xcarchive"
         rm -rf "$archive"
-        xcodebuild archive -skipMacroValidation -onlyUsePackageVersionsFromResolvedFile -workspace "$ROOT/LightTouchMac.xcworkspace" \
+        xcodebuild archive -skipMacroValidation -onlyUsePackageVersionsFromResolvedFile -project "$ROOT/LightTouchMac.xcodeproj" \
             -scheme LightTouchMac -configuration Release -destination 'generic/platform=macOS' -archivePath "$archive" \
             LTM_HELPER_SANDBOX="${LTM_HELPER_SANDBOX:-YES}" \
             > "$WORK/archive.log" 2>&1 \
@@ -292,7 +292,7 @@ main() {
         TEST_RUNNER_LTM_RELEASE_APP="$app" TEST_RUNNER_LTM_RELEASE_EXPORTED=$((1 - DRY)) \
             TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE="$SKIP_PREPARE" \
             TEST_RUNNER_LTM_RELEASE_HELPER_SANDBOX="${LTM_HELPER_SANDBOX:-YES}" \
-            xcodebuild -quiet -skipMacroValidation -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
+            xcodebuild -quiet -skipMacroValidation -project "$ROOT/LightTouchMac.xcodeproj" -scheme LightTouchMac -testPlan Release \
             -only-testing:"ReleaseChecksTests/$2" -derivedDataPath "$WORK/dd" \
             -resultBundlePath "$WORK/$1.xcresult" test > "$WORK/$1.log" 2>&1 \
             || {

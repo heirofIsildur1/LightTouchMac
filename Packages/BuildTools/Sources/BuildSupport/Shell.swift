@@ -63,13 +63,13 @@ public enum Shell {
         )
     }
 
-    /// `name` on the command's PATH (the environment it runs in), then this process's, then the system's.
+    /// `name` on the command's PATH (the environment it runs in; this process's when it is given none), then the
+    /// system's. A command given an environment (ReleaseApp.cleanEnvironment) never finds a tool on this process's PATH.
     static func resolve(_ name: String, path given: String? = nil) throws -> String {
         if name.hasPrefix("/") { return name }
         let path =
-            (given ?? "").split(separator: ":").map(String.init)
-            + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
-            + ["/usr/bin", "/bin", "/usr/sbin", "/sbin", "/usr/libexec", "/opt/homebrew/bin", "/usr/local/bin"]
+            (given ?? ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+            + ["/usr/bin", "/bin", "/usr/sbin", "/sbin", "/usr/libexec"]
         guard
             let found = path.map({ "\($0)/\(name)" }).first(where: { FileManager.default.isExecutableFile(atPath: $0) })
         else {
@@ -88,4 +88,13 @@ public enum ShellError: Error, CustomStringConvertible {
         case .timedOut(let command): "timed out: \(command)"
         }
     }
+}
+
+/// `body` with a new scratch directory (symlinks resolved), removed afterward: the release checks' and their tests'.
+public func withScratch<T>(_ body: (URL) throws -> T) throws -> T {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("release-checks-\(UUID().uuidString)")
+        .resolvingSymlinksInPath()
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    return try body(root)
 }

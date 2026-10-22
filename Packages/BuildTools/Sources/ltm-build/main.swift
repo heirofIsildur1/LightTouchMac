@@ -1,9 +1,9 @@
 // scripts/ltm-build SUBCOMMAND ...: the build's tools (Packages/BuildTools); `scripts/ltm-build help SUBCOMMAND`.
 // LTM_ROOT is the repository (the wrapper sets it).
 import ArgumentParser
+import BuildSupport
 import BuildTools
 import Foundation
-import ReleaseChecks
 
 let repository = URL(
     fileURLWithPath: ProcessInfo.processInfo.environment["LTM_ROOT"] ?? FileManager.default.currentDirectoryPath

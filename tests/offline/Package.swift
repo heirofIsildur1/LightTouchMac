@@ -11,8 +11,10 @@ let settings: [SwiftSetting] = [
     .enableUpcomingFeature("InferIsolatedConformances")
 ]
 
-/// Where the libimobiledevice and libplist headers are (Homebrew's), for the modules that import the engine.
-let imobiledevice = ["-Xcc", "-I/opt/homebrew/include", "-Xcc", "-I/usr/local/include"]
+/// The vendored, patched libimobiledevice and libplist headers (build/vendor, the link scripts/vendor-check points at
+/// the current pins' vendor directory), for the modules that import the engine.
+let vendorInclude = Context.packageDirectory + "/../../build/vendor/include"
+let imobiledevice = ["-Xcc", "-I" + vendorInclude]
 
 let package = Package(
     name: "OfflineChecks",
@@ -84,10 +86,10 @@ let package = Package(
             swiftSettings: settings
         ),
         // The services helper's engine (LightTouchServices/Engine) over a libimobiledevice of the tests' own
-        // (tests/fixtures/imobiledevice-fake.swift), with the real headers from Homebrew's libimobiledevice.
+        // (tests/fixtures/imobiledevice-fake.swift), with the vendored libimobiledevice's headers.
         .target(
             name: "CIMobileDevice",
-            cSettings: [.unsafeFlags(["-I/opt/homebrew/include", "-I/usr/local/include"])]
+            cSettings: [.unsafeFlags(["-I" + vendorInclude])]
         ),
         .target(
             name: "Engine",

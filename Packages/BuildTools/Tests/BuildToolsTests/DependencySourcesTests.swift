@@ -1,5 +1,5 @@
+import BuildSupport
 import Foundation
-import ReleaseChecks
 import Testing
 
 @testable import BuildTools
@@ -157,8 +157,10 @@ struct DependencySourcesTests {
         }
     }
 
-    /// dependencies.json is the Swift packages' license and provenance ledger: every package the app resolves has a
-    /// record at the resolved version, and each manifest that pins one exact is named in its record, at that version.
+    /// dependencies.json is the Swift packages' license and provenance ledger, and their one set of pins: every package
+    /// a committed Package.resolved pins (the project's, which Xcode and scripts/ship use, and each package's own, for
+    /// `swift build`) has a record at that version; every remote package of every manifest and of the project is
+    /// pinned exactly (no ranges) at its record's version; and each manifest that pins one is named in its record.
     @Test func theLedgerRecordsEverySwiftPackageAndWhereItIsPinned() throws {
         let repository = URL(fileURLWithPath: #filePath).appendingPathComponent("../../../../..").standardized
         let records = Dictionary(
@@ -166,22 +168,44 @@ struct DependencySourcesTests {
                 as? [[String: Any]] ?? []).map { (($0["name"] as? String ?? "").lowercased(), $0) },
             uniquingKeysWith: { a, _ in a }
         )
-        let resolved = try readJSON(
-            repository.appendingPathComponent("LightTouchMac.xcworkspace/xcshareddata/swiftpm/Package.resolved")
-        )
-        for pin in resolved["pins"] as? [[String: Any]] ?? [] {
-            let identity = pin["identity"] as? String ?? ""
-            let version = (pin["state"] as? [String: Any])?["version"] as? String
-            #expect(records[identity]?["version"] as? String == version, "\(identity) \(version ?? "")")
+        func tracked(_ pattern: String) throws -> [String] {
+            let listed = try Shell.run(["git", "ls-files", pattern], directory: repository)
+            try #require(listed.succeeded, "\(listed.error)")
+            return listed.output.split(separator: "\n").map(String.init)
         }
-        let manifests = [
-            "Packages/BuildTools", "Packages/DeviceRuntime", "Packages/DeviceServices", "Packages/FirmwareKit",
-            "Packages/HostRuntime", "Packages/LightTouchCore", "Packages/ReleaseChecks", "tests/offline",
-            "tests/sessions", "tools/device-access"
-        ].map { "\($0)/Package.swift" }
+        let resolvedFiles = try tracked("*Package.resolved")
+        #expect(
+            resolvedFiles.contains("LightTouchMac.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"))
+        for file in resolvedFiles {
+            for pin in try readJSON(repository.appendingPathComponent(file))["pins"] as? [[String: Any]] ?? [] {
+                let identity = pin["identity"] as? String ?? ""
+                let version = (pin["state"] as? [String: Any])?["version"] as? String
+                #expect(records[identity]?["version"] as? String == version, "\(file): \(identity) \(version ?? "")")
+            }
+        }
+        let project = try String(
+            contentsOf: repository.appendingPathComponent("LightTouchMac.xcodeproj/project.pbxproj"),
+            encoding: .utf8
+        )
+        let references = project.matches(
+            of: /isa = XCRemoteSwiftPackageReference;\s*repositoryURL = "([^"]+)";\s*requirement = \{([^}]*)\}/
+        )
+        #expect(references.count == project.matches(of: /isa = XCRemoteSwiftPackageReference;/).count)
+        for reference in references {
+            let name = String(reference.1.split(separator: "/").last ?? "").replacingOccurrences(of: ".git", with: "")
+            let version = reference.2.firstMatch(of: /version = ([^;\s]+);/).map { String($0.1) }
+            #expect(reference.2.contains("kind = exactVersion;"), "the project pins \(name) with a range")
+            #expect(records[name.lowercased()]?["version"] as? String == version, "the project: \(name)")
+        }
+        let manifests = try tracked("*Package.swift")
+        #expect(manifests.count >= 10, "\(manifests)")
         let pinned = /\.package\(url: "[^"]*\/([^\/"]+?)(?:\.git)?", exact: "([^"]+)"\)/
         for manifest in manifests {
             let text = try String(contentsOf: repository.appendingPathComponent(manifest), encoding: .utf8)
+            #expect(
+                text.matches(of: pinned).count == text.matches(of: /\.package\(\s*url:/).count,
+                "\(manifest): a remote package pinned other than exact:"
+            )
             for match in text.matches(of: pinned) {
                 let record = records[String(match.1).lowercased()]
                 #expect(record?["version"] as? String == String(match.2), "\(manifest): \(match.1) \(match.2)")

@@ -22,7 +22,7 @@ let package = Package(
         .package(path: "../../Packages/DeviceRuntime"),
         .package(path: "../../Packages/DeviceServices"),
         .package(path: "../../Packages/FirmwareKit"),
-        .package(path: "../../Packages/ReleaseChecks"),
+        .package(path: "../../Packages/BuildTools"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2")
     ],
     targets: [
@@ -30,7 +30,7 @@ let package = Package(
         .executableTarget(
             name: "sessions",
             dependencies: [
-                "SessionKit", parser, .product(name: "ReleaseChecks", package: "ReleaseChecks"),
+                "SessionKit", parser, .product(name: "BuildSupport", package: "BuildTools"),
                 .product(name: "HostRuntime", package: "HostRuntime"),
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
                 .product(name: "FirmwareSchema", package: "FirmwareKit")

@@ -64,8 +64,8 @@ development build directory, and the usbmuxd commit; iBoot32Patcher and ANGLE (w
 `scripts/vendor` reads the pin (`QEMU_IOS_DIR` and `USBMUXD_SOURCE_DIR` move the checkouts) and hands the recipes
 (`build-support/recipes`) a tree at each pinned commit.
 To produce the dylib, build `qemu-system-arm` in that checkout and run `contrib/macos-app/make-dylib-macos.sh BUILD_DIR`.
-The services helper links libimobiledevice and libplist: from the vendor directory (below) when there is one,
-else Homebrew's. Put local overrides of any of these in `Configuration/Local.xcconfig` (gitignored).
+The services helper links libimobiledevice and libplist from the vendor directory (below), and OfflineTests compile
+against its headers (`build/vendor/include`); nothing in the build reads Homebrew's (BuildToolsTests checks). Put local overrides of any of these in `Configuration/Local.xcconfig` (gitignored).
 
 The device helper runs under the App Sandbox, in Debug and Release (`LTM_HELPER_SANDBOX = YES`, `Shared.xcconfig`):
 whoever spawns it (the app, `firmwarekit`, the harness) reads the helper's signature and grants it its device's files
@@ -150,7 +150,7 @@ A release is an Xcode archive made by `scripts/ship`; nothing edits the bundle a
    release.)
 
    The Release plan alone, on a built app: `TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test
-   -skipMacroValidation -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Release`
+   -skipMacroValidation -project LightTouchMac.xcodeproj -scheme LightTouchMac -testPlan Release`
    (`TEST_RUNNER_LTM_RELEASE_ARCHIVE` takes an archive; `TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE=1` skips the matrix, for
    development runs only; a missing IPSW fails the plan).
 
@@ -175,7 +175,7 @@ Three commands, no runner around them:
 ```sh
 # no emulator: every package's Swift Testing suites (the list is Unit.xctestplan); -skipMacroValidation for
 # swift-binary-parsing's macro target, which Xcode itself asks once to trust
-xcodebuild test -skipMacroValidation -workspace LightTouchMac.xcworkspace -scheme LightTouchMac -testPlan Unit
+xcodebuild test -skipMacroValidation -project LightTouchMac.xcodeproj -scheme LightTouchMac -testPlan Unit
 # emulator sessions on prepared bases (firmwarekit create output), one boot at a time; `sessions --help` for the rest
 swift run --package-path tests/sessions sessions single BASE [--launch] [--reboot]
 # as a device the user already has, through the app's boot admission; an old device must take its admission steps
@@ -185,7 +185,7 @@ swift run --package-path tests/sessions sessions single OLD_DEVICE --expect-admi
 swift run --package-path tests/sessions sessions phone N90_BASE --only carrier --overlay PAST_SETUP_OVERLAY
 swift run --package-path tests/sessions sessions local-network N72_BASE
 # a built app (Releases, step 2)
-TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -skipMacroValidation -workspace LightTouchMac.xcworkspace \
+TEST_RUNNER_LTM_RELEASE_APP="path/to/Light Touch.app" xcodebuild test -skipMacroValidation -project LightTouchMac.xcodeproj \
     -scheme LightTouchMac -testPlan Release
 ```
 
@@ -202,7 +202,7 @@ directory and fails a run that touched the real `app.log`.
 | `Packages/*/Tests`, `Unit.xctestplan` | Swift Testing: LightTouchCoreTests (the app's logic), HostRuntimeTests, FirmwareKitTests, HostServiceWireTests, ReleaseChecksTests' fixtures, BuildToolsTests (the native merge, the dependency sources, the repository's format and lint). LightTouchCore's tests run one at a time in a private home (Tests/TestIsolation) |
 | `tests/offline/` | A Swift package (OfflineTests, in the Unit plan) for what needs the app target's own files: AppKit views rendered offscreen, the display's input and layout, the helper's C API version and LCD color, the services engine against a fake libimobiledevice. The production files are compiled whole through symlinks beside small stand-ins; no window is ordered in |
 | `tests/sessions/` | A Swift package: `sessions` (the checks and their verdicts), the drivers that stand in for the app (`session-driver`: the app's session code; `helper-driver`: DeviceLink straight to the helper), and SessionKit (frame references, the Home verdict, the Setup walks), whose tests are in the Unit plan |
-| `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `format-hook.sh`: the pre-commit formatter in a scratch repository; `host-ready.sh`; `ship.sh`: scripts/ship's tags, notes, Xcode pin, notary config, IPSW fill, pruning, argument checks and `ltm-build release`), run by hand |
+| `tests/scripts/` | Shell tests of the scripts (`clean.sh`: scripts/clean's keep and remove decisions; `format-hook.sh`: the pre-commit formatter in a scratch repository; `host-ready.sh`; `ship.sh`: scripts/ship's tags, notes, Xcode pin, notary config, IPSW fill, pruning, argument checks and `ltm-build release`), each run by BuildToolsTests in the Unit plan, or alone |
 | `tests/activation/`, `tests/fixtures/` | C harnesses run by hand (`tests/activation/run.sh`: the activation finish and the lockdown zone writes); the fake preparer (`fake-firmwarekit`, bash), the store fixtures and `machines.json` the tests share |
 | `swift test --package-path Packages/FirmwareKit` | Also runs FirmwareKit's suites alone. Optional corpus tests report real skips unless `FK_TEST_CORPUS=1` or `FK_REQUIRE_FIXTURES=1` selects them; selected missing inputs fail. Format/bake oracle checks compare against qemu-ios's imgtools through `FIRMWAREKIT_QEMU_IOS` |
 
