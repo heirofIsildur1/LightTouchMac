@@ -33,7 +33,8 @@ let package = Package(
                 "SessionKit", parser, .product(name: "BuildSupport", package: "BuildTools"),
                 .product(name: "HostRuntime", package: "HostRuntime"),
                 .product(name: "LightTouchCore", package: "LightTouchCore"),
-                .product(name: "FirmwareSchema", package: "FirmwareKit")
+                .product(name: "FirmwareSchema", package: "FirmwareKit"),
+                .product(name: "FirmwareKit", package: "FirmwareKit")
             ]
         ),
         .executableTarget(

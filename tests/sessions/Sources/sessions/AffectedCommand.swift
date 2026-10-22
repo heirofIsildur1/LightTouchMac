@@ -58,6 +58,12 @@ func affected(_ args: AffectedCheck) -> Never {
     ]
     let needsUnit = changed.count > plan.nothing.count
     print(needsUnit ? "unit: xcodebuild \(unit.joined(separator: " "))" : "unit: none")
+    // Preparation code: its volumes against the recorded listings first, booting nothing (they can't see boot-time
+    // regressions: the family boots still run).
+    let preparation = changed.contains {
+        $0.hasPrefix("Packages/FirmwareKit/Sources/") || $0.hasPrefix("LightTouchMac/Resources/firmware-catalog")
+    }
+    if preparation { print("listings: sessions listings (every family row's volumes)") }
     let rows = Affected.families.filter { plan.boards.contains(String($0.row.prefix { $0 != "-" })) }
     if rows.isEmpty { print("boot: none") }
     var jobs: [String] = []
@@ -91,6 +97,11 @@ func affected(_ args: AffectedCheck) -> Never {
             print("FAIL the Unit plan \(log.path)")
             exit(1)
         }
+    }
+    if preparation {
+        var listings = ["listings", "--work", work.appendingPathComponent("listings").path]
+        listings += args.ipswDir.flatMap { ["--ipsw-dir", $0.path] }
+        guard sessions(listings, args.inputs) == 0 else { exit(1) }
     }
     guard !jobs.isEmpty else {
         print("PASS the Unit plan\(skipped.isEmpty ? "" : "; skipped \(skipped.joined(separator: ", "))") \(work.path)")

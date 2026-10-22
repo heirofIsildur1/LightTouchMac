@@ -187,6 +187,10 @@ swift run --package-path tests/sessions sessions matrix JOBS [--lanes 3]
 # what a change needs, from the paths it touches (git diff RANGE): the Unit plan, and one boot per board family it can
 # reach (all of them for the helper, the emulator, guest code, the drivers or a path no rule names); --run runs it
 swift run --package-path tests/sessions sessions affected main [--run] [--bases DIR]
+# preparation's gate, booting nothing: each family row's volumes (create --stop-after volumes) against the listings
+# in tests/sessions/listings (paths, owners, modes, flags, sizes, content hashes, link targets); --record rewrites them
+# and prints every change, and the commit that re-records says why each changed path changed
+swift run --package-path tests/sessions sessions listings [ROW …] [--record]
 # as a device the user already has, through the app's boot admission; an old device must take its admission steps
 # (the old devices in ~/Developer/qemu-ios-files/old-devices: tests/sessions/Sources/sessions/Managed.swift)
 swift run --package-path tests/sessions sessions single BASE --managed
