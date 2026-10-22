@@ -1,22 +1,8 @@
 // dyld_v1 shared caches (iOS 3.x/4.x, armv6/armv7): mappings, cached images, each image's own
 // LC_SYMTAB (cache file offsets: the old caches keep an unslid linkedit), and the AppSync patch.
 // Port of imgtools/appsync_cachepatch.py and ipad1_rootfs.cache_images/image_strings.
+import BinaryParsing
 import Foundation
-
-extension UnsafeRawBufferPointer {
-    /// Offset of the first NUL at or after `o` (the end if there is none).
-    func nulIndex(from o: Int) -> Int {
-        var i = o
-        while i < count && self[i] != 0 { i += 1 }
-        return i
-    }
-    /// The NUL-terminated bytes at `o` (to the end, without a NUL).
-    func cBytes(_ o: Int) throws -> UnsafeRawBufferPointer {
-        _ = try bytes(o, 0)
-        return UnsafeRawBufferPointer(rebasing: self[o..<nulIndex(from: o)])
-    }
-    func latin1(_ o: Int) throws -> String { String(try cBytes(o).map { Character(Unicode.Scalar($0)) }) }
-}
 
 public struct DyldSharedCache: @unchecked Sendable {
     public struct Mapping: Sendable { public let address: UInt64, size: UInt64, fileOffset: UInt64 }
@@ -46,28 +32,34 @@ public struct DyldSharedCache: @unchecked Sendable {
         guard data.count >= 0x20, data.prefix(7) == Data("dyld_v1".utf8) else {
             throw FirmwareError(.unsupported, "not a dyld_v1 shared cache")
         }
-        let (maps, imgs): ([Mapping], [(UInt64, Int)]) = try data.withUnsafeBytes { b in
-            let (mo, mc, io, ic) = (
-                Int(try b.u32le(0x10)), Int(try b.u32le(0x14)), Int(try b.u32le(0x18)), Int(try b.u32le(0x1c))
-            )
-            // Every record has to be in the file, so a count can't ask for more than the file holds.
-            _ = try b.bytes(mo, 32 * mc)
-            _ = try b.bytes(io, 32 * ic)
-            let maps = try (0..<mc).map { i in
+        // dyld_cache_header: the magic, then mappingOffset, mappingCount, imagesOffset, imagesCount at 0x10; each
+        // mapping is address, size, fileOffset (u64s) and two protections, each image address, modTime, inode (u64s),
+        // the path's file offset and a pad. Every record has to be in the file.
+        let (maps, imgs) = try parsing(data, "dyld_v1 shared cache") { s in
+            func table<T>(_ at: Int, _ body: (inout ParserSpan) throws -> T) throws -> [T] {
+                var h = try s.seeking(toAbsoluteOffset: at)
+                var t = try s.seeking(toAbsoluteOffset: try UInt32(parsingLittleEndian: &h))
+                return try [T](parsing: &t, count: Int(try UInt32(parsingLittleEndian: &h))) { r in
+                    var record = try r.sliceSpan(byteCount: 32)
+                    return try body(&record)
+                }
+            }
+            let maps = try table(0x10) { r in
                 Mapping(
-                    address: try b.u64le(mo + 32 * i),
-                    size: try b.u64le(mo + 32 * i + 8),
-                    fileOffset: try b.u64le(mo + 32 * i + 16)
+                    address: try UInt64(parsingLittleEndian: &r),
+                    size: try UInt64(parsingLittleEndian: &r),
+                    fileOffset: try UInt64(parsingLittleEndian: &r)
                 )
             }
-            return (maps, try (0..<ic).map { i in (try b.u64le(io + 32 * i), Int(try b.u32le(io + 32 * i + 24))) })
+            let imgs = try table(0x18) { r in
+                let address = try UInt64(parsingLittleEndian: &r)
+                try r.seek(toRelativeOffset: 16)
+                return (address, try s.latin1(at: Int(try UInt32(parsingLittleEndian: &r))))
+            }
+            return (maps, imgs)
         }
         mappings = maps
-        images = try data.withUnsafeBytes { b in
-            try imgs.map { va, p in
-                Image(path: try b.latin1(p), address: va, headerOffset: Self.offset(of: va, in: maps) ?? -1)
-            }
-        }
+        images = imgs.map { Image(path: $1, address: $0, headerOffset: Self.offset(of: $0, in: maps) ?? -1) }
     }
 
     /// The file offset of `address` in `maps`; nil outside them (or past what an Int holds).
@@ -82,38 +74,71 @@ public struct DyldSharedCache: @unchecked Sendable {
 
     public func image(_ path: String) -> Image? { images.first { $0.path == path } }
 
-    /// Walks an image's load commands: (cmd, offset of the command) for each.
-    func loadCommands(_ img: Image, _ body: (UInt32, Int, UnsafeRawBufferPointer) throws -> Void) throws {
-        try data.withUnsafeBytes { b in
-            let h = img.headerOffset
-            guard h >= 0, try b.u32le(h) == 0xFEED_FACE else { return }
-            var off = h + 28
-            let ncmds = try b.u32le(h + 16)
+    /// Walks an image's load commands (its mach_header: magic, cputype, cpusubtype, filetype, ncmds, …): `body` gets
+    /// each command's cmd and the command (cmd, cmdsize, its body: at least 8 bytes, all in the cache), positioned at
+    /// its start, offsets the cache file's. A command can't be shorter than its header, so the walk always moves on.
+    func loadCommands(_ img: Image, _ body: (UInt32, inout ParserSpan) throws -> Void) throws {
+        let h = img.headerOffset
+        guard h >= 0 else { return }
+        try parsing(data, "\(img.path): load commands") { s in
+            try s.seek(toAbsoluteOffset: h)
+            guard try UInt32(parsingLittleEndian: &s) == 0xFEED_FACE else { return }
+            try s.seek(toRelativeOffset: 12)
+            let ncmds = try UInt32(parsingLittleEndian: &s)
+            try s.seek(toRelativeOffset: 8)
             for _ in 0..<ncmds {
-                try body(try b.u32le(off), off, b)
-                off += Int(try b.u32le(off + 4))
+                var head = try s.seeking(toRelativeOffset: 0)
+                let cmd = try UInt32(parsingLittleEndian: &head)
+                let size = try UInt32(parsingLittleEndian: &head)
+                guard size >= 8 else {
+                    throw FirmwareError(.unsupported, "\(img.path): load command \(cmd) of \(size) bytes")
+                }
+                var command = try s.sliceSpan(byteCount: size)
+                try body(cmd, &command)
+            }
+        }
+    }
+
+    /// LC_SYMTAB's symoff, nsyms and stroff (after cmd and cmdsize).
+    func symbolTable(_ img: Image) throws -> (symoff: UInt32, nsyms: UInt32, stroff: UInt32)? {
+        var tab: (UInt32, UInt32, UInt32)?
+        try loadCommands(img) { cmd, c in
+            guard cmd == 2 else { return }
+            try c.seek(toRelativeOffset: 8)
+            tab = (
+                try UInt32(parsingLittleEndian: &c), try UInt32(parsingLittleEndian: &c),
+                try UInt32(parsingLittleEndian: &c)
+            )
+        }
+        return tab
+    }
+
+    /// Each nlist of the image's symbol table: its name's string offset, type, sect, desc and value; `body` returns
+    /// false to stop. The table must be in the cache; a name past it is an error when read.
+    func forEachNlist(
+        _ img: Image,
+        _ body: (_ name: UInt32, _ type: UInt8, _ desc: UInt16, _ value: UInt32, _ strings: borrowing ParserSpan) throws
+            -> Bool
+    ) throws {
+        guard let (symoff, nsyms, stroff) = try symbolTable(img) else { return }
+        try parsing(data, "\(img.path): symbol table") { s in
+            let strings = try s.seeking(toAbsoluteOffset: stroff)
+            var t = try s.seeking(toAbsoluteOffset: symoff)
+            for _ in 0..<nsyms {
+                var e = try t.sliceSpan(byteCount: 12)
+                let name = try UInt32(parsingLittleEndian: &e)
+                let type = try UInt8(parsing: &e)
+                try e.seek(toRelativeOffset: 1)
+                let desc = try UInt16(parsingLittleEndian: &e)
+                if try !body(name, type, desc, try UInt32(parsingLittleEndian: &e), strings) { return }
             }
         }
     }
 
     /// The image's LC_SYMTAB entries in table order; `body` returns false to stop.
     public func forEachSymbol(in img: Image, _ body: (Symbol) throws -> Bool) throws {
-        var tab: (Int, Int, Int)?
-        try loadCommands(img) { cmd, off, b in
-            if cmd == 2 { tab = (Int(try b.u32le(off + 8)), Int(try b.u32le(off + 12)), Int(try b.u32le(off + 16))) }
-        }
-        guard let (symoff, nsyms, stroff) = tab else { return }
-        try data.withUnsafeBytes { b in
-            for s in 0..<nsyms {
-                let e = symoff + 12 * s
-                let sym = Symbol(
-                    name: try b.latin1(stroff + Int(try b.u32le(e))),
-                    type: try b.byte(e + 4),
-                    desc: try b.u16le(e + 6),
-                    value: try b.u32le(e + 8)
-                )
-                if try !body(sym) { return }
-            }
+        try forEachNlist(img) { name, type, desc, value, strings in
+            try body(Symbol(name: try strings.latin1(at: Int(name)), type: type, desc: desc, value: value))
         }
     }
 
@@ -129,14 +154,25 @@ public struct DyldSharedCache: @unchecked Sendable {
     /// The C strings of one of the image's sections (e.g. "__cstring"), as image_strings(section=) gives them.
     public func cStrings(in img: Image, section: String) throws -> [String] {
         var out: [String] = []
-        try loadCommands(img) { cmd, off, b in
+        try loadCommands(img) { cmd, c in
             guard cmd == 1 else { return }
-            for k in 0..<Int(try b.u32le(off + 48)) {
-                let so = off + 56 + 68 * k
-                guard String(decoding: try b.cBytes(so).prefix(16), as: UTF8.self) == section,
-                    let start = fileOffset(of: UInt64(try b.u32le(so + 32)))
-                else { continue }
-                let bytes = try b.bytes(start, Int(try b.u32le(so + 36)))
+            // LC_SEGMENT: cmd, cmdsize, segname, four addresses and sizes, two protections, nsects at 48, flags; then
+            // its 68-byte sections (sectname, segname, addr, size, …) within the command
+            try c.seek(toRelativeOffset: 48)
+            let nsects = try UInt32(parsingLittleEndian: &c)
+            try c.seek(toRelativeOffset: 4)
+            for _ in 0..<nsects {
+                var sect = try c.sliceSpan(byteCount: 68)
+                let name = try [UInt8](parsing: &sect, byteCount: 16).prefix { $0 != 0 }
+                try sect.seek(toRelativeOffset: 16)
+                let addr = try UInt32(parsingLittleEndian: &sect)
+                let size = try UInt32(parsingLittleEndian: &sect)
+                guard String(decoding: name, as: UTF8.self) == section, let start = fileOffset(of: UInt64(addr)) else {
+                    continue
+                }
+                let bytes = try parsing(data, "\(img.path): \(section)") { s in
+                    try s.bytes(at: start, Int(size))
+                }
                 out += bytes.split(separator: 0).map { String($0.map { Character(Unicode.Scalar($0)) }) }
             }
         }
@@ -152,23 +188,12 @@ public struct DyldSharedCache: @unchecked Sendable {
                 throw FirmwareError(.internal, "VA \(hex(img.address)) not in any mapping")
             }
             var hit: (UInt64, Bool)?
-            var tab: (Int, Int, Int)?
-            try loadCommands(img) { cmd, off, b in
-                if cmd == 2 {
-                    tab = (Int(try b.u32le(off + 8)), Int(try b.u32le(off + 12)), Int(try b.u32le(off + 16)))
+            try forEachNlist(img) { name, type, desc, value, strings in
+                guard value != 0, type & 0x0e == 0x0e, try strings.cBytes(at: Int(name)).elementsEqual(want) else {
+                    return true
                 }
-            }
-            guard let (symoff, nsyms, stroff) = tab else { continue }
-            try data.withUnsafeBytes { b in
-                for s in 0..<nsyms {
-                    let e = symoff + 12 * s
-                    let value = try b.u32le(e + 8)
-                    guard value != 0, try b.byte(e + 4) & 0x0e == 0x0e else { continue }
-                    if try b.cBytes(stroff + Int(try b.u32le(e))).elementsEqual(want) {
-                        hit = (UInt64(value), try b.u16le(e + 6) & 0x0008 != 0)  // N_ARM_THUMB_DEF
-                        return
-                    }
-                }
+                hit = (UInt64(value), desc & 0x0008 != 0)  // N_ARM_THUMB_DEF
+                return false
             }
             if let (a, t) = hit { return (a, t) }
         }
@@ -205,7 +230,7 @@ public enum AppSyncCachePatch {
         guard let foff = cache.fileOffset(of: va) else {
             throw FirmwareError(.internal, "VA \(hex(va)) not in any mapping")
         }
-        let cur = try cache.data.withUnsafeBytes { [UInt8](try $0.bytes(foff, 4)) }
+        let cur = try parsing(cache.data, "\(target) prologue") { s in try s.bytes(at: foff, 4) }
         guard cur == patch || (thumb && looksLikeThumbEntry(cur)) else {
             let curHex = cur.hexString
             throw FirmwareError(

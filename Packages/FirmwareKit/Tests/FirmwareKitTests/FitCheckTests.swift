@@ -153,8 +153,8 @@ enum FitFixture {
         let b: [UInt8] =
             [0xEE] + [0x00, 0x02] + Array("_A".utf8) + [0, 10] + Array("_B".utf8) + [0, 15]
             + [0x03, 0x08, 0x02, 0x00, 0x00] + [0x02, 0x00, 0x04, 0x00]
-        #expect(b.withUnsafeBytes { MachO32.trieReexports($0, at: 1, size: b.count - 1) } == ["_A"])
-        #expect(b.withUnsafeBytes { MachO32.trieReexports($0, at: 1, size: 3) } == [])  // truncated: nothing, no crash
+        #expect(MachO32.trieReexports(b, at: 1, size: b.count - 1) == ["_A"])
+        #expect(MachO32.trieReexports(b, at: 1, size: 3) == [])  // truncated: nothing, no crash
     }
 
     /// FitCheck.loads on real firmware: the iPod agent and the loader (both legacy-linked, guest serial 13 on) fit

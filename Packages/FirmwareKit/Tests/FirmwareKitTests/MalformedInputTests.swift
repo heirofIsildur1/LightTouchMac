@@ -41,6 +41,47 @@ struct MalformedInputTests {
         }
     }
 
+    // MARK: dyld shared cache
+
+    /// A dyld_v1 cache of one image, /usr/lib/libtest.dylib, mapped at 0x30000000: its Mach-O at 0x100 holds
+    /// `commands` (by default an LC_SEGMENT with a 12-byte __cstring at 0x400 and an LC_SYMTAB of
+    /// _MISValidateSignature, a Thumb function at 0x410, and _x).
+    static func sharedCache(ncmds: UInt32 = 2, commands: [UInt8]? = nil) -> [UInt8] {
+        var c = [UInt8](repeating: 0, count: 0x1000)
+        func at(_ o: Int, _ bytes: [UInt8]) { c.replaceSubrange(o..<o + bytes.count, with: bytes) }
+        func w(_ v: [UInt32]) -> [UInt8] { [UInt8](le(v)) }
+        at(0, Array("dyld_v1   armv7\0".utf8))
+        at(0x10, w([0x40, 1, 0x60, 1]))
+        at(0x40, w([0x3000_0000, 0, 0x1000, 0, 0, 0, 5, 5]))
+        at(0x60, w([0x3000_0100, 0, 0, 0, 0, 0, 0x80, 0]))
+        at(0x80, Array("/usr/lib/libtest.dylib\0".utf8))
+        let segment =
+            w([1, 56 + 68]) + Array("__TEXT".utf8) + [UInt8](repeating: 0, count: 10)
+            + w([0x3000_0000, 0x1000, 0, 0x1000, 5, 5, 1, 0]) + Array("__cstring".utf8)
+            + [UInt8](repeating: 0, count: 7) + Array("__TEXT".utf8) + [UInt8](repeating: 0, count: 10)
+            + w([0x3000_0400, 12, 0x400, 0, 0, 0, 0, 0, 0])
+        let cmds = commands ?? segment + w([2, 24, 0x500, 2, 0x600, 0x40])
+        at(0x100, w([0xFEED_FACE, 12, 9, 6, ncmds, UInt32(cmds.count), 0]) + cmds)
+        at(0x400, Array("hello\0world\0".utf8) + [0, 0, 0, 0, 0x80, 0xB5, 0x00, 0xAF])
+        at(0x500, w([1, 0x0008_010F, 0x3000_0410, 23, 0x01, 0]))  // nlists: strx, type/sect/desc, value
+        at(0x600, Array("\0_MISValidateSignature\0_x\0".utf8))
+        return c
+    }
+
+    /// An image whose load command claims no size: the walk visited the same command once per ncmds (50 million
+    /// times here) and took the image as read.
+    @Test func aCacheImagesZeroSizedLoadCommandIsRefused() throws {
+        let clean = try DyldSharedCache(data: Data(Self.sharedCache()))
+        let img = try #require(clean.image("/usr/lib/libtest.dylib"))
+        #expect(try clean.cStrings(in: img, section: "__cstring") == ["hello", "world"])
+        #expect(try clean.symbolNames(in: img) == ["_MISValidateSignature", "_x"])
+        #expect(try AppSyncCachePatch.locate(clean).offset == 0x410)
+        let looping = try DyldSharedCache(
+            data: Data(Self.sharedCache(ncmds: 50_000_000, commands: [1, 0, 0, 0, 0, 0, 0, 0])))
+        let image = try #require(looping.image("/usr/lib/libtest.dylib"))
+        #expect(throws: FirmwareError.self) { try looping.cStrings(in: image, section: "__cstring") }
+    }
+
     // MARK: Mach-O (kernelcaches)
 
     static let le = DeviceTree.Value.le

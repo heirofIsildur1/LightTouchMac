@@ -58,8 +58,9 @@ struct InputBoundsTests {
             #expect(throws: FirmwareError.self) { try b.u16le(-1) }
             #expect(throws: FirmwareError.self) { try b.u64le(0) }
             #expect(throws: FirmwareError.self) { try b.bytes(4, Int.max) }
-            #expect(throws: FirmwareError.self) { try b.cBytes(7) }
         }
+        #expect(try parsing(bytes, "t") { s in try s.cBytes(at: 4) } == [5, 6])
+        #expect(throws: FirmwareError.self) { try parsing(bytes, "t") { s in try s.cBytes(at: 7) } }
     }
 
     /// A 32-bit Mach-O whose load commands claim more than the file holds.

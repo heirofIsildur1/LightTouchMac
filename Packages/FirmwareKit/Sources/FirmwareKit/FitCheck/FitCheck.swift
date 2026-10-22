@@ -162,10 +162,8 @@ public enum FitCheck {
             if let cache, let img = cache.image(install) ?? cache.image("/" + followed) {
                 // An image whose load commands don't read links nothing.
                 do {
-                    try cache.loadCommands(img) { cmd, off, b in
-                        if MachO32.linkCommands.contains(cmd) {
-                            out.append(try b.latin1(off + Int(try b.u32le(off + 8))))
-                        }
+                    try cache.loadCommands(img) { cmd, c in
+                        if MachO32.linkCommands.contains(cmd) { out.append(try MachO32.dylibName(c)) }
                     }
                 } catch { out = [] }
             } else if onDisk, let d = data(followed), let m = MachO32.slice(d, arch: arch)?.image {
@@ -222,21 +220,15 @@ public enum FitCheck {
                         if MachO32.isExport(s.type) { out.insert(s.name) }
                         return true
                     }
-                    try cache.loadCommands(img) { cmd, off, b in
-                        if cmd == MachO32.lcReexportDylib {
-                            reexports.append(try b.latin1(off + Int(try b.u32le(off + 8))))
-                        }
+                    var tries: [(at: Int, size: Int)] = []
+                    try cache.loadCommands(img) { cmd, c in
+                        if cmd == MachO32.lcReexportDylib { reexports.append(try MachO32.dylibName(c)) }
                         // a cache image's export trie offset is a cache file offset
                         if cmd == MachO32.lcDyldInfo || cmd == MachO32.lcDyldInfoOnly {
-                            out.formUnion(
-                                MachO32.trieReexports(
-                                    b,
-                                    at: Int(try b.u32le(off + 40)),
-                                    size: Int(try b.u32le(off + 44))
-                                )
-                            )
+                            tries.append((Int(try c.le32(at: 40)), Int(try c.le32(at: 44))))
                         }
                     }
+                    for t in tries { out.formUnion(MachO32.trieReexports(cache.data, at: t.at, size: t.size)) }
                 } catch { return nil }
                 for r in reexports { out.formUnion(exports(r) ?? []) }
                 return out
@@ -247,7 +239,7 @@ public enum FitCheck {
             if let info = m.commands.first(where: { $0.cmd == MachO32.lcDyldInfo || $0.cmd == MachO32.lcDyldInfoOnly }),
                 let at = try? m.u32(info.off + 40), let size = try? m.u32(info.off + 44)
             {
-                m.b.withUnsafeBytes { b in out.formUnion(MachO32.trieReexports(b, at: Int(at), size: Int(size))) }
+                out.formUnion(MachO32.trieReexports(m.b, at: Int(at), size: Int(size)))
             }
             return out
         }
@@ -354,45 +346,51 @@ struct MachO32 {
     /// The names an export trie re-exports one by one (EXPORT_SYMBOL_FLAGS_REEXPORT). iOS 6 moved NSObject to libobjc
     /// and left CoreFoundation re-exporting _OBJC_CLASS_$_NSObject this way, with no nlist entry, so images that
     /// bind NSObject to CoreFoundation (built against an older SDK) still load.
-    static func trieReexports(_ b: UnsafeRawBufferPointer, at start: Int, size: Int) -> [String] {
-        guard start > 0, size > 0, start + size <= b.count else { return [] }
-        let end = start + size
-        func uleb(_ p: inout Int) -> Int? {
+    static func trieReexports(_ bytes: some ParserSpanProvider, at start: Int, size: Int) -> [String] {
+        guard start > 0, size > 0 else { return [] }
+        /// A ULEB128 of at most 63 bits; nil cut short or longer.
+        func uleb(_ p: inout ParserSpan) -> Int? {
             var r = 0
             var shift = 0
-            while p < end, shift < 63 {
-                let x = b[p]
-                p += 1
+            while shift < 63, let x = try? UInt8(parsing: &p) {
                 r |= Int(x & 0x7F) << shift
                 shift += 7
                 if x < 0x80 { return r }
             }
             return nil
         }
-        var out: [String] = []
-        var stack: [(Int, [UInt8])] = [(0, [])]
-        var seen = Set<Int>()
-        while let (node, prefix) = stack.popLast() {
-            guard seen.insert(node).inserted else { continue }  // a malformed trie cannot loop
-            var p = start + node
-            guard p < end, let info = uleb(&p) else { continue }
-            if info > 0 {
-                var q = p
-                if let flags = uleb(&q), flags & 0x8 != 0 { out.append(String(decoding: prefix, as: UTF8.self)) }
+        // A node: its terminal info's size (ULEB) and the info (flags first), a child count (a byte), each child's
+        // NUL-terminated label and node offset (ULEB); offsets are the trie's own, and all of it is in the trie.
+        let found = try? parsing(bytes, "export trie") { whole -> [String] in
+            try whole.seek(toAbsoluteOffset: start)
+            let trie = try whole.sliceSpan(byteCount: size)
+            var out: [String] = []
+            var stack: [(Int, [UInt8])] = [(0, [])]
+            var seen = Set<Int>()
+            while let (node, prefix) = stack.popLast() {
+                guard seen.insert(node).inserted else { continue }  // a malformed trie cannot loop
+                guard var p = try? trie.seeking(toRelativeOffset: node), let info = uleb(&p) else { continue }
+                if info > 0, var q = try? p.seeking(toRelativeOffset: 0), let flags = uleb(&q), flags & 0x8 != 0 {
+                    out.append(String(decoding: prefix, as: UTF8.self))
+                }
+                guard (try? p.seek(toRelativeOffset: info)) != nil, let children = try? UInt8(parsing: &p) else {
+                    continue
+                }
+                for _ in 0..<children {
+                    guard let label = p.withUnsafeBytes({ b in b.firstIndex(of: 0).map { Array(b[..<$0]) } }),
+                        (try? p.seek(toRelativeOffset: label.count + 1)) != nil, let child = uleb(&p)
+                    else { break }
+                    stack.append((child, prefix + label))
+                }
             }
-            p += info
-            guard p < end else { continue }
-            let children = Int(b[p])
-            p += 1
-            for _ in 0..<children {
-                guard let nul = b[p..<end].firstIndex(of: 0) else { break }
-                let label = Array(b[p..<nul])
-                p = nul + 1
-                guard let child = uleb(&p) else { break }
-                stack.append((child, prefix + label))
-            }
+            return out
         }
-        return out
+        return found ?? []
+    }
+
+    /// A dylib command's name (lc_str: its offset from the command's start, at 8), within the command.
+    static func dylibName(_ command: borrowing ParserSpan) throws -> String {
+        try command.latin1(at: Int(try command.le32(at: 8)))
     }
 
     let b: [UInt8]
@@ -435,19 +433,29 @@ struct MachO32 {
     static func slice(_ d: Data, arch: String) -> (image: MachO32, arch: String)? {
         let b = [UInt8](d)
         let want = FitCheck.subtype[arch] ?? -1
-        var slices: [(Int32, [UInt8])] = []
-        if b.count >= 8, be32(b, 0) == 0xCAFE_BABE {
-            for i in 0..<Int(be32(b, 4)) {
-                let o = 8 + 20 * i
-                guard o + 20 <= b.count, be32(b, o) == 12 else { continue }
-                let off = Int(be32(b, o + 8))
-                let size = Int(be32(b, o + 12))
-                guard off + size <= b.count else { continue }
-                slices.append((Int32(bitPattern: be32(b, o + 4)), Array(b[off..<off + size])))
-            }
-        } else if b.count >= 12, le32(b, 4) == 12 {
-            slices.append((Int32(bitPattern: le32(b, 8)), b))
-        }
+        // fat_header: magic, nfat_arch (big-endian); then each fat_arch: cputype, cpusubtype, offset, size, align. An
+        // arch record past the file ends the list; an ARM slice past the file is left out. A thin image: its magic,
+        // cputype (ARM) and cpusubtype, little-endian.
+        let slices =
+            (try? parsing(b, "Mach-O") { s -> [(Int32, [UInt8])] in
+                if try UInt32(parsingBigEndian: &s) == 0xCAFE_BABE {
+                    var out: [(Int32, [UInt8])] = []
+                    for _ in 0..<(try UInt32(parsingBigEndian: &s)) {
+                        guard var a = try? s.sliceSpan(byteCount: 20) else { break }
+                        let cpu = try UInt32(parsingBigEndian: &a)
+                        let sub = try UInt32(parsingBigEndian: &a)
+                        let offset = try Int(parsing: &a, storedAsBigEndian: UInt32.self)
+                        let size = try Int(parsing: &a, storedAsBigEndian: UInt32.self)
+                        guard cpu == 12, var file = try? s.seeking(toAbsoluteOffset: offset),
+                            let slice = try? [UInt8](parsing: &file, byteCount: size)
+                        else { continue }
+                        out.append((Int32(bitPattern: sub), slice))
+                    }
+                    return out
+                }
+                guard try s.le32(at: 0) == 12 else { return [] }
+                return [(Int32(bitPattern: try s.le32(at: 4)), b)]
+            }) ?? []
         let runnable = arch == "armv7" ? [want, 6, 0] : [want, 0]
         for s in runnable {
             if let hit = slices.first(where: { $0.0 == s }), let m = MachO32(hit.1) {
@@ -467,11 +475,13 @@ struct MachO32 {
         type & 0xE0 == 0 && type & 0x01 != 0 && (type & 0x0E == 0 || type & 0x0E == 0x0C)
     }
 
+    /// The string a command at `off` names (an lc_str at 8: its offset from the command); "" past the image.
     func name(_ off: Int) -> String {
-        guard let name = try? u32(off + 8), off + Int(name) < b.count else { return "" }
-        let start = off + Int(name)
-        let end = b[start...].firstIndex(of: 0) ?? b.count
-        return String(decoding: b[start..<end], as: UTF8.self)
+        let bytes = try? parsing(b, "Mach-O") { s in
+            try s.seek(toRelativeOffset: off)
+            return try s.cBytes(at: Int(try s.le32(at: 8)))
+        }
+        return String(decoding: bytes ?? [], as: UTF8.self)
     }
 
     /// Linked images in ordinal order.
@@ -502,17 +512,24 @@ struct MachO32 {
         guard let st = commands.first(where: { $0.cmd == 2 }),
             let (symoff, nsyms, stroff) = try? (Int(u32(st.off + 8)), Int(u32(st.off + 12)), Int(u32(st.off + 16)))
         else { return [] }
-        var out: [(String, UInt8, UInt16)] = []
-        for i in 0..<nsyms {
-            let e = symoff + 12 * i
-            guard e + 12 <= b.count else { break }
-            let s = stroff + Int(le32(b, e))
-            guard s < b.count else { continue }
-            let end = b[s...].firstIndex(of: 0) ?? b.count
-            out.append(
-                (String(decoding: b[s..<end], as: UTF8.self), b[e + 4], UInt16(b[e + 6]) | UInt16(b[e + 7]) << 8)
-            )
+        // each nlist: the name's offset in the string table, type, sect, desc, value; the table ends at the image's
+        // end, and a name past the image is left out
+        let out = try? parsing(b, "Mach-O symbols") { s -> [(name: String, type: UInt8, desc: UInt16)] in
+            var out: [(name: String, type: UInt8, desc: UInt16)] = []
+            guard var t = try? s.seeking(toAbsoluteOffset: symoff) else { return out }
+            for _ in 0..<nsyms {
+                guard var e = try? t.sliceSpan(byteCount: 12) else { break }
+                let name = try UInt32(parsingLittleEndian: &e)
+                let type = try UInt8(parsing: &e)
+                try e.seek(toRelativeOffset: 1)
+                let desc = try UInt16(parsingLittleEndian: &e)
+                guard let strings = try? s.seeking(toAbsoluteOffset: stroff),
+                    let text = try? strings.cBytes(at: Int(name)), stroff + Int(name) < b.count
+                else { continue }
+                out.append((String(decoding: text, as: UTF8.self), type, desc))
+            }
+            return out
         }
-        return out
+        return out ?? []
     }
 }

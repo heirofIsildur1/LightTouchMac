@@ -273,6 +273,24 @@ import Testing
         }
     }
 
+    /// MalformedInputTests' one-image shared cache, its header, tables, Mach-O and nlists flipped and the whole cut,
+    /// through the cache's image list, sections, symbols and the AppSync patch's locate, and FitCheck's export trie
+    /// over it.
+    @Test func sharedCachesThrowOnCorruption() {
+        let clean = MalformedInputTests.sharedCache()
+        let regions = [0..<0x20, 0x40..<0x80, 0x100..<0x1B0, 0x500..<0x518]
+        let flipped = regions.enumerated().flatMap { Self.flipped(clean, in: $1, count: 600, seed: 20 + UInt64($0)) }
+        for b in flipped + Self.cut(clean, 128) {
+            guard let cache = try? DyldSharedCache(data: Data(b)) else { continue }
+            for img in cache.images {
+                _ = try? cache.cStrings(in: img, section: "__cstring")
+                _ = try? cache.symbolNames(in: img)
+            }
+            _ = try? AppSyncCachePatch.locate(cache)
+            _ = MachO32.trieReexports(b, at: 0x400, size: 0x20)
+        }
+    }
+
     /// KBootTests' kernelcache, its header and load commands flipped and the whole cut, through MachO (segments,
     /// entry, the boot_args version scan), the keybag one-shot's entry and the sandbox patch's locate.
     @Test func kernelcachesThrowOnCorruption() {

@@ -103,6 +103,15 @@ extension ParserSpan {
         var s = try seeking(toRelativeOffset: o)
         return try [UInt8](parsing: &s, byteCount: n)
     }
+    /// The NUL-terminated string's bytes `o` bytes in: up to the NUL, or to the span's end when there is none.
+    func cBytes(at o: Int) throws(ParsingError) -> [UInt8] {
+        let s = try seeking(toRelativeOffset: o)
+        return s.withUnsafeBytes { Array($0.prefix { $0 != 0 }) }
+    }
+    /// The NUL-terminated string `o` bytes in, as Latin-1.
+    func latin1(at o: Int) throws(ParsingError) -> String {
+        String(try cBytes(at: o).map { Character(Unicode.Scalar($0)) })
+    }
 }
 
 /// `body` over `bytes`, a ParsingError (input cut short or out of range) as FirmwareError's unsupported, naming
