@@ -67,11 +67,12 @@ import HostRuntime
                 self?.checkBoard(info)
                 return configure(info)
             },
-            preparation: preparation
-        ) { result in
-            if case .failure(let error) = result { logEvent("device helper: didn’t start: \(error)") }
-            completion(result)
-        }
+            preparation: preparation,
+            completion: { result in
+                if case .failure(let error) = result { logEvent("device helper: didn’t start: \(error)") }
+                completion(result)
+            }
+        )
     }
 
     public func terminate() { process.terminate() }

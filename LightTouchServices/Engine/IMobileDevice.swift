@@ -70,10 +70,9 @@ nonisolated enum IMobileDevice {
             "com.apple.mobile.installation_proxy",
             device: device,
             newClient: { instproxy_client_new($0, $1, $2) },
-            freeClient: { instproxy_client_free($0) }
-        ) {
-            DeviceError.instproxy(.init(code: $0), phase: "connect")
-        }
+            freeClient: { instproxy_client_free($0) },
+            connectError: { DeviceError.instproxy(.init(code: $0), phase: "connect") }
+        )
     }
 
     // MARK: - plist ↔ Foundation (via the XML both sides speak)

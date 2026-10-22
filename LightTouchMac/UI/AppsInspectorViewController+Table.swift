@@ -143,7 +143,7 @@ extension AppsInspectorViewController: NSTableViewDataSource, NSTableViewDelegat
     ) -> Bool {
         let ipas = Self.droppedIPAs(info)
         if !ipas.isEmpty, info.draggingSource as? NSTableView !== tableView {
-            ipas.forEach { AppInstaller.start($0, with: emulator, presenting: view.window) }
+            for ipa in ipas { AppInstaller.start(ipa, with: emulator, presenting: view.window) }
             return true
         }
         guard let id = info.draggingPasteboard.string(forType: .string) else { return false }

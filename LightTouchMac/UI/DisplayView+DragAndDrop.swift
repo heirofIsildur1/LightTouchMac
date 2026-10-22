@@ -60,8 +60,8 @@ extension DisplayView {
         let ipas = dropped(sender, .ipa)
         let media = dropped(sender, .media)
         guard !ipas.isEmpty || !media.isEmpty else { return false }
-        ipas.forEach { onDropIPA?($0) }  // AppInstaller queues them
-        media.forEach { onDropMedia?($0) }
+        for ipa in ipas { onDropIPA?(ipa) }  // AppInstaller queues them
+        for file in media { onDropMedia?(file) }
         return true
     }
 

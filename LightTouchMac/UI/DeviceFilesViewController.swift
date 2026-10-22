@@ -190,7 +190,7 @@ final class DeviceFilesViewController: NSViewController, NSBrowserDelegate, NSMe
 
     func stop() {
         revision += 1
-        tasks.forEach { $0.cancel() }
+        for task in tasks { task.cancel() }
         tasks.removeAll()
         transfer?.cancel()
         transfer = nil

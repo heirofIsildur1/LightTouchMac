@@ -146,15 +146,18 @@ default:  // the root alone, or help
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
     } catch { await fail(error) }
     let selectedOptions = options
-    await supervised(cleanup: { try await Preparer.cancel(staging: staging) }) {
-        do {
-            try await Preparer.create(selectedOptions, emit: emit)
-            return 0
-        } catch {
-            if Task.isCancelled { return 143 }
-            FirmwareDiagnostics.write(Data("firmwarekit: \(error)\n".utf8))
-            emit(Preparer.errorEvent(error))
-            return 1
+    await supervised(
+        cleanup: { try await Preparer.cancel(staging: staging) },
+        {
+            do {
+                try await Preparer.create(selectedOptions, emit: emit)
+                return 0
+            } catch {
+                if Task.isCancelled { return 143 }
+                FirmwareDiagnostics.write(Data("firmwarekit: \(error)\n".utf8))
+                emit(Preparer.errorEvent(error))
+                return 1
+            }
         }
-    }
+    )
 }

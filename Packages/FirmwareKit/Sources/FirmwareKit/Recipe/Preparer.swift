@@ -269,7 +269,7 @@ public enum Preparer {
         for (child, parent) in inherit { posix_spawn_file_actions_adddup2(&actions, parent, child) }
         posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
         let argv = ([executable.path] + arguments).map { strdup($0) } + [nil]
-        defer { argv.forEach { free($0) } }
+        defer { for arg in argv { free(arg) } }
         var pid: pid_t = 0
         let rc = posix_spawn(&pid, executable.path, &actions, &attributes, argv, environ)
         guard rc == 0 else {

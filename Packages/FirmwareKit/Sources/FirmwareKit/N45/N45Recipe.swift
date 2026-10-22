@@ -249,7 +249,8 @@ final class N45Board: Board {
             let body = try Apple8900.body(ipsw.read(n))
             images[try IMG2.Header(body).type] = body
         }
-        try N45NOR.build(identity: ident.filled("the identity"), images: images).write(to: c.file("nor.bin"))  // host file
+        let nor = try N45NOR.build(identity: ident.filled("the identity"), images: images)
+        try nor.write(to: c.file("nor.bin"))  // host file
         try iboot.write(to: c.file("iBoot.bin"))  // host file
         derived = [
             "kernelcache_path": kcPath, "kernelcache_member": kcMember, "nor_images": N45NOR.order,

@@ -31,7 +31,8 @@ public enum Preferences1x {
             defer { withExtendedLifetime(owner) {} }
             return owner.paths?.overlay.appendingPathComponent(stamp)
         }
-        if let url = try stampURL(), (try? String(contentsOf: url, encoding: .utf8)) == digest { return false }  // host file
+        let stamped = try stampURL().flatMap { try? String(contentsOf: $0, encoding: .utf8) }  // host file
+        if stamped == digest { return false }
         let session = try await StoppedVolumeEdit.begin(device: device, policy: policy, log: log)
         do {
             let point = session.image.deletingLastPathComponent().appendingPathComponent("preferences-mount")

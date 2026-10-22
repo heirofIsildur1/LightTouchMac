@@ -30,9 +30,8 @@ extension SharedState {
             let a = FakeDevice("a")
             let b = FakeDevice("b")
             let c = FakeDevice("c")
-            try await withInstallerState(named: ["test.fixture"], devices: { [a.instance, b.instance, c.instance] }) {
-                state,
-                _ in
+            let devices: () -> [DeviceInstance] = { [a.instance, b.instance, c.instance] }
+            try await withInstallerState(named: ["test.fixture"], devices: devices) { state, _ in
                 let fm = FileManager.default
                 let work = state.appendingPathComponent("scratch", isDirectory: true)
                 try fm.createDirectory(at: work, withIntermediateDirectories: true)

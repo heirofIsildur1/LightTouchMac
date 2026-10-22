@@ -617,7 +617,8 @@ public enum SystemEdits {
             throw FirmwareError(.internal, "\(src.path) missing")
         }
         let bin = try Data(contentsOf: src)  // host file
-        let names = (try? String(contentsOf: helpers.appendingPathComponent(Helpers.glesNames), encoding: .utf8)) ?? ""  // host file
+        let namesURL = helpers.appendingPathComponent(Helpers.glesNames)
+        let names = (try? String(contentsOf: namesURL, encoding: .utf8)) ?? ""  // host file
         do {
             try fit.check(FitCheck.glesFrontEnd(fw, binary: bin, names: names), required: true)
         } catch let e as FirmwareError where e.code == .unsupported {
@@ -643,7 +644,8 @@ public enum SystemEdits {
         guard let have = GLIDispatch.fields(in: cache) else {
             return "no __GLIFunctionDispatchRec @encode in the shared cache: the shim will read OpenGLES's trampolines"
         }
-        let names = (try? String(contentsOf: helpers.appendingPathComponent(Helpers.glesNames), encoding: .utf8)) ?? ""  // host file
+        let namesURL = helpers.appendingPathComponent(Helpers.glesNames)
+        let names = (try? String(contentsOf: namesURL, encoding: .utf8)) ?? ""  // host file
         let known = Set(names.matches(of: /(?m)^GLES_FN\(\w+,\s*(\w+),/).map { String($0.1) })
         let unknown = have.filter { !known.contains($0) }
         return "GLI dispatch: \(have.count) slots, \(unknown.count) unknown to the name table"

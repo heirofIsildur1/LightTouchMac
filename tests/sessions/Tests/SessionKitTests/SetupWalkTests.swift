@@ -98,7 +98,7 @@ struct SetupWalkTests {
 
     @Test func theLanguagePageTakesEnglishThenTheArrow() {
         var language = Self.sheetOnLanguage
-        ["Emergency Call", "Start Over", "Cancel"].forEach { language[$0] = nil }
+        for title in ["Emergency Call", "Start Over", "Cancel"] { language[title] = nil }
         let plan = SetupPlan.plan(language, pages: [])
         #expect(plan.count == 3 && plan[0] == .tap(0.15, 0.2, "English"))
         guard case .tap(let x, let y, _) = plan.last else {

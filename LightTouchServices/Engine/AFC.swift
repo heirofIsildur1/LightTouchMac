@@ -36,8 +36,9 @@ extension IMobileDevice {
             "com.apple.mobile.house_arrest",
             device: device,
             newClient: { house_arrest_client_new($0, $1, $2) },
-            freeClient: { house_arrest_client_free($0) }
-        ) { DeviceError.failed("The device's app file service refused the connection (error \($0)).") }
+            freeClient: { house_arrest_client_free($0) },
+            connectError: { DeviceError.failed("The device's app file service refused the connection (error \($0)).") }
+        )
         var handedOff = false
         defer { if !handedOff { _ = house_arrest_client_free(arrest) } }
         let sent = house_arrest_send_command(arrest, "VendContainer", bundleID)

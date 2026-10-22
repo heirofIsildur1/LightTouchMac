@@ -344,7 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             FirmwareJobs.shared.cancelAll()
             CrashGuard.quit()
         }
-        emulators.forEach { $0.stop() }
+        for emulator in emulators { emulator.stop() }
     }
 
     /// On quit: guard an in-flight install, then halt each device

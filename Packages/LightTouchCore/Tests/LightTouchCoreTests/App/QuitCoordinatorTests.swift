@@ -55,7 +55,7 @@ struct QuitCoordinatorTests {
 
     @Test func holdsAndQuestions() {
         let log = Log()
-        let quit = QuitCoordinator(budget: 60, retry: {}) { log.events.append("reply") }
+        let quit = QuitCoordinator(budget: 60, retry: {}, reply: { log.events.append("reply") })
         let halt: (@escaping () -> Void) -> Void = { _ in log.events.append("halt") }
         #expect(request(quit, log, recording: true, running: [halt]) == .cancel && log.events == ["recording"])
         log.events = []
@@ -78,7 +78,7 @@ struct QuitCoordinatorTests {
     /// Confirmed changes are cancelled and then the devices halt like any other quit (their storage is flushed).
     @Test func confirmedChangesStillHalt() async throws {
         let log = Log()
-        let quit = QuitCoordinator(budget: 60, retry: {}) { log.events.append("reply") }
+        let quit = QuitCoordinator(budget: 60, retry: {}, reply: { log.events.append("reply") })
         #expect(
             request(
                 quit,
@@ -99,7 +99,7 @@ struct QuitCoordinatorTests {
 
     @Test func waitsForTheLastDeviceAndRepliesOnce() async throws {
         let log = Log()
-        let quit = QuitCoordinator(budget: 60, retry: {}) { log.events.append("reply") }
+        let quit = QuitCoordinator(budget: 60, retry: {}, reply: { log.events.append("reply") })
         var finish: [() -> Void] = []
         #expect(request(quit, log, running: [{ finish.append($0) }, { finish.append($0) }]) == .later)
         #expect(quit.awaitingTermination && finish.count == 2)
@@ -122,7 +122,7 @@ struct QuitCoordinatorTests {
     /// A halt that completes at once still replies after terminateLater was returned, never inside the request.
     @Test func synchronousCompletionRepliesAfterReturning() async throws {
         let log = Log()
-        let quit = QuitCoordinator(budget: 60, retry: {}) { log.events.append("reply") }
+        let quit = QuitCoordinator(budget: 60, retry: {}, reply: { log.events.append("reply") })
         #expect(request(quit, log, running: [{ $0() }]) == .later)
         #expect(!log.events.contains("reply"))
         try await settle()
@@ -131,7 +131,7 @@ struct QuitCoordinatorTests {
 
     @Test func budgetRepliesWhenAHaltNeverFinishes() async throws {
         let log = Log()
-        let quit = QuitCoordinator(budget: 0.5, retry: {}) { log.events.append("reply") }
+        let quit = QuitCoordinator(budget: 0.5, retry: {}, reply: { log.events.append("reply") })
         var late: (() -> Void)?
         #expect(request(quit, log, running: [{ late = $0 }]) == .later)
         try await settle()
@@ -146,7 +146,7 @@ struct QuitCoordinatorTests {
 
     @Test func terminatingCancelsTheBackstop() async throws {
         let log = Log()
-        let quit = QuitCoordinator(budget: 0.05, retry: {}) { log.events.append("reply") }
+        let quit = QuitCoordinator(budget: 0.05, retry: {}, reply: { log.events.append("reply") })
         #expect(request(quit, log, running: [{ _ in }]) == .later)
         quit.willTerminate()
         try await Task.sleep(for: .milliseconds(200))
@@ -157,9 +157,12 @@ struct QuitCoordinatorTests {
     /// Finish File System Recovery), so quit says what it waits for and, if asked to, quits once it is done.
     @Test func workUnderWayIsWaitedFor() async throws {
         let log = Log()
-        let quit = QuitCoordinator(budget: 60, poll: .milliseconds(10), retry: { log.events.append("quit again") }) {
-            log.events.append("reply")
-        }
+        let quit = QuitCoordinator(
+            budget: 60,
+            poll: .milliseconds(10),
+            retry: { log.events.append("quit again") },
+            reply: { log.events.append("reply") }
+        )
         let halt: (@escaping () -> Void) -> Void = { _ in log.events.append("halt") }
         log.busy = "Saving the file system…"
         #expect(request(quit, log, confirmWait: false, running: [halt]) == .cancel)

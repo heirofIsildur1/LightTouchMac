@@ -299,7 +299,7 @@ final class DeviceLibraryViewController: NSViewController, NSOutlineViewDataSour
     /// Failures stay listed and are reported together once every deletion has ended.
     private func finish(_ batch: Batch) {
         let deletions = batch.delete.compactMap { entry in host.instance(for: entry).map { (entry, host.delete($0)) } }
-        batch.remove.forEach { list.remove($0.id) }
+        for entry in batch.remove { list.remove(entry.id) }
         listDidChange()
         guard !deletions.isEmpty else { return }
         Task {
@@ -628,7 +628,7 @@ final class DeviceLibraryViewController: NSViewController, NSOutlineViewDataSour
         let ipas = Self.files(info, .ipa)
         if !ipas.isEmpty {
             guard let emulator = installTarget(item) else { return false }
-            ipas.forEach { AppInstaller.start($0, with: emulator, presenting: view.window) }
+            for ipa in ipas { AppInstaller.start(ipa, with: emulator, presenting: view.window) }
             return true
         }
         let urls = Self.ipsws(info)

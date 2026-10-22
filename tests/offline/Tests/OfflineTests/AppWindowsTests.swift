@@ -74,10 +74,15 @@ extension SharedState {
                 resources: nil,
                 sweep: false
             ) { _ in }
-            let usage = StorageUsage(catalog: catalog, jobs: jobs, delete: { _ in }) {
-                asked.insert($0.id)
-                return true
-            }
+            let usage = StorageUsage(
+                catalog: catalog,
+                jobs: jobs,
+                delete: { _ in },
+                canDelete: {
+                    asked.insert($0.id)
+                    return true
+                }
+            )
             let settings = SettingsWindowController(general: EmptyView(), capture: EmptyView(), storage: usage)
             settings.pane = .general
             await until { usage.usage.devices.isEmpty }

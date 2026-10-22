@@ -331,7 +331,7 @@ final class DevicePlaceholderViewController: NSViewController {
         let bar = bars[row.entry.id] ?? Self.makeBar()
         bars[row.entry.id] = bar
         if progress !== bar {
-            progressSlot.subviews.forEach { $0.removeFromSuperview() }
+            for subview in progressSlot.subviews { subview.removeFromSuperview() }
             bar.frame = progressSlot.bounds
             bar.autoresizingMask = [.width, .height]
             progressSlot.addSubview(bar)

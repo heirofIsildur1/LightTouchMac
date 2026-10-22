@@ -189,7 +189,7 @@ extension SharedState {
             check(shell.contents != nil && shell.shadowOpacity > 0, "bezel on: no shell art or shadow")
             check(models().count == 1 && DeviceModelView.framesPrepared == 1, "bezel on: the model didn't load")
             check(display.canPerformSpecialTrick, "3D: the special trick isn't offered")
-            models().forEach { $0.isHidden = true }
+            for model in models() { model.isHidden = true }
             shell.isHidden = false
             home.isHidden = false
             // 2D: the shell art, its shadow and the Home button, with no model loaded or kept.

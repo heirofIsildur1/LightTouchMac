@@ -62,7 +62,10 @@ extension MainWindowController {
     /// one-row command does after its question.
     func perform(_ batch: DeviceBatch<FirmwareCatalog.Entry>) {
         guard batch.isEnabled else { return }
-        if batch.action == .start { return batch.targets.forEach { start($0, select: false) } }
+        if batch.action == .start {
+            for entry in batch.targets { start(entry, select: false) }
+            return
+        }
         guard let window, window.attachedSheet == nil else { return }
         batchAlert(batch).beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }

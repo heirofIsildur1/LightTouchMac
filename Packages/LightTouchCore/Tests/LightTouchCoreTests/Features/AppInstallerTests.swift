@@ -166,9 +166,8 @@ extension SharedState {
 
         @Test func removalsQueueBehindInstallsCancelPauseAndKeepSharedIcons() async throws {
             let other = FakeDevice("other")
-            try await withInstallerState(named: ["diner", "broken", "shared"], devices: { [other.instance] }) {
-                state,
-                _ in
+            let devices: () -> [DeviceInstance] = { [other.instance] }
+            try await withInstallerState(named: ["diner", "broken", "shared"], devices: devices) { state, _ in
                 let device = FakeDevice()
                 let id = device.instance.id
                 let queue = AppInstaller.queue(for: id)

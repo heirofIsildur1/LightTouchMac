@@ -242,10 +242,11 @@ extension DeviceSession: LibrarySession {
             release: { [weak self] in
                 guard let self, let entry else { return true }
                 return await releaseStopped(for: entry)
+            },
+            {
+                try DeviceStateStorage.removeDevice(instance.id, state: state)
+                try? DeviceStateStorage.removeTree(logs)
             }
-        ) {
-            try DeviceStateStorage.removeDevice(instance.id, state: state)
-            try? DeviceStateStorage.removeTree(logs)
-        }
+        )
     }
 }

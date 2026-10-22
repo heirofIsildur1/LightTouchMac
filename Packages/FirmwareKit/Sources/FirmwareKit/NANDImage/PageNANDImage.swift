@@ -161,19 +161,19 @@ public struct PageNANDImage: Sendable, Equatable {
                 guard fd >= 0, !create || ftruncate(fd, off_t(image.chipBytes)) == 0, fstat(fd, &st) == 0 else {
                     let why = String(cString: strerror(errno))
                     if fd >= 0 { Darwin.close(fd) }
-                    fds.forEach { Darwin.close($0) }
+                    for fd in fds { Darwin.close(fd) }
                     throw FirmwareError(.internal, "\(path): \(why)")
                 }
                 fds.append(fd)
                 guard Int(st.st_size) == image.chipBytes else {
-                    fds.forEach { Darwin.close($0) }
+                    for fd in fds { Darwin.close(fd) }
                     throw FirmwareError(.unsupported, "\(path): NAND file size differs from geometry")
                 }
             }
             self.fds = fds
         }
 
-        deinit { fds.forEach { Darwin.close($0) } }
+        deinit { for fd in fds { Darwin.close(fd) } }
 
         /// The page's record as the emulator reads it.
         func read(_ chip: Int, _ page: Int) throws -> [UInt8] {

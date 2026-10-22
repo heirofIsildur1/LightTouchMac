@@ -19,7 +19,7 @@ struct AppChangeWatchTests {
         let host = DeviceAppsTests.Host()
         let apps = DeviceApps(host: host)
         var changes = 0
-        let watch = AppChangeWatch(apps: apps, attachAllowed: { true }) { changes += 1 }
+        let watch = AppChangeWatch(apps: apps, attachAllowed: { true }, onChange: { changes += 1 })
         let attaches = Attaches()
         watch.observe = { endpoint, _, change in
             attaches.state.withLock { $0.append((endpoint, change)) }

@@ -159,7 +159,7 @@ import System
         let clientSocket = String(session.clientSocket.dropFirst("UNIX:".count))
         let guestAddress = session.guestAddress
         // A dead daemon leaves its socket files behind.
-        session.paths.forEach { unlink($0) }
+        for path in session.paths { unlink(path) }
         self.session = session
         launched = (session, paths)
 
@@ -305,7 +305,7 @@ import System
         // the task cancellation would otherwise run. Only ever our own child.
         if let pid = daemonPID { kill(pid, SIGTERM) }
         if let pidFile { try? FileManager.default.removeItem(atPath: pidFile) }
-        session?.paths.forEach { unlink($0) }
+        for path in session?.paths ?? [] { unlink(path) }
         daemonPID = nil
         daemonTask?.cancel()
         daemonTask = nil

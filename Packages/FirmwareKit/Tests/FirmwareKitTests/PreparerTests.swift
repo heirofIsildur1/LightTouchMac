@@ -169,7 +169,7 @@ import Testing
         var sh: pid_t = 0
         let argv: [UnsafeMutablePointer<CChar>?] =
             ["/bin/sh", "-c", "sleep 60 & wait"].map { (s: String) in strdup(s) } + [nil]
-        defer { argv.forEach { free($0) } }
+        defer { for arg in argv { free(arg) } }
         try #require(posix_spawn(&sh, "/bin/sh", nil, nil, argv, environ) == 0)
         var reaped = false
         defer {

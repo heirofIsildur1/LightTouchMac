@@ -185,8 +185,9 @@ import HostRuntime
             configuration: configuration,
             expectedBytes: { bytes[$0] },
             sources: { urls[$0] ?? [] },
-            install: install
-        ) { sha1, event in inputs.yield(.download(sha1, event)) }
+            install: install,
+            onEvent: { sha1, event in inputs.yield(.download(sha1, event)) }
+        )
         self.downloads = downloads
         Task { [weak self] in
             for await input in stream { self?.receive(input) }

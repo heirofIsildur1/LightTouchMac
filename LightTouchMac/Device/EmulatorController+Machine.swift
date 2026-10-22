@@ -88,15 +88,19 @@ extension EmulatorController {
     var overlay: URL { overlayURL }
     func foregroundApp() async throws -> (bundleID: String, name: String?) { try await guest.foreground() }
     func applyWebProxy(since applied: Int?, generation: Int) async throws -> Int? {
-        try await proxy.apply(since: applied, isCurrent: { generation == self.bootGeneration }) { enabled in
-            try await WebProxySetup(
-                services: self.services,
-                guest: self.guest,
-                proxyDirectory: self.proxyDirectory,
-                stoppedTrust: self.trustsStopped ? (self.instance.paths.directory, self.instance.storage.key) : nil
-            )
-            .configure(enabled: enabled)
-        }
+        try await proxy.apply(
+            since: applied,
+            isCurrent: { generation == self.bootGeneration },
+            setUp: { enabled in
+                try await WebProxySetup(
+                    services: self.services,
+                    guest: self.guest,
+                    proxyDirectory: self.proxyDirectory,
+                    stoppedTrust: self.trustsStopped ? (self.instance.paths.directory, self.instance.storage.key) : nil
+                )
+                .configure(enabled: enabled)
+            }
+        )
     }
     func setupFinished(generation: Int) { timeZone.schedule(generation: generation) }
     func applyTweaks(generation: Int) async throws {

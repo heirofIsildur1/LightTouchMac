@@ -53,8 +53,8 @@ struct HomeVerdictTests {
         let right = try shot("m68ap-1A543a-home.png")
         let wrong = try shot("n72ap-5F138-home.png")
         defer {
-            [right, wrong].forEach {
-                try? FileManager.default.removeItem(atPath: ($0 as NSString).deletingLastPathComponent)
+            for path in [right, wrong] {
+                try? FileManager.default.removeItem(atPath: (path as NSString).deletingLastPathComponent)
             }
         }
         #expect(verdict(events(frontmost: "", screen: "", path: right), lock: [:], entry: "m68ap-1A543a") == true)

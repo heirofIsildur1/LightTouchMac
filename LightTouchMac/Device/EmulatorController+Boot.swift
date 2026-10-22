@@ -87,10 +87,11 @@ extension EmulatorController {
                 self.instance = admitted.instance
                 self.admittedStorage = admitted.proof
                 self.onStorageGenerationChanged?()
+            },
+            completion: { [weak self] result in
+                if case .failure(let error) = result, let self { logEvent("boot: \(instance.name): \(error)") }
             }
-        ) { [weak self] result in
-            if case .failure(let error) = result, let self { logEvent("boot: \(instance.name): \(error)") }
-        }
+        )
         // The boot begins, with its watches, in bootConfiguration(), once it is built and its offer composed.
     }
 

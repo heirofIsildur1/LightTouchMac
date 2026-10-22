@@ -87,7 +87,7 @@ struct StorageLeaseTests {
                     }
                 }
             }
-            spawners.forEach { $0.start() }
+            for spawner in spawners { spawner.start() }
             defer { spawning.withLock { $0 = false } }
             var refused = 0
             for _ in 0..<2000 {

@@ -49,7 +49,7 @@ public enum FitCheck {
         @discardableResult
         public func checkAny(_ places: [Fit], outcome: String = "left out") -> [Bool] {
             fits += places
-            if !places.contains(where: \.fits) { places.forEach { warn($0.warning(outcome)) } }
+            if !places.contains(where: \.fits) { for place in places { warn(place.warning(outcome)) } }
             return places.map(\.fits)
         }
         /// A piece the preparer did not install, recorded as such (nothing proven, so not a fit; no warning).

@@ -130,7 +130,7 @@ final class Mux {
     func stop() {
         process.terminate()
         process.waitUntilExit()
-        [String(clientSocket.dropFirst("UNIX:".count)), guestAddress].forEach { unlink($0) }
+        for path in [String(clientSocket.dropFirst("UNIX:".count)), guestAddress] { unlink(path) }
     }
 }
 
@@ -328,22 +328,23 @@ extension String {
                         "notice": report.notice ?? ""
                     ]
                 )
+            },
+            completion: { result in
+                switch result {
+                case .success:
+                    emit(
+                        "booted",
+                        [
+                            "device": self.name, "pid": process.link.pid, "seconds": Date().timeIntervalSince(started),
+                            "generation": generation
+                        ]
+                    )
+                case .failure(let error):
+                    self.bootError = self.preparationError ?? "\(error)"
+                    emit("bootFailed", ["device": self.name, "error": self.bootError!])
+                }
             }
-        ) { result in
-            switch result {
-            case .success:
-                emit(
-                    "booted",
-                    [
-                        "device": self.name, "pid": process.link.pid, "seconds": Date().timeIntervalSince(started),
-                        "generation": generation
-                    ]
-                )
-            case .failure(let error):
-                self.bootError = self.preparationError ?? "\(error)"
-                emit("bootFailed", ["device": self.name, "error": self.bootError!])
-            }
-        }
+        )
     }
     /// GuestPackageWatch.compose for a prepared iPad: the bundled itpack, the base's lock record.
     func iPadOffer(base: URL) throws -> String? {
@@ -919,16 +920,19 @@ func checkPreparedFiles() throws {
         var completionError: DeviceLinkError?
         var deaths = 0
         process.onDeath = { _ in deaths += 1 }
-        process.start({ _ in
-            hello = true
-            return nil
-        }) { result in
-            if case .failure(let error) = result {
-                completionError = error
-            } else {
-                fail("lease test unexpectedly booted")
+        process.start(
+            { _ in
+                hello = true
+                return nil
+            },
+            completion: { result in
+                if case .failure(let error) = result {
+                    completionError = error
+                } else {
+                    fail("lease test unexpectedly booted")
+                }
             }
-        }
+        )
         let pid = process.link.pid
         let exited = await process.waitForExit(timeout: 20)
         if !exited {
@@ -997,13 +1001,16 @@ func checkPreparedFiles() throws {
         guard death == .stopped else { fail("kill before boot classified as \(death)") }
         deaths += 1
     }
-    process.start({ _ in
-        configured = true
-        return nil
-    }) { result in
-        completions += 1
-        guard case .failure(.closed) = result else { fail("kill before boot completion: \(result)") }
-    }
+    process.start(
+        { _ in
+            configured = true
+            return nil
+        },
+        completion: { result in
+            completions += 1
+            guard case .failure(.closed) = result else { fail("kill before boot completion: \(result)") }
+        }
+    )
     let pid = process.link.pid
     guard pid > 0 else { fail("kill-before-boot did not spawn the actual helper") }
     // Same actor turn: the hello callback has not run, although spawn has.

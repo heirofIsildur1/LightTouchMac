@@ -32,7 +32,7 @@ struct USBBridgeTests {
         defer { close(listener) }
         var pair: [Int32] = [-1, -1]
         #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
-        defer { pair.forEach { close($0) } }
+        defer { for fd in pair { close(fd) } }
         // the helper asks; the app connects and answers with the descriptor
         #expect(BridgeSocket.send(pair[1]))
         #expect(BridgeSocket.receive(pair[0]) == (true, .usb, -1))
@@ -145,7 +145,7 @@ struct USBBridgeTests {
         #expect(stat(path, &info) == 0 && info.st_mode & 0o777 == 0o600)
         var pair: [Int32] = [-1, -1]
         #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
-        defer { pair.forEach { close($0) } }
+        defer { for fd in pair { close(fd) } }
         #expect(BridgeSocket.send(pair[1], .gdb))
         #expect(BridgeSocket.receive(pair[0]) == (true, .gdb, -1))
         #expect(BridgeSocket.send(pair[0], .gdb, descriptor: listener))

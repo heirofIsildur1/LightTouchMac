@@ -673,7 +673,7 @@ nonisolated final class TestHTTPServer: @unchecked Sendable {
 
     func stop() {
         listener.cancel()
-        lock.withLock { held }.forEach { $0.cancel() }
+        for connection in lock.withLock({ held }) { connection.cancel() }
     }
 
     private func receive(_ connection: NWConnection, _ buffer: Data) {
