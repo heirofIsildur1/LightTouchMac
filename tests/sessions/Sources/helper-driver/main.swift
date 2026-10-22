@@ -53,6 +53,8 @@ struct Scenario: Decodable {
         var angle: Bool?
         /// The Debug Port's gdbstub on this Unix socket, as the app adds it (DebugPort.arguments); "gdb" attaches.
         var debugPort: String?
+        /// A snapshot ("snapshot PATH") the boot resumes from (QEMU's -incoming), on the overlay as it was saved.
+        var restore: String?
     }
     var dylib: String?
     var board: String?
@@ -98,10 +100,14 @@ func preparedBoot(_ p: Scenario.Prepared, hardware: DeviceInfo?) throws -> BootC
         serial: "file:\(p.serial)",
         audio: ["-audio", "driver=none"],
         netdev: "user,id=wifi0",
+        restore: p.restore.map { ["-incoming", "file:" + $0] } ?? [],
         carrier: p.carrier,
         refreshHz: p.refreshHz ?? 60,
         angle: p.angle ?? false
     )
+    if let restore = p.restore {
+        config.files?.readOnly.append(URL(fileURLWithPath: restore).deletingLastPathComponent().path)
+    }
     if let socket = p.debugPort { config.argv += DebugPort.arguments(socket: socket) }
     return config
 }
@@ -660,6 +666,18 @@ Thread.detachNewThread {
             let shown = URL(fileURLWithPath: "\(dumpDir)/\(p[1])-shown.png")
             _ = onMain { r.writeShown(URL(fileURLWithPath: "\(dumpDir)/\(p[1]).png"), to: shown) }
             emit("ocr", ["name": p[1], "lines": readText(in: shown), "redness": redness(of: shown)])
+        case "seen":  // seen WORD SECONDS: until Vision reads WORD on the screen (an icon's label: Home is up)
+            guard let r = rotationDriver else { fail("seen: no board") }
+            let start = Date()
+            var found = false
+            while !found, Date().timeIntervalSince(start) < Double(p[2]) ?? 60 {
+                dump("seen")
+                let shown = URL(fileURLWithPath: "\(dumpDir)/seen-shown.png")
+                _ = onMain { r.writeShown(URL(fileURLWithPath: "\(dumpDir)/seen.png"), to: shown) }
+                found = readText(in: shown).contains { $0.contains(p[1]) }
+                if !found { usleep(1_000_000) }
+            }
+            emit("seen", ["word": p[1], "found": found, "seconds": Date().timeIntervalSince(start)])
         case "hidden":  // hidden [BUNDLE-ID]: the hidden apps the guest has (HiddenApp.present); with an id, open it
             let found = blocking { try await HiddenApp.present(on: guest) }
             var opened = ""
