@@ -184,6 +184,9 @@ swift run --package-path tests/sessions sessions single JAILBROKEN_BASE --jailbr
 # many rows at once: each job a base, or create's flags to prepare one, and a check (default single as prepared);
 # up to --lanes jobs share the Mac's emulator slots, so one row prepares while others boot (`sessions matrix --help`)
 swift run --package-path tests/sessions sessions matrix JOBS [--lanes 3]
+# what a change needs, from the paths it touches (git diff RANGE): the Unit plan, and one boot per board family it can
+# reach (all of them for the helper, the emulator, guest code, the drivers or a path no rule names); --run runs it
+swift run --package-path tests/sessions sessions affected main [--run] [--bases DIR]
 # as a device the user already has, through the app's boot admission; an old device must take its admission steps
 # (the old devices in ~/Developer/qemu-ios-files/old-devices: tests/sessions/Sources/sessions/Managed.swift)
 swift run --package-path tests/sessions sessions single BASE --managed

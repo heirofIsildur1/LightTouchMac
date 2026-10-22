@@ -38,6 +38,9 @@ what to do and not do on a shared Mac.
   the logs.
 - Before booting emulators, `scripts/host-ready` prints `READY …` (exit 0) or `WAIT <why>` (exit 1: load, all three
   emulator slots taken, or disk); `sessions` holds a slot for its run and waits for one when none is free.
+- Check a change with the fast tiers, not every device: `sessions affected main` prints what it needs (the Unit plan,
+  and which board families boot, one row each) and `--run` runs it through `sessions matrix`. Boot every catalog row
+  (jailbroken rows with `--network`) only before a release or for a change to the boot path, the emulator or its pin.
 - A new test must fail with the fix reverted; say so in the commit.
 - The pre-commit hook formats staged Swift and C (`scripts/format --staged`; `scripts/vendor` turns it on). When
   it refuses a partly staged file, run the command it prints. `scripts/format --check` (run by the Unit plan) fails on
