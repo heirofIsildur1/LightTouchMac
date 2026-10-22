@@ -63,9 +63,11 @@ extension VolumeFiles {
     public func put(_ data: Data, at path: String) throws { try put(data, at: path, mode: nil) }
 
     /// The IPSW's `member` at `path`: on a mount extracted there, as the recipes always have (so the volume a mount
-    /// builds keeps its bytes: the kernel counts the extraction's writes), else put.
+    /// builds keeps its bytes: the kernel counts the extraction's writes), else put as a new file, as the extraction
+    /// makes one (FileManager.createFile replaces what is there: a new record, dated as it is written).
     func put(member: String, of ipsw: IPSWArchive, at path: String) throws {
         if let m = self as? MountedVolume { return try ipsw.extract(member, to: m.url(path)) }
+        try remove(path)
         try put(ipsw.read(member), at: path)
     }
     public func makeDirectory(_ path: String) throws { try makeDirectory(path, mode: nil) }

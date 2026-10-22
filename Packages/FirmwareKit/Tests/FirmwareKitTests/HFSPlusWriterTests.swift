@@ -242,8 +242,9 @@ import Testing
     }
 
     /// The Cydia bootstrap extracted by TarArchive into a writer-made volume lists the same (paths, owners, modes,
-    /// sizes, content, link targets) as /usr/bin/tar -xkf into a kernel-mounted newfs_hfs one, both over the same
-    /// existing folder and file, which -k keeps.
+    /// sizes, content, link targets, flags) as the kernel route's extraction (MountedVolume.extract: /usr/bin/tar
+    /// -xkf on the host, merged in) into a kernel-mounted newfs_hfs one, both over the same existing folder and file,
+    /// which -k keeps; and every file and folder the archive dates has the same modification date in both.
     @Test func tarExtractionMatchesTheKernel() async throws {
         let tar = Oracle.path("Library/Caches/gold.samhenri.LightTouchMac/Jailbreak/freeze.tar.gz")
         guard Oracle.exists(tar) else { try FixtureRequirements.missing(tar.path) }
@@ -257,7 +258,7 @@ import Testing
                     attributes: [.posixPermissions: 0o700]
                 )
                 try Data("keep".utf8).write(to: m.appendingPathComponent("usr/bin/gunzip"))
-                try await DiskImage.run(["/usr/bin/tar", "-xkf", tar.path, "-C", m.path])
+                try MountedVolume(root: m).extract(tar: tar, excluding: [])
             }
             let writer = dir.appendingPathComponent("w.img")
             try HFSPlusWriter.makeHFS(writer, size: 128 << 20)
@@ -280,6 +281,15 @@ import Testing
             let b = try HFSPlusVolume(writer).listing().filter { !$0.path.isEmpty }.map(unhashed)
             #expect(a.count == b.count)
             for (x, y) in zip(a, b) where x != y { Issue.record("kernel \(x)\nwriter \(y)") }
+            // the archive's dates (a folder only the extraction made, or a symlink, is dated by whoever made it)
+            let members = try TarArchive(contentsOf: tar).members
+            let dated = Set(members.filter { $0.kind != .symlink }.map(\.path)).subtracting(["", "usr", "usr/bin"])
+            let modified = { (image: URL) in
+                Dictionary(try HFSPlusVolume(image).paths().map { ($0.path, $0.record.dates[1]) }) { a, _ in a }
+            }
+            let (k, wd) = (try modified(kernel), try modified(writer))
+            let differing = dated.filter { k[$0] != wd[$0] }.sorted()
+            #expect(dated.count > 900 && differing.isEmpty, "\(differing.count): \(differing.prefix(5))")
         }
     }
 

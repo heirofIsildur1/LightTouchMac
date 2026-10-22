@@ -506,13 +506,16 @@ public enum SystemEdits {
             guard services["com.apple.afc"] != nil else {
                 throw FirmwareError(.unsupported, "\(lockdownServices) has no com.apple.afc service")
             }
-            services["com.apple.afc2"] =
-                oldStyle
-                ? [
-                    "AllowUnactivatedService": true, "Label": "com.apple.afc2",
-                    "ProgramArguments": ["/usr/libexec/afcd", "--lockdown", "-d", "/"]
-                ]
-                : ["AllowUnactivatedService": true, "Label": "com.apple.afc2", "XPCServiceName": "com.apple.afc2"]
+            // an NSDictionary, not a bridged Swift one, whose key order (and so the binary plist's bytes) changes
+            // from run to run
+            services["com.apple.afc2"] = NSDictionary(
+                dictionary: oldStyle
+                    ? [
+                        "AllowUnactivatedService": true, "Label": "com.apple.afc2",
+                        "ProgramArguments": ["/usr/libexec/afcd", "--lockdown", "-d", "/"]
+                    ]
+                    : ["AllowUnactivatedService": true, "Label": "com.apple.afc2", "XPCServiceName": "com.apple.afc2"]
+            )
         }
         if oldStyle { return ("afc2: com.apple.afc2 runs afcd at / (Lockdown/Services.plist)", []) }
         try v.put(try afc2Copy(stock), at: afc2d, mode: 0o755)
