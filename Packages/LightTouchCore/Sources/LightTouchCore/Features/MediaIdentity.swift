@@ -1,3 +1,4 @@
+import BinaryParsing
 import Crypto
 import Foundation
 import HostServiceWire
@@ -25,50 +26,52 @@ public nonisolated enum MediaIdentity {
     /// Audio/video encoders put the current time in generated movie headers.
     /// Zero only those timestamps so repeated conversion has identical bytes.
     public static func normalizeGeneratedMovie(_ file: URL) throws {
+        let stamps = try timestamps(in: Data(contentsOf: file, options: .alwaysMapped))
         let handle = try FileHandle(forUpdating: file)
         defer { try? handle.close() }
-        let length = try handle.seekToEnd()
-        var atoms = 0
-        func invalid() -> DeviceToolsError { .failed("The converted media file is invalid.") }
-        func read(_ offset: UInt64, _ count: Int) throws -> Data {
-            try handle.seek(toOffset: offset)
-            guard let data = try handle.read(upToCount: count), data.count == count else { throw invalid() }
-            return data
+        for stamp in stamps {
+            try handle.seek(toOffset: UInt64(stamp.lowerBound))
+            try handle.write(contentsOf: Data(count: stamp.count))
         }
-        func integer(_ bytes: Data) -> UInt64 { bytes.reduce(0) { ($0 << 8) | UInt64($1) } }
-        func walk(_ start: UInt64, _ end: UInt64, _ depth: Int) throws {
-            guard depth <= 4 else { throw invalid() }
-            var offset = start
-            while offset < end {
+    }
+
+    /// Where the movie's creation and modification times are: each mvhd, tkhd and mdhd atom's two, after its version
+    /// and flags (32-bit times in version 0, 64-bit in 1), inside moov, trak and mdia, at most four deep and 4096 atoms
+    /// in all. An atom is a big-endian size (1: a 64-bit size follows the type; 0: to the end of its parent) and a type.
+    static func timestamps(in movie: Data) throws -> [Range<Int>] {
+        var atoms = 0
+        func walk(_ s: inout ParserSpan, _ depth: Int) throws -> [Range<Int>] {
+            guard depth <= 4 else { throw invalid }
+            var out: [Range<Int>] = []
+            while !s.isEmpty {
                 try Task.checkCancellation()
                 atoms += 1
-                guard atoms <= 4096, end - offset >= 8 else { throw invalid() }
-                let header = try read(offset, 8)
-                let kind = String(decoding: header.suffix(4), as: UTF8.self)
-                var size = integer(header.prefix(4))
+                guard atoms <= 4096 else { throw invalid }
+                var size = UInt64(try UInt32(parsingBigEndian: &s))
+                let kind = String(decoding: try [UInt8](parsing: &s, byteCount: 4), as: UTF8.self)
                 var headerSize: UInt64 = 8
                 if size == 1 {
-                    guard end - offset >= 16 else { throw invalid() }
-                    size = integer(try read(offset + 8, 8))
+                    size = try UInt64(parsingBigEndian: &s)
                     headerSize = 16
                 } else if size == 0 {
-                    size = end - offset
+                    size = UInt64(s.count) + headerSize
                 }
-                guard size >= headerSize, size <= end - offset else { throw invalid() }
+                guard size >= headerSize else { throw invalid }
+                var body = try s.sliceSpan(byteCount: size - headerSize)
                 if ["moov", "trak", "mdia"].contains(kind) {
-                    try walk(offset + headerSize, offset + size, depth + 1)
+                    out += try walk(&body, depth + 1)
                 } else if ["mvhd", "tkhd", "mdhd"].contains(kind) {
-                    guard size >= headerSize + 4 else { throw invalid() }
-                    let version = try read(offset + headerSize, 1)[0]
-                    guard version <= 1 else { throw invalid() }
-                    let count = version == 0 ? 8 : 16
-                    guard size >= headerSize + 4 + UInt64(count) else { throw invalid() }
-                    try handle.seek(toOffset: offset + headerSize + 4)
-                    try handle.write(contentsOf: Data(count: count))
+                    let version = try UInt8(parsing: &body)
+                    guard version <= 1 else { throw invalid }
+                    try body.seek(toRelativeOffset: 3)  // flags
+                    let times = try body.sliceRange(byteCount: version == 0 ? 8 : 16)
+                    out.append(times.lowerBound..<times.upperBound)
                 }
-                offset += size
             }
+            return out
         }
-        try walk(0, length, 0)
+        do { return try movie.withParserSpan { s in try walk(&s, 0) } } catch is ParsingError { throw invalid }
     }
+
+    static var invalid: DeviceToolsError { .failed("The converted media file is invalid.") }
 }

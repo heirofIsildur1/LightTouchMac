@@ -17,6 +17,7 @@
 // is 1) and a full battery (displayBatteryCapacityAsPercentage answers 100). 1.0 and 1.1.4's SpringBoards name the same
 // keys, but for 1.0's SBFakeCarrier.
 
+import BinaryParsing
 import Foundation
 
 /// What the status bar shows with Marketing Status Bar on (TweakSettings.statusBar).
@@ -164,17 +165,21 @@ public nonisolated struct StatusBarOverride: Sendable {
     public var rawSize: Int { size - Self.values }
 
     /// What status bar raw data (getStatusBarData: SpringBoard's, the overrides merged in) shows: the clock's text,
-    /// the carrier and the battery.
+    /// the carrier and the battery. The guest's bytes: a C string is read within its char[capacity] field, what the
+    /// data doesn't hold reads as empty (the battery as -1).
     public func shown(_ raw: Data) -> (time: String, carrier: String, battery: Int) {
-        let raw = Data(raw)
-        func text(_ at: Int) -> String {
-            String(decoding: raw.dropFirst(at - Self.values).prefix { $0 != 0 }, as: UTF8.self)
+        func text(_ at: Int, capacity: Int) -> String {
+            let field = try? raw.withParserSpan { s throws(ParsingError) in
+                try s.seek(toRelativeOffset: at - Self.values)
+                return try [UInt8](parsing: &s, byteCount: min(capacity, s.count))
+            }
+            return String(decoding: (field ?? []).prefix { $0 != 0 }, as: UTF8.self)
         }
-        let b = wifiBarsValue + 8 - Self.values
-        let battery =
-            raw.count >= b + 4
-            ? Int(raw.subdata(in: b..<b + 4).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }) : -1
-        return (text(time), text(gsmBars + 4), battery)
+        let battery = try? raw.withParserSpan { s throws(ParsingError) in
+            try s.seek(toRelativeOffset: wifiBarsValue + 8 - Self.values)
+            return Int(try Int32(parsingLittleEndian: &s))
+        }
+        return (text(time, capacity: 64), text(gsmBars + 4, capacity: 100), battery ?? -1)
     }
 
     /// No overrides: posting it gives the status bar back to SpringBoard.

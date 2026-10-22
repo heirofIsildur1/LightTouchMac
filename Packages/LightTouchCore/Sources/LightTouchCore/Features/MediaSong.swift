@@ -1,5 +1,6 @@
 import AVFoundation
 import AudioToolbox
+import BinaryParsing
 import Foundation
 import HostServiceWire
 import ImageIO
@@ -164,17 +165,9 @@ public struct MediaSong: Sendable {
             else { return nil }
             return value
         }
-        /// "3/12", or iTunes' binary trkn/disk atom: 2 pad bytes, UInt16 number, UInt16 count.
         func pair(_ item: AVMetadataItem) async throws -> (Int, Int)? {
-            guard let value = try await text(item) else {
-                guard let data = try await item.load(.dataValue), data.count >= 6 else { return nil }
-                let bytes = [UInt8](data)
-                return (Int(bytes[2]) << 8 | Int(bytes[3]), Int(bytes[4]) << 8 | Int(bytes[5]))
-            }
-            let parts = value.split(separator: "/", maxSplits: 1).map {
-                Int($0.trimmingCharacters(in: .whitespaces)) ?? 0
-            }
-            return (parts[0], parts.count > 1 ? parts[1] : 0)
+            guard let value = try await text(item) else { return try await item.load(.dataValue).flatMap(numberPair) }
+            return numberPair(value)
         }
         func set(_ key: String, _ value: Any?) { if let value, properties[key] == nil { properties[key] = value } }
         func setPair(_ keys: (String, String), _ value: (Int, Int)?) {
@@ -192,10 +185,7 @@ public struct MediaSong: Sendable {
             case .iTunesMetadataComposer, .id3MetadataComposer: set("composer", try await text(item))
             case .iTunesMetadataUserGenre, .id3MetadataContentType: set("genre", (try await text(item)).map(genreName))
             case .iTunesMetadataPredefinedGenre:
-                // gnre: a UInt16 ID3v1 genre index plus one.
-                if let data = try await item.load(.dataValue), data.count >= 2 {
-                    set("genre", id3Genres.indices.contains(Int(data[1]) - 1) ? id3Genres[Int(data[1]) - 1] : nil)
-                }
+                if let data = try await item.load(.dataValue) { set("genre", predefinedGenre(data)) }
             case .iTunesMetadataTrackNumber, .id3MetadataTrackNumber:
                 setPair(("track_number", "track_count"), try await pair(item))
             case .iTunesMetadataDiscNumber, .id3MetadataPartOfASet:
@@ -224,6 +214,30 @@ public struct MediaSong: Sendable {
             }
         }
         return (properties, cover)
+    }
+
+    /// A track or disc number as text: "3/12" (number, count), "3" (count 0), "/12" (number 0).
+    nonisolated static func numberPair(_ value: String) -> (Int, Int) {
+        let parts = value.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).map {
+            Int($0.trimmingCharacters(in: .whitespaces)) ?? 0
+        }
+        return (parts[0], parts.count > 1 ? parts[1] : 0)
+    }
+
+    /// iTunes' binary trkn/disk atom: 2 pad bytes, then the number and the count, big-endian UInt16s.
+    nonisolated static func numberPair(_ data: Data) -> (Int, Int)? {
+        try? data.withParserSpan { s throws(ParsingError) in
+            try s.seek(toRelativeOffset: 2)
+            return (Int(try UInt16(parsingBigEndian: &s)), Int(try UInt16(parsingBigEndian: &s)))
+        }
+    }
+
+    /// gnre: a big-endian UInt16, the ID3v1 genre index plus one.
+    nonisolated static func predefinedGenre(_ data: Data) -> String? {
+        guard let value = try? data.withParserSpan({ s throws(ParsingError) in try UInt16(parsingBigEndian: &s) })
+        else { return nil }
+        let index = Int(value) - 1
+        return id3Genres.indices.contains(index) ? id3Genres[index] : nil
     }
 
     /// ID3 genres may be "(13)", "13" or "(13)Refinement"; resolve the ID3v1 index to its name.

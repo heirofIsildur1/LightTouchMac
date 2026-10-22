@@ -345,6 +345,22 @@ import Testing
         #expect(int(six, 120) == 5 && six.prefix(24).allSatisfy { $0 == 0 })
     }
 
+    /// getStatusBarData's raw data comes from the guest: each C string is read within its field (timeString's 64
+    /// bytes, serviceString's 100) though the guest leaves it unterminated, and a short buffer reads as what it holds,
+    /// the battery as -1.
+    @Test func statusBarRawDataIsReadWithinItsFields() throws {
+        let layout = try #require(StatusBarOverride.layout(version: "7.1.2"))
+        var raw = Data(repeating: 0x42, count: layout.rawSize)  // no NUL anywhere
+        raw.replaceSubrange(25..<89, with: Data(repeating: 0x41, count: 64))  // timeString, at 53 - 28
+        let shown = layout.shown(raw)
+        #expect(shown.time == String(repeating: "A", count: 64))
+        #expect(shown.carrier == String(repeating: "B", count: 100))
+        #expect(shown.battery == 0x4242_4242)
+        let short = layout.shown(raw.prefix(60))
+        #expect(short == (String(repeating: "A", count: 35), "", -1))
+        #expect(layout.shown(Data()) == ("", "", -1))
+    }
+
     @Test func iOS2To4TakeSpringBoardsDemoKeys() {
         var s = TweakSettings()
         s.on = [.cleanStatusBar, .keynoteClock]

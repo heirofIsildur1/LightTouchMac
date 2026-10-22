@@ -77,4 +77,18 @@ struct MediaSongTests {
             await #expect(throws: CancellationError.self) { try await task.value }
         }
     }
+
+    /// The track and disc numbers a tag's text or its binary trkn/disk atom gives, and the genre a gnre atom names: a
+    /// missing number reads as 0, a short atom as none, a gnre index past the table as no genre.
+    @Test func trackDiscAndGenreTags() {
+        #expect(MediaSong.numberPair("3/12") == (3, 12) && MediaSong.numberPair(" 7 ") == (7, 0))
+        #expect(MediaSong.numberPair("/12") == (0, 12), "a count without a number is not the number")
+        #expect(MediaSong.numberPair("/") == (0, 0))
+        func atom(_ bytes: [UInt8]) -> [Int]? { MediaSong.numberPair(Data(bytes)).map { [$0, $1] } }
+        #expect(atom([0, 0, 0, 3, 0, 12, 0, 0]) == [3, 12] && atom([0, 0, 1, 0, 0, 2]) == [256, 2])
+        #expect(atom([0, 0, 0, 3, 0]) == nil)
+        #expect(MediaSong.predefinedGenre(Data([0, 1])) == "Blues" && MediaSong.predefinedGenre(Data([0, 0])) == nil)
+        #expect(MediaSong.predefinedGenre(Data([1, 1])) == nil, "257 is past the ID3v1 table")
+        #expect(MediaSong.predefinedGenre(Data([1])) == nil)
+    }
 }
