@@ -48,7 +48,9 @@ Open `LightTouchMac.xcodeproj` in Xcode and build the `LightTouchMac` scheme: th
 `Packages/FirmwareKit/Sources/FirmwareKitCLI`). The app's one script phase stamps the build number
 (`CFBundleVersion`, the commit count).
 
-Debug and Release share `Configuration/Shared.xcconfig`. A Debug helper loads `libqemu-arm.dylib` from a
+Every build setting is in `Configuration/`, none in the project file: `Shared.xcconfig` is the project's (every
+target's base), and `App`, `Device`, `Services` and `Tool.xcconfig` are the four targets' own, each written once with a
+`[config=Debug]` or `[config=Release]` line where the two differ. A Debug helper loads `libqemu-arm.dylib` from a
 qemu-ios development build:
 
 ```
@@ -298,7 +300,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `scripts/` | `bootstrap`, `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check` (with `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-angle.sh`, `build-guest-tools.sh`), `ltm-build` (Packages/BuildTools: vendor, check-macho, merge-native, sources), `sources`, `ship`, `release` (with `release-common.sh` and `release-helper.swift`) |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `dependencies.json` (pinned archives) and build patches |
-| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
+| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), the targets' `App`, `Device`, `Services` and `Tool.xcconfig`, `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
 | `Models/` | The 3D device models and their lighting (`Resources/Models/` in the app) |
 | `LightTouchServices/` | The services helper: `Engine/` (libimobiledevice: installation_proxy, AFC, springboardservices, notification_proxy and lockdown on one `run` kernel, the serial gate and deadlines), and the lockdown writes (`Lockdown/`) it runs as child processes |
 | `tools/activation/` | Sam's activation tool (its `build/` output is ignored) |
