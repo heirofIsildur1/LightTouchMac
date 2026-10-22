@@ -134,7 +134,7 @@ struct Tools {
     }
 
     /// LightTouchDevice, LightTouchServices and firmwarekit, Debug, signed by the project's team (the helper sandboxed
-    /// with LTM_HELPER_SANDBOX=YES); the build is cached under .build/sessions-xcode.
+    /// unless the environment sets LTM_HELPER_SANDBOX=NO); the build is cached under .build/sessions-xcode.
     static func build(work: URL) -> URL {
         let symroot = repository.appendingPathComponent(".build/sessions-xcode")
         let log = work.appendingPathComponent("xcodebuild.log")
@@ -145,8 +145,8 @@ struct Tools {
                 "-skipMacroValidation", "-project", repository.appendingPathComponent("LightTouchMac.xcodeproj").path,
                 "-target", "LightTouchDevice", "-target", "LightTouchServices", "-target", "firmwarekit",
                 "-configuration", "Debug", "SYMROOT=\(symroot.path)", "OBJROOT=\(symroot.path)/obj",
-                // the helper under the App Sandbox when the environment asks (Configuration/Shared.xcconfig)
-                "LTM_HELPER_SANDBOX=\(ProcessInfo.processInfo.environment["LTM_HELPER_SANDBOX"] ?? "NO")",
+                // the helper under the App Sandbox unless the environment says NO (Configuration/Shared.xcconfig)
+                "LTM_HELPER_SANDBOX=\(ProcessInfo.processInfo.environment["LTM_HELPER_SANDBOX"] ?? "YES")",
                 "COMPILER_INDEX_STORE_ENABLE=NO", "build"
             ],
             log: log

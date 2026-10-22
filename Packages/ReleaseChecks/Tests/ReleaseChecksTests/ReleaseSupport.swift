@@ -10,6 +10,6 @@ let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().del
 /// The app's tests run when an app was given or the Release plan requires one (then a missing app fails).
 let appGiven = ReleaseApp.given || ReleaseApp.required
 
-/// The release is built with the helper under the App Sandbox (LTM_RELEASE_HELPER_SANDBOX=YES; scripts/ship passes
-/// LTM_HELPER_SANDBOX): its helper and app must carry exactly that build's entitlements.
-let helperSandbox = ProcessInfo.processInfo.environment["LTM_RELEASE_HELPER_SANDBOX"] == "YES"
+/// The release is built with the helper under the App Sandbox unless LTM_RELEASE_HELPER_SANDBOX=NO (scripts/ship passes
+/// its LTM_HELPER_SANDBOX, YES by default): its helper and app must carry exactly that build's entitlements.
+let helperSandbox = ProcessInfo.processInfo.environment["LTM_RELEASE_HELPER_SANDBOX"] != "NO"

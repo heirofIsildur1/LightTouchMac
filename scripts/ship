@@ -30,8 +30,9 @@
 # 8. one line in LTM_RELEASE_LOG (default <release directory>/releases.log): build, commit, tag, notarization ids,
 #    Amore id, the zip's SHA-256; then archives and exports beyond the newest two are removed.
 # --dry-run runs 1 to 5 without notarizing, stapling or the export-only checks, and prints what 6 to 8 would do;
-# LTM_RELEASE_SKIP_PREPARE=1 (dry runs only) also skips 5's prepare matrix. LTM_HELPER_SANDBOX=YES: the archive was
-# built with the helper under the App Sandbox; 5 holds the helper and the app to those entitlements.
+# LTM_RELEASE_SKIP_PREPARE=1 (dry runs only) also skips 5's prepare matrix. The helper is under the App Sandbox
+# (Configuration/Shared.xcconfig); LTM_HELPER_SANDBOX=NO archives it without, for debugging; 5 holds the helper and
+# the app to the entitlements LTM_HELPER_SANDBOX names, so an --archive built the other way fails there.
 #
 # Notarization's App Store Connect API key: LTM_NOTARY_KEY (the .p8's path), LTM_NOTARY_KEY_ID and LTM_NOTARY_ISSUER
 # from the environment, else from ~/.config/lighttouch/notary.env (LTM_NOTARY_CONFIG moves it; KEY=value lines, ~ or
@@ -238,6 +239,7 @@ main() {
         rm -rf "$archive"
         xcodebuild archive -skipMacroValidation -onlyUsePackageVersionsFromResolvedFile -workspace "$ROOT/LightTouchMac.xcworkspace" \
             -scheme LightTouchMac -configuration Release -destination 'generic/platform=macOS' -archivePath "$archive" \
+            LTM_HELPER_SANDBOX="${LTM_HELPER_SANDBOX:-YES}" \
             > "$WORK/archive.log" 2>&1 \
             || { grep -E "error:" "$WORK/archive.log" | head -20; fail archive "xcodebuild archive (its log: $WORK/archive.log)"; }
     fi
@@ -289,7 +291,7 @@ main() {
     release_tests() {
         TEST_RUNNER_LTM_RELEASE_APP="$app" TEST_RUNNER_LTM_RELEASE_EXPORTED=$((1 - DRY)) \
             TEST_RUNNER_LTM_RELEASE_SKIP_PREPARE="$SKIP_PREPARE" \
-            TEST_RUNNER_LTM_RELEASE_HELPER_SANDBOX="${LTM_HELPER_SANDBOX:-NO}" \
+            TEST_RUNNER_LTM_RELEASE_HELPER_SANDBOX="${LTM_HELPER_SANDBOX:-YES}" \
             xcodebuild -quiet -skipMacroValidation -workspace "$ROOT/LightTouchMac.xcworkspace" -scheme LightTouchMac -testPlan Release \
             -only-testing:"ReleaseChecksTests/$2" -derivedDataPath "$WORK/dd" \
             -resultBundlePath "$WORK/$1.xcresult" test > "$WORK/$1.log" 2>&1 \

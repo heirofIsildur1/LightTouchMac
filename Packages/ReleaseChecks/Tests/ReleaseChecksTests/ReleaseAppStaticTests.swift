@@ -22,8 +22,8 @@ struct ReleaseAppStaticTests {
         #expect(result.succeeded, "\(result.error)")
     }
 
-    /// The helper's entitlements are exactly its build's (LightTouchDevice-Sandbox.entitlements when the release is
-    /// built with LTM_HELPER_SANDBOX=YES), and the app carries the helper's app group exactly when the helper does.
+    /// The helper's entitlements are exactly its build's (LightTouchDevice-Sandbox.entitlements, unless the release was
+    /// built with LTM_HELPER_SANDBOX=NO), and the app carries the helper's app group exactly when the helper does.
     @Test func everyExecutableIsHardenedUniversalAndEntitledAsDeclared() throws {
         let sandbox = helperSandbox
         func entitlements(_ name: String) throws -> NSDictionary {

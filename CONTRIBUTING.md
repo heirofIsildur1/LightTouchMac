@@ -67,6 +67,14 @@ To produce the dylib, build `qemu-system-arm` in that checkout and run `contrib/
 The services helper links libimobiledevice and libplist: from the vendor directory (below) when there is one,
 else Homebrew's. Put local overrides of any of these in `Configuration/Local.xcconfig` (gitignored).
 
+The device helper runs under the App Sandbox, in Debug and Release (`LTM_HELPER_SANDBOX = YES`, `Shared.xcconfig`):
+whoever spawns it (the app, `firmwarekit`, the harness) reads the helper's signature and grants it its device's files
+(HostRuntime `HelperSandbox`, `SandboxExtension`; a Debug helper also gets the emulator's folders, read-only). To debug
+without it, set `LTM_HELPER_SANDBOX = NO` in `Local.xcconfig`, or pass `LTM_HELPER_SANDBOX=NO` to `xcodebuild`,
+`sessions` or `scripts/ship`. The sockets the helper reaches are in its app group's container, which the app is
+entitled to; `firmwarekit` or the harness run from a Terminal without Full Disk Access makes macOS ask once to let
+the Terminal reach that container.
+
 Debug-only knobs (compiled out of Release, which runs only what its bundle holds; the Release plan's
 `noBinaryNamesADebugOverride` fails on any of these names in a shipped binary, `ReleaseApp.debugOverrides`):
 `LTM_FIRMWAREKIT=/path/to/firmwarekit` (another preparer), `LTM_QEMU_DYLIB` (another emulator library),
@@ -108,9 +116,11 @@ A release is an Xcode archive made by `scripts/ship`; nothing edits the bundle a
    and `xcodebuild archive` (scheme `LightTouchMac`, Release, arm64 + x86_64, Developer ID, only the package versions
    `Package.resolved` records; `--archive` restarts with an archive made before). The archive's Copy Files phases
    bring in the vendor directory (Code Sign On Copy signs its binaries with the app's identity and the hardened
-   runtime); only `LightTouchDevice` carries entitlements (`Configuration/LightTouchDevice.entitlements`: allow-jit,
-   library validation on; a Debug build uses `LightTouchDevice-Debug.entitlements`, which also disables library
-   validation for a development dylib). Nothing edits the bundle after Xcode.
+   runtime); `LightTouchDevice` carries `Configuration/LightTouchDevice-Sandbox.entitlements` (the App Sandbox,
+   allow-jit, network client and server, the app group; library validation on; a Debug build uses
+   `LightTouchDevice-Sandbox-Debug.entitlements`, which also disables library validation for a development dylib) and
+   the app `LightTouchMac-Sandbox.entitlements` (the app group, location); with `LTM_HELPER_SANDBOX=NO`, the helper's
+   are `LightTouchDevice.entitlements` (`-Debug`) and the app's only location. Nothing edits the bundle after Xcode.
 
    It exports for Developer ID (`Configuration/ExportOptions.plist`), notarizes a zip of the app (`notarytool submit
    --wait`; on Invalid it prints the log), staples and validates the ticket, and writes `LightTouchMac-universal.zip`
@@ -301,7 +311,7 @@ those two places; its firmware is catalog entries, and preparing it is a Firmwar
 | `scripts/` | `clean`, `format` (with `hooks/pre-commit`), `host-ready`, `vendor` and `vendor-check`, `ltm-build` (Packages/BuildTools: vendor, machine-options, release, check-macho, merge-native, sources), `ship` (and the deprecated `release`, which runs it) |
 | `tests/` | `offline/` and `sessions/` (Swift packages), `activation/` (C harnesses), `fixtures/` |
 | `build-support/` | `sources.json` and `dependencies.json` (the pins), `recipes/` (the native builds `scripts/vendor` runs: `build-package-native.sh`, `build-static-deps.sh`, `build-iboot32patcher.sh`, `build-angle.sh`), build patches and checks |
-| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), the targets' `App`, `Device`, `Services` and `Tool.xcconfig`, `LightTouchDevice.entitlements` (Release) and `LightTouchDevice-Debug.entitlements` |
+| `Configuration/` | `Shared.xcconfig` (with the gitignored, optional `Local.xcconfig`), the targets' `App`, `Device`, `Services` and `Tool.xcconfig`, the helper's `LightTouchDevice-Sandbox.entitlements` (Release) and `-Sandbox-Debug`, the app's `LightTouchMac-Sandbox.entitlements`, and the unsandboxed `LightTouchDevice.entitlements` and `-Debug` (`LTM_HELPER_SANDBOX = NO`) |
 | `Models/` | The 3D device models and their lighting (`Resources/Models/` in the app) |
 | `LightTouchServices/` | The services helper: `Engine/` (libimobiledevice: installation_proxy, AFC, springboardservices, notification_proxy and lockdown on one `run` kernel, the serial gate and deadlines), and the lockdown writes (`Lockdown/`) it runs as child processes |
 | `tools/activation/` | Sam's activation tool (its `build/` output is ignored) |

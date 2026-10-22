@@ -22,8 +22,9 @@ CURRENT_PROJECT_VERSION = 1
 // The device helper under the App Sandbox: YES signs LightTouchDevice with LightTouchDevice-Sandbox.entitlements
 // (-Sandbox-Debug in Debug) and the app with LightTouchMac-Sandbox.entitlements (the helper's app group). Nothing else
 // reads it: at run time the app, firmwarekit and the harness look at the helper's own signature (HostRuntime
-// HelperSandbox). Off until it ships; Local.xcconfig, or `xcodebuild … LTM_HELPER_SANDBOX=YES`, turns it on.
-LTM_HELPER_SANDBOX = NO
+// HelperSandbox). On in Debug and Release; for debugging without it, LTM_HELPER_SANDBOX = NO in Local.xcconfig, or
+// `xcodebuild … LTM_HELPER_SANDBOX=NO` (`LTM_HELPER_SANDBOX=NO scripts/ship` or `sessions`).
+LTM_HELPER_SANDBOX = YES
 LTM_HELPER_ENTITLEMENTS_NO = Configuration/LightTouchDevice.entitlements
 LTM_HELPER_ENTITLEMENTS_YES = Configuration/LightTouchDevice-Sandbox.entitlements
 LTM_HELPER_DEBUG_ENTITLEMENTS_NO = Configuration/LightTouchDevice-Debug.entitlements
