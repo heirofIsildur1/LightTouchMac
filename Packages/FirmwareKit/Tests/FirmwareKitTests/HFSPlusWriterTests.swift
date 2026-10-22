@@ -1,4 +1,5 @@
 import Crypto
+import FirmwareSchema
 import Foundation
 import Testing
 
@@ -76,6 +77,48 @@ import Testing
                 #expect(try v.listing().map(\.path) == (journaled ? ["", ".journal", ".journal_info_block"] : [""]))
                 #expect(try v.journal()?.needsInit == (journaled ? true : nil))
             }
+        }
+    }
+
+    /// create and unpack-base bind --hfs for their run (VolumeMount.backend): withVolume, grow and makeHFS follow it;
+    /// and a volume the writer can't edit (newfs_hfs without -s: case-insensitive HFS+) is refused before anything is
+    /// written, naming HFSRoute.writerRefusal so the app can say to turn the writer off.
+    @Test func theRunsRouteChoosesTheWriterAndItRefusesCaseInsensitiveVolumes() async throws {
+        try await Oracle.withTemp { dir in
+            let mnt = dir.appendingPathComponent("mnt")
+            let made = dir.appendingPathComponent("made.img")
+            let kind = try await VolumeMount.$backend.withValue(.writer) {
+                try await VolumeMount.makeHFS(made, size: 16 << 20)
+                try await VolumeMount.grow(made, toBytes: 32 << 20)
+                return try await VolumeMount.withVolume(made, at: mnt) { "\(type(of: $0))" }
+            }
+            #expect(kind == "HFSPlusWriter" && !FileManager.default.fileExists(atPath: mnt.path), "nothing mounted")
+            #expect(try HFSPlusVolume(made).totalBlocks * HFSPlusVolume(made).blockSize == 32 << 20)
+
+            let plain = dir.appendingPathComponent("plain.img")
+            #expect(FileManager.default.createFile(atPath: plain.path, contents: nil))
+            #expect(truncate(plain.path, 16 << 20) == 0)
+            let dev = try await VolumeMount.attach(plain)
+            _ = try await VolumeMount.run("/sbin/newfs_hfs", ["-v", "Plain", dev])
+            try await VolumeMount.detach(dev)
+            let before = try Data(contentsOf: plain)
+            func refused(_ error: any Error) -> Bool {
+                (error as? FirmwareError)?.piece == HFSRoute.writerRefusal
+                    && (error as? FirmwareError)?.code == .unsupported
+            }
+            await #expect(
+                performing: {
+                    try await VolumeMount.$backend.withValue(.writer) {
+                        try await VolumeMount.grow(plain, toBytes: 32 << 20)
+                    }
+                }, throws: refused)
+            await #expect(
+                performing: {
+                    try await VolumeMount.$backend.withValue(.writer) {
+                        try await VolumeMount.withVolume(plain, at: mnt) { try $0.makeDirectory("x", mode: 0o755) }
+                    }
+                }, throws: refused)
+            #expect(try Data(contentsOf: plain) == before, "the refused volume is untouched")
         }
     }
 

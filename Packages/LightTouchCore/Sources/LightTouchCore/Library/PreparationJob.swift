@@ -29,7 +29,8 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
             log: URL,
             blob: URL? = nil,
             skipSetup: Bool = false,
-            jailbreak: Bool = false
+            jailbreak: Bool = false,
+            hfs: HFSRoute? = nil
         ) {
             self.entry = entry
             self.ipsw = ipsw
@@ -43,6 +44,7 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
             self.blob = blob
             self.skipSetup = skipSetup
             self.jailbreak = jailbreak
+            self.hfs = hfs
         }
         public var entry: FirmwareCatalog.Entry
         public var ipsw: URL
@@ -62,6 +64,8 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
         public var skipSetup = false
         /// Prepare the device jailbroken (firmwarekit create --jailbreak).
         public var jailbreak = false
+        /// How the volumes are edited (create and unpack-base --hfs; nil: firmwarekit's default, mounted).
+        public var hfs: HFSRoute?
     }
 
     public enum Event: Sendable, Equatable {
@@ -140,6 +144,10 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
 
     /// A fit check's piece (FirmwareKit's FitCheck names) in the user's words.
     public static func unsupportedReason(_ piece: String) -> String {
+        if piece == HFSRoute.writerRefusal {
+            return "its disk images have to be mounted to prepare it (turn off Prepare devices without mounting disk "
+                + "images in Settings ▸ General)"
+        }
         if piece.hasPrefix("OpenGLES") { return "its graphics library isn’t supported" }
         if piece.hasPrefix("kernelcache") || piece.hasPrefix("boot-arg") || piece.hasPrefix("DeviceTree") {
             return "the way it starts up isn’t supported"
@@ -181,7 +189,9 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
             FileManager.default.createFile(atPath: request.log.path, contents: nil)
             let arguments: [String]
             if let blob = request.blob {
-                arguments = FirmwareCommand.UnpackBase(blob: blob, out: staging, seed: id.uuidString).arguments
+                arguments =
+                    FirmwareCommand.UnpackBase(blob: blob, out: staging, seed: id.uuidString, hfs: request.hfs)
+                    .arguments
             } else {
                 if let sibling = request.sibling { try JSONEncoder().encode(sibling.entry).write(to: siblingFile) }
                 arguments =
@@ -194,7 +204,8 @@ public nonisolated final class PreparationJob: @unchecked Sendable {
                         cache: request.cache,
                         sibling: request.sibling.map { (siblingFile, $0.ipsw) },
                         skipSetup: request.skipSetup,
-                        jailbreak: request.jailbreak
+                        jailbreak: request.jailbreak,
+                        hfs: request.hfs
                     ).arguments
             }
             let log = try FileDescriptor.open(request.log.path, .writeOnly)

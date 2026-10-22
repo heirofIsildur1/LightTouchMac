@@ -76,7 +76,11 @@ import Testing
             ("boot-arg rd", "the way it starts up isn’t supported"),
             ("libappsync.dylib (in installd)", "installing apps on it isn’t supported"),
             ("iPhone OS 1.x boot chain", "only iPhone OS 1 runs on this device"),
-            ("it_boot (guest-package loader)", "the guest tools don’t run on it")
+            ("it_boot (guest-package loader)", "the guest tools don’t run on it"),
+            (
+                "HFSPlusWriter",
+                "its disk images have to be mounted to prepare it (turn off Prepare devices without mounting disk images in Settings ▸ General)"
+            )
         ] {
             #expect(
                 PreparationJob.message(code: "unsupported", detail: "", piece: piece)

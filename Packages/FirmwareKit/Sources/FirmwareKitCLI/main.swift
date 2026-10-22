@@ -5,7 +5,8 @@
 // command line it doesn't take; SIGTERM, or the parent (the app) exiting, cancels (children stopped, images under
 // --out detached, exit 143) and leaves --out to the caller. Closed command pipes cannot interrupt owned cleanup.
 // --guest-tools defaults to ../Resources/guest-tools next to this executable (the app bundle's), --helper to the
-// LightTouchDevice beside it.
+// LightTouchDevice beside it. create and unpack-base edit the volumes as --hfs says (kernel: mounted; writer: in their
+// images, nothing mounted), by default as FIRMWAREKIT_HFS does, else kernel.
 //
 // mount/export rebuild the device's HFS+ volumes from base + overlay into sparse images in --out (default: a new
 // temp dir) and print one JSON line per volume: {volume, image, clean, repaired, seconds, and for mount device +
@@ -146,11 +147,12 @@ default:  // the root alone, or help
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
     } catch { await fail(error) }
     let selectedOptions = options
+    let hfs = command.hfs ?? VolumeMount.backend
     await supervised(
         cleanup: { try await Preparer.cancel(staging: staging) },
         {
             do {
-                try await Preparer.create(selectedOptions, emit: emit)
+                try await VolumeMount.$backend.withValue(hfs) { try await Preparer.create(selectedOptions, emit: emit) }
                 return 0
             } catch {
                 if Task.isCancelled { return 143 }

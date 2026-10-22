@@ -26,7 +26,7 @@ struct LockedPreparationTests {
         lock["inputs"] = [
             "ipsw": ["path": "/ipsw/iPad1,1_4.2.1_8C148_Restore.ipsw", "sha1": "8717b3be"],
             "language": "fr-FR", "keyboards": ["com.apple.keylayout.French", "com.apple.keylayout.US"],
-            "sibling": ["entry": "k48ap-8F190", "ipsw": "/ipsw/sibling.ipsw"]
+            "sibling": ["entry": "k48ap-8F190", "ipsw": "/ipsw/sibling.ipsw"], "hfs": "writer"
         ]
         return lock
     }
@@ -62,6 +62,7 @@ struct LockedPreparationTests {
         #expect(value("language") == "fr-FR")
         #expect(value("keyboards") == "com.apple.keylayout.French,com.apple.keylayout.US")
         #expect(value("sibling-ipsw") == "/ipsw/sibling.ipsw")
+        #expect(value("hfs") == "writer", "the route its volumes were edited through")
         #expect(value("entry") == "/w/entry.json" && value("catalog") == nil, "the recipe as prepared, not the row's")
     }
 
@@ -77,6 +78,7 @@ struct LockedPreparationTests {
         )
         #expect(plan.entry.recipe == (try Self.row("n88ap-8B117")).recipe)
         #expect(plan.variants == [] && plan.seed == nil && plan.language == nil && plan.keyboards == nil)
+        #expect(plan.hfs == .kernel, "a lock from before the route was recorded: mounted")
     }
 
     @Test func variantsAreWhereTheBaseIsNotItsRow() throws {
@@ -98,7 +100,7 @@ struct LockedPreparationTests {
         let labels = Set(Mirror(reflecting: FirmwareCommand.Create()).children.compactMap(\.label))
         let recorded: Set = [
             "_entry", "_ipsw", "_seed", "_language", "_keyboards", "_siblingEntry", "_siblingIpsw", "_glTest",
-            "_skipSetup", "_jailbreak"
+            "_skipSetup", "_jailbreak", "_hfs"
         ]
         let runsOwn: Set = ["_catalog", "_id", "_out", "_helper", "_cache", "_guestTools", "_stopAfter"]
         #expect(labels == recorded.union(runsOwn), "\(labels.subtracting(recorded.union(runsOwn)).sorted())")

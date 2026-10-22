@@ -4,7 +4,7 @@
 // fsck_hfs are run here.
 //
 //   try await VolumeMount.withVolume(image, at: mountPoint) { v in ... }       // VolumeFiles: the mount below, or
-//                                                                        // HFSPlusWriter (FIRMWAREKIT_HFS=writer)
+//                                                                        // HFSPlusWriter (--hfs writer)
 //   try await VolumeMount.withMounted(image, at: mountPoint) { root in ... }   // attach + diskutil mount (nobrowse,
 //                                                                        // nosuid, nodev); then junk removed, unmount
 //                                                                        // (retried), fsck_hfs -fn, detach
@@ -17,19 +17,17 @@
 // wrote, links included: files on it are read and written through DevicePath, from the root these hand out (its
 // real path), and it is mounted nosuid and nodev.
 
+import FirmwareSchema
 import Foundation
 
 public enum VolumeMount {
     /// How volumes are edited: `kernel`, attached and mounted through the stock tools (the default), or `writer`,
-    /// offline through HFSPlusWriter and UDIFReader. FIRMWAREKIT_HFS=writer|kernel overrides (Debug only).
-    public enum Backend: String, Sendable { case kernel, writer }
+    /// offline through HFSPlusWriter and UDIFReader.
+    public typealias Backend = HFSRoute
 
-    public static let backend: Backend = {
-        #if DEBUG
-            if let b = ProcessInfo.processInfo.environment["FIRMWAREKIT_HFS"].flatMap(Backend.init) { return b }
-        #endif
-        return .kernel
-    }()
+    /// FIRMWAREKIT_HFS=writer|kernel, else kernel; create and unpack-base bind their --hfs here for the run.
+    @TaskLocal public static var backend: Backend =
+        ProcessInfo.processInfo.environment["FIRMWAREKIT_HFS"].flatMap(Backend.init) ?? .kernel
 
     /// What macOS drops on a mounted volume; removed from its root before unmounting.
     public static let junk = [".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", ".DS_Store"]

@@ -124,6 +124,7 @@ struct GeneralSettingsView: View {
     @AppStorage(VibrationSound.key) private var vibrationSound = true
     @AppStorage(DisplayRefresh.key) private var refresh120 = false
     @AppStorage(ANGLERenderer.key) private var angle = false
+    @AppStorage(FirmwareJobs.withoutMountingKey) private var withoutMounting = false
     @AppStorage(ClipboardSync.key) private var shareClipboard = true
 
     var body: some View {
@@ -142,6 +143,12 @@ struct GeneralSettingsView: View {
             Toggle(isOn: $angle) {
                 Text("ANGLE renderer (experimental)")
                 Text("Takes effect when a device next starts. Draws with Metal through ANGLE instead of OpenGL.")
+            }
+            Toggle(isOn: $withoutMounting) {
+                Text("Prepare devices without mounting disk images (experimental)")
+                Text(
+                    "Edits a new device’s disk images directly instead of mounting them in macOS, groundwork for other platforms. May be slower, or fail on some versions."
+                )
             }
         }
     }

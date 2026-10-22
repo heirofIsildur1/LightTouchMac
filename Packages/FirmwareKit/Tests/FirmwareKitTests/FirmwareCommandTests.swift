@@ -18,9 +18,10 @@ struct FirmwareCommandTests {
                 guestTools: url,
                 sibling: (url, url),
                 skipSetup: true,
-                language: "fr-FR"
+                language: "fr-FR",
+                hfs: .writer
             ),
-            FirmwareCommand.UnpackBase(blob: url, out: url, seed: "S"),
+            FirmwareCommand.UnpackBase(blob: url, out: url, seed: "S", hfs: .writer),
             FirmwareCommand.PackBase(base: url, out: url),
             FirmwareCommand.BootAdmit(device: url, recordPolicy: .standalone, allowRaw: true),
             FirmwareCommand.Edit(

@@ -247,7 +247,7 @@ public enum Recipe {
                 "activation": opt(c.activation.map { $0.record }),
                 "rootfs": "rootfs.dmg", "guest_tools": o.guestTools.path, "lockdown": NSNull(),
                 // create's choices beyond the entry, for preparing the base again (LockedPreparation.plan)
-                "language": opt(o.language), "keyboards": opt(o.keyboards),
+                "language": opt(o.language), "keyboards": opt(o.keyboards), "hfs": VolumeMount.backend.rawValue,
                 "sibling": opt(o.sibling.map { ["entry": $0.entry.id, "ipsw": $0.ipsw.path] })
             ],
             "identity": [

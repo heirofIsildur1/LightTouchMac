@@ -31,6 +31,7 @@ import os
     /// A FirmwareJobs over `root`'s state, logs and caches, recording every change to one entry's job.
     @MainActor final class Harness {
         let state: URL, store: IPSWStore, jobs: FirmwareJobs, library: DeviceLibrary, catalog: FirmwareCatalog
+        let defaults = UserDefaults(suiteName: "ltm-tests-\(UUID().uuidString)")!
         var seen: [String: [FirmwareJob]] = [:]
         var changes: [String: Int] = [:]
         /// What FirmwareJobs asked the app to show in an alert.
@@ -61,7 +62,7 @@ import os
                 resources: resources,
                 library: library,
                 sweep: false,
-                defaults: UserDefaults(suiteName: "ltm-tests-\(UUID().uuidString)")!,
+                defaults: defaults,
                 presentError: { [alerts] in alerts.messages.append($0.localizedDescription) }
             )
             observer = NotificationCenter.default.addObserver(
@@ -317,6 +318,39 @@ import os
             #expect(seen["k48ap-9B206 false"]?.contains("--jailbreak") == false, "5.1.1, turned off")
             #expect(seen["k48ap-8C148 false"]?.contains("--jailbreak") == false, "4.2.1 iPad, turned off")
             #expect(seen["k48ap-7B500 false"]?.contains("--jailbreak") == false, "3.2.2 iPad, turned on")
+        }
+    }
+
+    /// Settings ▸ General ▸ Prepare devices without mounting disk images reaches firmwarekit create as --hfs writer when
+    /// it is on, and nothing (firmwarekit's default, mounted) when it is off or was never set.
+    @Test func theWithoutMountingSettingReachesThePreparer() async throws {
+        try await LibraryFixtures.withScratch { tmp in
+            let id = "k48ap-9B206"
+            var e = Self.entry(id)
+            let data = LibraryFixtures.randomData(1 << 20)
+            let url = tmp.appendingPathComponent("\(id).ipsw")
+            try data.write(to: url)
+            e["source"] = [
+                "kind": "ipsw", "url": url.absoluteString, "sha1": IPSWStoreTests.sha1Hex(data), "bytes": 1 << 20
+            ]
+            e["estimates"] = Self.smallEstimates
+            e.removeValue(forKey: "bundled")
+            let catalog = try Self.catalog([e], in: tmp)
+            for setting in [true, false, nil] {
+                let argvURL = tmp.appendingPathComponent("argv-\(UUID().uuidString).json")
+                let h = try Harness(
+                    tmp.appendingPathComponent(UUID().uuidString),
+                    catalog: catalog,
+                    preparer: try LibraryFixtures.fakePreparer(in: tmp, argv: argvURL)
+                )
+                if let setting { h.defaults.set(setting, forKey: FirmwareJobs.withoutMountingKey) }
+                h.jobs.downloadAndPrepare(try #require(catalog.entry(id: id)))
+                await h.settle(id)
+                #expect(h.devices(id).count == 1, "prepared: \(h.seen)")
+                let arguments = argv(argvURL)
+                let hfs = arguments.firstIndex(of: "--hfs").map { arguments[$0 + 1] }
+                #expect(hfs == (setting == true ? "writer" : nil), "setting \(String(describing: setting))")
+            }
         }
     }
 

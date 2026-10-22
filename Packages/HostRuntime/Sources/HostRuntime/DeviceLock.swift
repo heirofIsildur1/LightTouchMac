@@ -237,6 +237,8 @@ public struct DeviceLock: Codable, Sendable, Equatable {
     public var hasDataVolume: Bool { entry?["content"]?["recipe"]?["data_size"]?.string == "partition" }
     /// The entry content's board (the recipe's board, for admission steps).
     public var entryBoard: String? { entry?["content"]?["board"]?.string }
+    /// Prepared without mounting its volumes (firmwarekit create --hfs writer: inputs.hfs).
+    public var preparedWithoutMounting: Bool { inputs?["hfs"]?.string == "writer" }
     /// Whether the preparer activated the volume (inputs.activation is a record).
     public var activated: Bool { inputs?["activation"]?.object != nil }
     /// Whether the boot pins the guest clock (the recipe's rtc-epoch: a beta's lockdownd stops activating past its

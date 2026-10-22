@@ -250,6 +250,9 @@ struct Base {
         for variant in (try? LockedPreparation.plan(lock: lock, catalog: catalogEntries))?.variants ?? [] {
             print("  as prepared, not the catalog row's: \(variant)")
         }
+        if (lock["inputs"] as? [String: Any])?["hfs"] as? String == "writer" {
+            print("  its volumes were edited without mounting them (create --hfs writer)")
+        }
         fflush(stdout)
         guard !verdict.stale.isEmpty else { return }
         let reasons = verdict.stale.map { "  - \($0)" }.joined(separator: "\n")

@@ -18,6 +18,7 @@
 // nothing to replay; the journal is left as it is.
 
 import BinaryParsing
+import FirmwareSchema
 import Foundation
 
 public final class HFSPlusWriter: VolumeFiles {
@@ -94,6 +95,11 @@ public final class HFSPlusWriter: VolumeFiles {
                 throw FirmwareError(.unsupported, "\(url.lastPathComponent): the allocation file is short")
             }
             try checkJournal()
+        } catch var refusal as FirmwareError where refusal.code == .unsupported {
+            // a volume the kernel route may still edit: the app says so (turn the writer off)
+            Darwin.close(fd)
+            refusal.piece = HFSRoute.writerRefusal
+            throw refusal
         } catch {
             Darwin.close(fd)
             throw error

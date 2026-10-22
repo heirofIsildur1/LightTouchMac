@@ -27,6 +27,8 @@ public nonisolated enum BugReportInfo {
         public var recipeVersion: Int?
         public var skipSetup: Bool?
         public var jailbreak: Bool?
+        /// Prepared through the experimental volume writer (Settings ▸ General).
+        public var withoutMounting = false
         /// Sandbox patch of a jailbroken base, from the lock's fit record: "applied", "not needed" or "not found".
         public var sandboxPatch: String?
         public var prepared: Date?
@@ -68,6 +70,7 @@ public nonisolated enum BugReportInfo {
             recipeVersion = lock.recipeVersion
             skipSetup = lock.skippedSetup
             jailbreak = lock.jailbroken
+            withoutMounting = lock.preparedWithoutMounting
             guard lock.jailbroken, case .array(let fits) = lock.other["fit"],
                 let fit = fits.first(where: { $0["piece"]?.string == "sandbox patch (sb_evaluate)" }),
                 let proof = fit["proof"]?.string
@@ -183,6 +186,7 @@ public nonisolated enum BugReportInfo {
                 facts.append(
                     "Prepared base: recipe \(recipe)"
                         + (d.prepared.map { ", \($0.formatted(.iso8601.year().month().day()))" } ?? "")
+                        + (d.withoutMounting ? ", without mounting" : "")
                         + (d.skipSetup == true ? ", Skip Setup" : "") + jailbreak
                         + (d.sandboxPatch.map { " (sandbox patch \($0))" } ?? "")
                 )

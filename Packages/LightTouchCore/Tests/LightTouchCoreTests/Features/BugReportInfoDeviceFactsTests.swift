@@ -135,6 +135,13 @@ struct BugReportInfoDeviceFactsTests {
         // stock says nothing of the patch; a jailbroken lock without the record, nothing either
         #expect(try line(lock(recipe: 3, jailbreak: false, sandbox: applied)) == "Prepared base: recipe 3, stock")
         #expect(try line(lock(recipe: 3, jailbreak: true, sandbox: nil)) == "Prepared base: recipe 3, Jailbreak")
+        // Settings ▸ General's experimental writer (firmwarekit --hfs writer) is said; the kernel route is not
+        for (hfs, said) in [("writer", ", without mounting"), ("kernel", "")] {
+            let stock = try lock(recipe: 3, jailbreak: false, sandbox: nil)
+            var json = try JSONSerialization.jsonObject(with: stock.data()) as! [String: Any]
+            json["inputs"] = ["hfs": hfs]
+            #expect(try line(DeviceLock(json: json)) == "Prepared base: recipe 3\(said), stock")
+        }
     }
 
     @Test func settingsLinesOnlyWhenNotTheDefault() {

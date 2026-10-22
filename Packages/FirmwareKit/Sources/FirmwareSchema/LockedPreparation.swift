@@ -18,6 +18,9 @@ nonisolated public enum LockedPreparation {
         public var keyboards: [String]?
         /// The sibling entry's IPSW (inputs.sibling.ipsw), for a recipe with keybag_ramdisk_from.
         public var siblingIPSW: String?
+        /// create --hfs (inputs.hfs): the route its volumes were edited through, kept (a base prepared before the lock
+        /// recorded it was mounted: kernel).
+        public var hfs: HFSRoute
         /// Where the base's recipe is not its row's (`variants`): what preparing it again keeps.
         public var variants: [String]
 
@@ -43,7 +46,8 @@ nonisolated public enum LockedPreparation {
                 guestTools: guestTools,
                 sibling: sibling,
                 language: language,
-                keyboards: keyboards?.joined(separator: ",")
+                keyboards: keyboards?.joined(separator: ","),
+                hfs: hfs
             )
         }
     }
@@ -82,6 +86,7 @@ nonisolated public enum LockedPreparation {
             language: inputs?["language"] as? String,
             keyboards: inputs?["keyboards"] as? [String],
             siblingIPSW: (inputs?["sibling"] as? [String: Any])?["ipsw"] as? String,
+            hfs: (inputs?["hfs"] as? String).flatMap(HFSRoute.init) ?? .kernel,
             variants: variants
         )
     }

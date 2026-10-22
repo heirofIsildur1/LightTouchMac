@@ -14,6 +14,15 @@ public enum RecordPolicy: String, CaseIterable, ExpressibleByArgument, Sendable 
     case standalone, managed
 }
 
+/// How create and unpack-base edit the device's volumes: `kernel` attaches and mounts them through macOS's disk image
+/// tools; `writer` edits the images themselves (FirmwareKit's HFSPlusWriter and UDIFReader) and mounts nothing.
+public enum HFSRoute: String, CaseIterable, ExpressibleByArgument, Sendable {
+    case kernel, writer
+
+    /// The error event's piece when the writer refuses a volume it can't edit (one not case-sensitive HFS+).
+    public static let writerRefusal = "HFSPlusWriter"
+}
+
 /// `--name value` for each value that is there.
 private func options(_ pairs: KeyValuePairs<String, String?>) -> [String] {
     pairs.flatMap { name, value in value.map { ["--\(name)", $0] } ?? [] }
@@ -52,6 +61,11 @@ public enum FirmwareCommand {
         public var skipSetup = false
         @Flag(help: "Prepares the device jailbroken: afc2 (the whole file system over USB), Cydia and Substrate.")
         public var jailbreak = false
+        @Option(
+            help:
+                "How the volumes are edited: kernel (mounted) or writer (in their images; experimental) (default: FIRMWAREKIT_HFS, else kernel)."
+        )
+        public var hfs: HFSRoute? = nil
 
         public init() {}
         public init(
@@ -66,7 +80,8 @@ public enum FirmwareCommand {
             skipSetup: Bool = false,
             jailbreak: Bool = false,
             language: String? = nil,
-            keyboards: String? = nil
+            keyboards: String? = nil,
+            hfs: HFSRoute? = nil
         ) {
             self.entry = entry.path
             self.ipsw = ipsw.path
@@ -85,6 +100,7 @@ public enum FirmwareCommand {
             self.jailbreak = jailbreak
             self.language = language
             self.keyboards = keyboards
+            self.hfs = hfs
         }
 
         public func validate() throws {
@@ -99,7 +115,7 @@ public enum FirmwareCommand {
                     "entry": entry, "catalog": catalog, "id": id, "ipsw": ipsw, "out": out, "seed": seed,
                     "helper": helper, "cache": cache, "guest-tools": guestTools, "sibling-entry": siblingEntry,
                     "sibling-ipsw": siblingIpsw, "stop-after": stopAfter?.rawValue,
-                    "language": language, "keyboards": keyboards
+                    "language": language, "keyboards": keyboards, "hfs": hfs?.rawValue
                 ]) + (glTest ? ["--gl-test"] : []) + (skipSetup ? ["--skip-setup"] : [])
                 + (jailbreak ? ["--jailbreak"] : [])
         }
@@ -118,19 +134,24 @@ public enum FirmwareCommand {
                 "The device's keyboards besides its language's, as Mac input source IDs (default: the Mac's enabled ones)."
         )
         public var keyboards: String? = nil
+        @Option(help: "As create's.") public var hfs: HFSRoute? = nil
 
         public init() {}
-        public init(blob: URL, out: URL, seed: String) {
+        public init(blob: URL, out: URL, seed: String, hfs: HFSRoute? = nil) {
             self.blob = blob.path
             self.out = out.path
             self.seed = seed
             language = nil
             keyboards = nil
+            self.hfs = hfs
         }
 
         public var arguments: [String] {
             ["unpack-base"]
-                + options(["blob": blob, "out": out, "seed": seed, "language": language, "keyboards": keyboards])
+                + options([
+                    "blob": blob, "out": out, "seed": seed, "language": language, "keyboards": keyboards,
+                    "hfs": hfs?.rawValue
+                ])
         }
     }
 

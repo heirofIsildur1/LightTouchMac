@@ -84,6 +84,9 @@ import HostRuntime
         get { Set(defaults.stringArray(forKey: "stockEntries") ?? []) }
         set { defaults.set(newValue.sorted(), forKey: "stockEntries") }
     }
+    /// Settings ▸ General ▸ Prepare devices without mounting disk images (experimental; off unless turned on): each
+    /// preparation started with it on edits the volumes in their images (firmwarekit --hfs writer), mounting nothing.
+    public nonisolated static let withoutMountingKey = "ExperimentalPrepareWithoutMounting"
     /// The jailbreak can be chosen where FirmwareKit's SandboxPatch lets Substrate's library into Safari's sandbox:
     /// iOS 5 on, and iOS 4 on the ARMv7 boards. Elsewhere (iOS 3, the ARMv6 iPod touch 2G's iOS 4) the patch doesn't
     /// resolve yet and Safari crashes at launch on a jailbroken device, so the checkbox is off and disabled.
@@ -478,7 +481,8 @@ import HostRuntime
             log: logs.appendingPathComponent("Preparing/\(entry.id).log"),
             blob: bundled ? ipsw : nil,
             skipSetup: !bundled && Self.offersSkipSetup(entry) && skipsSetup.contains(entry.id),
-            jailbreak: !bundled && jailbreaks(entry.id)
+            jailbreak: !bundled && jailbreaks(entry.id),
+            hfs: defaults.bool(forKey: Self.withoutMountingKey) ? .writer : nil
         )
         let id = UUID()
         let job = PreparationJob(request, id: id) { [inputs, entryID = entry.id] event in
